@@ -8,6 +8,7 @@ interface DomainRow {
   id: string
   name: string
   zoneId: string
+  accountId: string
   accountName: string
   status: string
   createdAt: string
@@ -219,6 +220,7 @@ function AddDomainDialog(props: {
 }) {
   const { copy } = props
   const [name, setName] = useState('')
+  const [accountId, setAccountId] = useState('')
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
@@ -226,6 +228,7 @@ function AddDomainDialog(props: {
   useEffect(() => {
     if (props.open) return
     setName('')
+    setAccountId('')
     setToken('')
     setFailure(null)
     setBusy(false)
@@ -237,7 +240,7 @@ function AddDomainDialog(props: {
     try {
       const data = await api<{ domain: DomainRow }>('/console-api/domains', {
         method: 'POST',
-        body: JSON.stringify({ name, token }),
+        body: JSON.stringify({ name, accountId, token }),
       })
       props.onAdded(data.domain)
     } catch (cause) {
@@ -261,7 +264,7 @@ function AddDomainDialog(props: {
           <DialogButton disabled={busy} onClick={props.onClose}>
             {copy.cancel}
           </DialogButton>
-          <DialogButton variant="primary" disabled={busy || name.trim() === '' || token.trim() === ''} onClick={() => void submit()}>
+          <DialogButton variant="primary" disabled={busy || name.trim() === '' || accountId.trim() === '' || token.trim() === ''} onClick={() => void submit()}>
             {busy ? copy.verifying : copy.submit}
           </DialogButton>
         </>
@@ -283,6 +286,18 @@ function AddDomainDialog(props: {
             required
             disabled={busy}
             onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label>
+          {copy.accountIdLabel}
+          <input
+            value={accountId}
+            placeholder={copy.accountIdPlaceholder}
+            autoComplete="off"
+            spellCheck={false}
+            required
+            disabled={busy}
+            onChange={(event) => setAccountId(event.target.value)}
           />
         </label>
         <label>

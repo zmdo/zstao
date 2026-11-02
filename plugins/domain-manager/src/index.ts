@@ -27,6 +27,7 @@ interface DomainRow {
   id: string
   name: string
   zone_id: string
+  account_id: string
   account_name: string
   status: string
   created_at: string
@@ -77,12 +78,13 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
 
 async function listDomains(pool: Queryable): Promise<unknown[]> {
   const { rows } = await pool.query<DomainRow>(
-    'select id, name, zone_id, account_name, status, created_at from domain_manager_domains order by created_at asc, name asc',
+    'select id, name, zone_id, account_id, account_name, status, created_at from domain_manager_domains order by created_at asc, name asc',
   )
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     zoneId: row.zone_id,
+    accountId: row.account_id,
     accountName: row.account_name,
     status: row.status,
     createdAt: row.created_at,
@@ -98,10 +100,15 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
     return
   }
   const rawName = field(body, 'name')?.trim() ?? ''
+  const accountId = field(body, 'accountId')?.trim() ?? ''
   const token = field(body, 'token')?.trim() ?? ''
   const name = normalizeDomain(rawName)
   if (name === undefined) {
     sendJson(response, 400, { code: 'invalid_domain', detail: '域名格式不正确' })
+    return
+  }
+  if (!/^[0-9a-fA-F]{32}$/.test(accountId)) {
+    sendJson(response, 400, { code: 'invalid_account_id', detail: 'Cloudflare 账户 ID 是 32 位十六进制' })
     return
   }
   if (token === '') {
@@ -113,7 +120,7 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
     sendJson(response, 409, { code: 'duplicate', detail: '该域名已经在列表里' })
     return
   }
-  const checked = await checkZone(token, name)
+  const checked = await checkZone(token, name, accountId.toLowerCase())
   if (!checked.ok) {
     sendJson(response, 400, { code: checked.code, detail: checked.detail })
     return
@@ -121,10 +128,10 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
   const id = randomUUID()
   const ciphertext = ctx.secrets.encrypt(token)
   const { rows } = await ctx.database.pool.query<DomainRow>(
-    `insert into domain_manager_domains (id, name, zone_id, account_name, status, token_ciphertext)
-     values ($1, $2, $3, $4, 'active', $5)
-     returning id, name, zone_id, account_name, status, created_at`,
-    [id, name, checked.zone.id, checked.zone.accountName, ciphertext],
+    `insert into domain_manager_domains (id, name, zone_id, account_id, account_name, status, token_ciphertext)
+     values ($1, $2, $3, $4, $5, 'active', $6)
+     returning id, name, zone_id, account_id, account_name, status, created_at`,
+    [id, name, checked.zone.id, checked.zone.accountId, checked.zone.accountName, ciphertext],
   )
   const row = rows[0]
   sendJson(response, 201, {
@@ -132,6 +139,7 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
       id: row.id,
       name: row.name,
       zoneId: row.zone_id,
+      accountId: row.account_id,
       accountName: row.account_name,
       status: row.status,
       createdAt: row.created_at,
@@ -141,7 +149,7 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
 
 async function readDns(ctx: HostCtx, id: string, response: ServerResponse): Promise<void> {
   const { rows } = await ctx.database.pool.query<DomainRow & { token_ciphertext: string }>(
-    'select id, name, zone_id, account_name, status, created_at, token_ciphertext from domain_manager_domains where id = $1',
+    'select id, name, zone_id, account_id, account_name, status, created_at, token_ciphertext from domain_manager_domains where id = $1',
     [id],
   )
   const row = rows[0]
@@ -152,7 +160,7 @@ async function readDns(ctx: HostCtx, id: string, response: ServerResponse): Prom
   try {
     const records = await listDnsRecords(ctx.secrets.decrypt(row.token_ciphertext), row.zone_id)
     sendJson(response, 200, {
-      domain: { id: row.id, name: row.name, zoneId: row.zone_id, accountName: row.account_name, status: row.status, createdAt: row.created_at },
+      domain: { id: row.id, name: row.name, zoneId: row.zone_id, accountId: row.account_id, accountName: row.account_name, status: row.status, createdAt: row.created_at },
       records,
     })
   } catch (cause) {

@@ -20,6 +20,8 @@ export interface Copy {
   updated: string
   noRecords: string
   addTitle: string
+  accountIdLabel: string
+  accountIdPlaceholder: string
   domainLabel: string
   domainPlaceholder: string
   tokenLabel: string
@@ -51,6 +53,8 @@ const ZH: Copy = {
   updated: '更新时间',
   noRecords: '该域名暂无 DNS 记录。',
   addTitle: '添加域名',
+  accountIdLabel: 'Cloudflare 账户 ID',
+  accountIdPlaceholder: '32 位十六进制账户 ID',
   domainLabel: '域名',
   domainPlaceholder: 'example.com',
   tokenLabel: 'Cloudflare API 令牌',
@@ -62,10 +66,12 @@ const ZH: Copy = {
   errors: {
     auth_required: '登录已过期，请重新登录。',
     invalid_domain: '域名格式不正确，例如 example.com。',
+    invalid_account_id: '账户 ID 是 Cloudflare 的 32 位十六进制账户 ID。',
     invalid_token: '请填写 Cloudflare API 令牌。',
     duplicate: '这个域名已经在列表里了。',
     unauthorized: '令牌无效或已过期。',
     zone_not_found: '这个令牌看不到该域名所在的 Zone。',
+    account_mismatch: '该域名不在这个 Cloudflare 账户下。',
     dns_read_forbidden: '令牌没有读取 DNS 的权限。',
     dns_write_forbidden: '令牌没有修改 DNS 的权限，请给它 DNS:Edit。',
     network: '访问 Cloudflare 失败，请检查网络后重试。',
@@ -96,6 +102,8 @@ const EN: Copy = {
   updated: 'Updated',
   noRecords: 'This domain has no DNS records.',
   addTitle: 'Add domain',
+  accountIdLabel: 'Cloudflare account ID',
+  accountIdPlaceholder: '32-character hex account ID',
   domainLabel: 'Domain',
   domainPlaceholder: 'example.com',
   tokenLabel: 'Cloudflare API token',
@@ -107,10 +115,12 @@ const EN: Copy = {
   errors: {
     auth_required: 'Your session expired. Sign in again.',
     invalid_domain: 'That is not a domain. Use a name such as example.com.',
+    invalid_account_id: 'The account ID is the 32-character hex ID from Cloudflare.',
     invalid_token: 'Enter a Cloudflare API token.',
     duplicate: 'This domain is already in the list.',
     unauthorized: 'The token is invalid or expired.',
     zone_not_found: 'The token cannot see the zone for this domain.',
+    account_mismatch: 'That domain is not in this Cloudflare account.',
     dns_read_forbidden: 'The token cannot read DNS records.',
     dns_write_forbidden: 'The token cannot change DNS records. Grant DNS:Edit.',
     network: 'Could not reach Cloudflare. Check the network and retry.',

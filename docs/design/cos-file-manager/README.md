@@ -1,31 +1,34 @@
 # 文件管理（腾讯云 COS）设计方案
 
 - 状态：已确认，待实施
-- 日期：2026-11-03
+- 日期：2026-11-03（第 2 版：按单桶、可配置上限、对象存储设置页、AI 工具更新）
 - 分支：`feat/cos`
 - 适用范围：单用户 CES / Harness 控制台，本地或内网部署
-- 关联代码：`plugins/domain-manager`（同款插件结构、审批与审计模式）、`plugins/server-management`（列表与审计页样式）
+- 关联代码：`plugins/domain-manager`（插件结构、审批与审计模式）、`plugins/server-management`（列表与审计页样式）
 
 ## 1. 背景与目标
 
-控制台目前只有域名管理，没有文件存储入口。本方案接入腾讯云对象存储（COS），在左侧侧边栏新增「文件管理」分组，包含两个页面：
+控制台目前没有文件存储入口。本方案接入腾讯云对象存储（COS），在控制台提供：
 
-1. **文件管理**：浏览某个存储桶内的对象，支持上传、下载、删除、查询。
-2. **审计记录**：记录对桶内文件的操作（上传、下载、删除、配置变更）。
+1. **文件管理**（侧边栏分组）：浏览桶内对象，支持上传、下载、删除、查询。
+2. **审计记录**：记录对桶内文件的操作（上传、下载、删除）与配置变更。
+3. **对象存储设置**（平台设置内）：集中配置腾讯云 SecretId / SecretKey / 桶 / 区域 / 前缀 / 上传上限。
 
 目标：
 
 - 密钥只留在宿主，浏览器拿不到 SecretId/SecretKey。
-- 列表与操作风格和「服务器管理」「域名管理」一致，不引入第二套视觉。
-- 所有写操作与下载都可追溯到时间、对象、结果。
+- 列表与操作风格和「服务器管理」「域名管理」一致。
+- 所有写操作与下载可追溯到时间、对象、结果。
+- AI 在 Harness 会话里能列文件、取下载链接、上传本地文件、删除对象（写操作需审批）。
 
 ## 2. 非目标
 
-- 不做多租户、不做共享链接、不做在线预览（图片/文档渲染）。
-- 不实现 COS 的目录语义（COS 没有真实目录，只有以 `/` 结尾的 key）；只做「前缀浏览 + 新建文件夹占位对象」的可选能力（P3 再定）。
-- 不做大文件分片/断点续传（P4 用预签名直传解决）。
-- 不接 CDN、不接图片处理、不接跨区域复制。
-- 不做 AI 工具的完整增删改（P4 只读工具，写操作再评审）。
+- 不做多租户、共享链接、在线预览。
+- **不做多桶**：一个部署只接一个 COS 桶（第 2 版决策）。切桶等于改设置，旧桶对象不再出现在列表里。
+- 不做目录语义：COS 没有真实目录，只有以 `/` 结尾的 key；只做「前缀浏览」，新建文件夹占位对象放 P5。
+- 不做分片 / 断点续传；>100 MB 走 P5 的预签名直传。
+- 不接 CDN、图片处理、跨区域复制。
+- 不做文件夹递归删除（只删单个对象）。
 
 ## 3. 现成方案调研
 
@@ -34,100 +37,111 @@
 | 库 | 版本 | 许可 | 结论 |
 | --- | --- | --- | --- |
 | `cos-nodejs-sdk-v5` | 3.0.0（2026-07 发布） | ISC | **采用**。官方 Node SDK，覆盖 `getBucket` / `putObject` / `getObject` / `getObjectUrl` / `deleteObject` / `headObject` |
-| `cos-js-sdk-v5` | 1.10.1 | ISC | 仅浏览器直传时使用；需要 STS 临时密钥，v1 不用 |
+| `cos-js-sdk-v5` | 1.10.1 | ISC | 仅浏览器直传时需要（配 STS 临时密钥）；v1 不用 |
 
-注意：`cos-nodejs-sdk-v5` 是 CJS、回调式 API（`main: index.js`，`engines.node >= 9`），在 ESM 插件里用 `createRequire` 或直接默认导入，再用 `node:util.promisify` 包装；esbuild 构建时把该包标为 external，不打进 `lib/`。
+该 SDK 是 CJS、回调式 API（`main: index.js`，`engines.node >= 9`）。插件里用 `node:util.promisify` 包装，esbuild 构建时标为 external，不打进 `lib/`。
 
-### 3.2 浏览器直传 vs 服务端代理
+### 3.2 上传方式
 
 | 方案 | 优点 | 缺点 | 结论 |
 | --- | --- | --- | --- |
-| 服务端代理（浏览器 → 宿主 → COS） | 密钥不出宿主；审计天然完整；无需桶 CORS | 占用宿主带宽；大文件受内存/超时限制 | **v1 采用**（上限 100 MB） |
-| 预签名 PUT 直传 | 不占宿主带宽，支持大文件 | 需要桶 CORS、暴露 key、审计只能记录签发动作 | P4 用于 >100 MB |
-| 预签名 GET 下载 | 下载不占宿主带宽 | 需要 CORS 才能 `fetch`；直接跳转不受影响 | **采用**：302 到 5 分钟有效的签名 URL |
+| 服务端代理（浏览器 → 宿主 → COS） | 密钥不出宿主；审计完整；无需桶 CORS | 占用宿主带宽；受上限约束 | **v1 采用**，上限由设置页配置 |
+| 预签名 PUT 直传 | 不占宿主带宽，支持大文件 | 需要桶 CORS，审计只能记签发动作 | P5，用于超过上限的文件 |
+| 预签名 GET 下载 | 下载不占宿主带宽 | `fetch` 需要 CORS（直接跳转不需要） | **采用**：302 到 5 分钟签名 URL |
 
-### 3.3 文件列表 UI 库对比
+### 3.3 文件列表 UI 库
 
-| 库 | 版本 | 许可 | 体积/依赖 | 适配度 | 结论 |
-| --- | --- | --- | --- | --- | --- |
-| `@cubone/react-file-manager` | 1.36.0 | MIT | 依赖 i18next、react-icons、react-collapsed、@fontsource/nunito-sans | 功能全（网格/列表、右键菜单、重命名），但自带主题与字体，和 `smp-console` 样式体系冲突，需要大量覆盖 | 备选，不默认采用 |
-| `chonky` | 2.3.2 | MIT | 较旧，2022 年后无更新 | 文件浏览器组件，定制成本高 | 不采用 |
-| `react-dropzone` | 20.1.4 | MIT | 仅拖拽 | 只解决拖放，不提供列表 | 可选（P2 若要更好的拖拽体验） |
-| `uppy` / `@uppy/core` | 6.x | MIT | 上传编排 + 自带 UI，体积大 | 与现有界面重复 | 不采用 |
+| 库 | 版本 | 许可 | 体积/依赖 | 结论 |
+| --- | --- | --- | --- | --- |
+| `@cubone/react-file-manager` | 1.36.0 | MIT | i18next、react-icons、react-collapsed、自带字体 | 功能全但主题冲突，覆盖成本高，备选 |
+| `chonky` | 2.3.2 | MIT | 2022 年后无更新 | 不采用 |
+| `react-dropzone` | 20.1.4 | MIT | 仅拖拽 | 可选（P3 增强拖拽） |
+| `uppy` / `@uppy/core` | 6.x | MIT | 上传编排 + 自带 UI，体积大 | 不采用 |
 
-**结论**：不引入重型文件浏览器。列表复用 `@smp/console-kit` 的 `Panel` / `TableCard` 与现有 `smp-table` 样式，自己做「面包屑 + 表格 + 悬浮图标按钮」，与域名/服务器列表保持一致；拖拽用原生 `input[type=file]` + 一个 `dragover` 蒙层即可，后续需要多文件进度再考虑 `react-dropzone`。
+**结论**：不引入文件浏览器库。列表复用 `@smp/console-kit` 的 `Panel` / `smp-table`，自研「面包屑 + 表格 + 悬浮图标按钮」，与域名/服务器列表同一视觉；拖拽用原生 `input[type=file]` + `dragover` 蒙层。
 
 ## 4. 总体设计
 
 ### 4.1 侧边栏结构
 
 ```
-文件管理            （分组，icon: folder）
-├── 文件管理        （页面，icon: folder）
-└── 审计记录        （页面，icon: audit）
+文件管理                （分组，icon: folder）
+├── 文件管理            （icon: folder）
+└── 审计记录            （icon: audit）
+
+平台设置（footer 分组）
+└── 对象存储            （icon: settings，key: cos-settings）
 ```
 
-与「域名管理」一致：`console.page` 注册两个页面，`group: 'cos-files'`、`navigation: 'sidebar'`。图标沿用 `NavGlyph` 的 `folder`（需新增）与已有 `audit`。
+「对象存储」沿用 `frame` 的平台设置分组（`group: 'platform'`、`placement: 'footer'`），排在「插件」附近。`NavGlyph` 需新增 `folder` 图标（`audit`、`settings` 已有）。
 
 ### 4.2 插件与文件结构
 
 ```
 plugins/cos-file-manager/
-├── package.json              @smp/console-cos-files, engines.dsh 0.2.1-rc.5
-├── cordis.patch.yml          insert smp-cos-files
+├── package.json              @smp/console-cos, engines.dsh 0.2.1-rc.5
+├── cordis.patch.yml          insert smp-cos
 ├── icon.svg / locale/{zh,en}.json
-├── src/index.ts              宿主入口：路由注册、鉴权、工具注入
+├── src/index.ts              宿主入口：路由、鉴权、工具注入
 ├── src/host/cos.ts           SDK 封装（promisify、错误映射、签名 URL）
-├── src/host/service.ts       桶配置读写、密钥解密、key 规范化
-├── src/host/audit.ts         写入与查询审计
-├── src/host/tools.ts         P4 只读工具（可选）
-├── src/client.tsx            注册两个页面
-├── src/client/FilesPage.tsx  文件列表 / 上传 / 下载 / 删除
+├── src/host/config.ts        单桶配置读写、密钥解密、上限校验
+├── src/host/objects.ts       列表 / 上传 / 下载 / 删除
+├── src/host/audit.ts         审计写入与查询
+├── src/host/tools.ts         AI 工具（4 个）
+├── src/client.tsx            注册 3 个页面
+├── src/client/FilesPage.tsx  文件列表与上传/下载/删除
+├── src/client/SettingsPage.tsx 对象存储设置
 ├── src/client/AuditPage.tsx  审计列表
-├── src/client/copy.ts        中英文案
-├── src/client/files.css      列表与拖拽样式
-└── test/*.test.ts            key 规范化、审计、接口参数
+├── src/client/copy.ts / files.css
+└── test/*.test.ts
 ```
 
-依赖：`cos-nodejs-sdk-v5 ^3.0.0`（宿主，external）、`@deepseek-ai/cordis`、`@deepseek-ai/dsh-tools`（仅 P4）。
+依赖：`cos-nodejs-sdk-v5 ^3.0.0`（宿主，external）、`@deepseek-ai/cordis`、`@deepseek-ai/dsh-tools`（AI 工具）。
 
 ### 4.3 页面与数据流
 
+**对象存储设置页（平台设置）**
+
+- 字段：展示名（可选）、Bucket（`name-appid`）、Region（如 `ap-guangzhou`）、SecretId、SecretKey、根前缀 `basePrefix`（只允许浏览该前缀内，默认空）、上传上限 MB（默认 100，范围 1–2048）、启用开关。
+- SecretKey 不回传，输入框留空表示「保持原值」。
+- 「测试连接」按钮：用当前表单值调 `getBucket(MaxKeys=1)`，返回延迟与结果。
+- 保存时先校验 bucket/region 格式与上限范围，再写库。
+
 **文件管理页**
 
-- 顶部：桶选择（多桶时显示）、面包屑前缀、「搜索」输入框、上传按钮、刷新图标。
-- 列表：目录行（`CommonPrefixes`）与对象行；列：名称、大小、修改时间、操作（下载 / 删除图标，悬浮显示）。
-- 上传：拖入或点上传 → `POST /console-api/cos/objects?bucket=&key=`，原始字节流，宿主直接 `putObject` 转发；进度用 XHR。
-- 下载：点下载 → `GET /console-api/cos/objects/download?...` → 302 到 5 分钟签名 URL，浏览器直连 COS。
-- 删除：确认弹窗 → `DELETE`；只删对象，不递归删前缀（v1 明确提示）。
-- 搜索：以当前前缀为界，宿主最多扫描 5 页 × 1000 个 key 做名称包含匹配，返回 `truncated` 标记；超出提示缩小前缀。
+- 顶部：面包屑前缀、搜索框、上传按钮、刷新图标（无桶选择器——单桶）。
+- 列表：目录行（`CommonPrefixes`）+ 对象行；列：名称、大小、修改时间、操作（下载 / 删除，悬浮显示）。
+- 上传：拖入或点上传 → `POST /console-api/cos/objects?key=`，原始字节流，宿主直接 `putObject` 转发，XHR 显示进度；超过设置页上限返回 413。
+- 下载：`GET /console-api/cos/objects/download?key=` → 302 到 5 分钟签名 URL，记 `download` 审计。
+- 删除：确认弹窗 → `DELETE`；只删单个对象，文案里明确不会递归删除前缀。
+- 搜索：以当前前缀为界，宿主最多扫描 5 页 × 1000 个 key 做名称包含匹配，返回 `truncated`；超出提示缩小前缀。
 
-**审计记录页**：与域名审计页同构（筛选：动作 / 时间 / 对象名，分页，行展开看 detail JSON）。
+**审计记录页**：筛选动作 / 时间 / 对象名，分页 20 条，行展开看 detail JSON。
 
 ## 5. 数据模型
 
-迁移文件 `plugins/database/migrations/0040_cos_files.sql`：
+迁移 `plugins/database/migrations/0040_cos.sql`：
 
 ```sql
-create table if not exists cos_buckets (
-  id uuid primary key,
-  name text not null,                        -- 展示名
-  bucket text not null,                      -- examplebucket-1250000000
-  region text not null,                      -- ap-guangzhou
-  secret_id text not null,
-  secret_key_ciphertext text not null,       -- ctx.secrets.encrypt
-  base_prefix text not null default '',      -- 只允许浏览该前缀以内
-  enabled boolean not null default true,
-  created_at timestamptz not null default now(),
-  unique (bucket, region)
+-- 单行配置：id 恒为 true。
+create table if not exists cos_config (
+  id boolean primary key default true check (id),
+  name text not null default '',
+  bucket text not null default '',
+  region text not null default '',
+  secret_id text not null default '',
+  secret_key_ciphertext text not null default '',
+  base_prefix text not null default '',
+  max_upload_bytes bigint not null default 104857600,
+  enabled boolean not null default false,
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists cos_audit (
   id bigserial primary key,
   session_id text,
   actor text not null default 'console',     -- console | tool
-  action text not null,                      -- config | list | upload | download | delete
-  bucket text not null default '',
+  action text not null,                      -- config | upload | download | delete
   object_key text not null default '',
   size_bytes bigint,
   ok boolean not null,
@@ -142,67 +156,78 @@ create index if not exists cos_audit_key_idx on cos_audit (object_key);
 
 ## 6. 宿主接口
 
-全部挂在 `/console-api/cos` 下，`consoleSession.read()` 鉴权，风格与域名插件一致。
+全部挂在 `/console-api/cos` 下，`consoleSession.read()` 鉴权，错误统一 `{ code, detail }`。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/console-api/cos/config` | 列出桶配置，`secretId` 脱敏，不含 `secretKey` |
-| POST | `/console-api/cos/config` | 新增/更新桶：`name`、`bucket`、`region`、`secretId`、`secretKey`、`basePrefix`；先用 `getBucket(MaxKeys=1)` 验证凭据与桶 |
-| DELETE | `/console-api/cos/config/{id}` | 删除配置（不删桶） |
-| GET | `/console-api/cos/objects?bucket=&prefix=&marker=&limit=&search=` | 列对象/目录；`Delimiter='/'`；返回 `items`、`nextMarker`、`truncated` |
-| POST | `/console-api/cos/objects?bucket=&key=&overwrite=` | 上传；`Content-Length` 必填，上限 100 MB；key 由服务端规范化 |
-| GET | `/console-api/cos/objects/download?bucket=&key=` | 302 到签名 URL（300 秒），并记录 `download` 审计 |
-| DELETE | `/console-api/cos/objects?bucket=&key=` | 删除单个对象；记录审计 |
-| GET | `/console-api/cos/audit?page=&page_size=&action=&hours=&key=` | 审计分页查询 |
+| GET | `/console-api/cos/config` | 读取配置；`secretId` 脱敏（前 6 位 + `…`），不含 `secretKey` |
+| PUT | `/console-api/cos/config` | 保存配置；`secretKey` 为空表示保持原值；保存前 `getBucket` 验证 |
+| POST | `/console-api/cos/config/test` | 用当前表单或已存配置测试连通性，返回 `{ ok, latencyMs, bucket }` |
+| DELETE | `/console-api/cos/config` | 清空配置（不删桶） |
+| GET | `/console-api/cos/objects?prefix=&marker=&limit=&search=` | 列目录/对象；`Delimiter='/'`；返回 `items`、`nextMarker`、`truncated` |
+| POST | `/console-api/cos/objects?key=&overwrite=` | 上传；`Content-Length` 必填；上限取配置；key 服务端规范化 |
+| GET | `/console-api/cos/objects/download?key=` | 302 到签名 URL（300 秒）；记录下载审计 |
+| DELETE | `/console-api/cos/objects?key=` | 删除单个对象；记录审计 |
+| GET | `/console-api/cos/audit?page=&page_size=&action=&hours=&key=` | 审计分页 |
 
-错误统一 `{ code, detail }`，例如 `cos_not_configured`、`object_not_found`、`key_invalid`、`upload_too_large`、`cos_forbidden`、`cos_error`。
+错误码：`cos_not_configured`、`cos_disabled`、`key_invalid`、`upload_too_large`（413）、`object_not_found`、`cos_forbidden`、`cos_error`。
 
-## 7. 客户端设计
+## 7. AI 工具
 
-- 复用 `smp-list-panel` / `smp-table` / `smp-domain-icon-button` 等既有样式；
-- 上传用 `XMLHttpRequest`（需要进度），请求头带 `X-Object-Key`；
-- 拖拽蒙层：`dragover` 时显示，`drop` 后按文件逐个上传；
-- 删除确认弹窗说明「只删除单个对象，不会删除以该名称结尾的文件夹」；
-- 空态、错误条、加载态与域名页一致；
-- 审计页复用域名审计页的表格与筛选组件（可抽公共小组件，或先复制）。
+在 Harness 会话中注册 4 个工具，写操作沿用域名插件的审批模式（full-access 直通，否则逐次批准），全部记 `actor='tool'` 审计。
+
+| 工具 | 参数 | 审批 | 说明 |
+| --- | --- | --- | --- |
+| `platform_cos_list` | `prefix?`、`search?`、`limit?` | 否 | 列对象/目录，返回 key、大小、修改时间 |
+| `platform_cos_get` | `key` | 否 | 返回对象元数据 + 300 秒签名下载链接 |
+| `platform_cos_upload` | `path`（工作区内本地文件）、`key`、`overwrite?` | 是 | 读本地文件流上传到 COS |
+| `platform_cos_delete` | `key` | 是 | 删除单个对象 |
+
+约束：
+
+- `path` 必须落在当前会话工作区内（`workingDirectory.ensure(agent)`），拒绝 `..` 越界；
+- 上传同样受设置页上限约束；
+- 未配置桶时工具返回 `cos_not_configured`，不静默失败；
+- 返回值只含对象信息与签名链接，不含任何密钥。
 
 ## 8. 安全与限制
 
-- `secretKey` 用 `ctx.secrets`（Fernet）加密存入 `cos_buckets`，任何接口都不返回；
-- `secretId` 只回传脱敏值（前 6 位 + `…`）；
-- 浏览器只接触对象 key 和 5 分钟签名 URL，不接触长期凭据；
-- key 规范化：去首尾空白、拒绝空、拒绝 `..` 段、限制 1024 字节、禁止以 `/` 开头；
-- 上传上限 100 MB（`COS_MAX_UPLOAD_BYTES` 可调），超限 413；
-- 下载响应头 `X-Content-Type-Options: nosniff`（若走代理），签名 URL 的 `response-content-disposition` 指定附件名；
-- 所有路由要求控制台会话；P4 的 AI 工具默认只读，写操作沿用域名插件的审批模式。
+- `secretKey` 用 `ctx.secrets`（Fernet）加密存储；任何接口都不返回；
+- `secretId` 只回传脱敏值；
+- 浏览器只接触对象 key 与 5 分钟签名 URL；
+- key 规范化：去空白、拒绝空、拒绝 `..` 段、限制 1024 字节、禁止以 `/` 开头；
+- 上传上限来自配置（1 MB–2 GB，默认 100 MB），超限 413；
+- 下载 302 时设置 `response-content-disposition` 指定附件名；代理下载（P5 可选）加 `X-Content-Type-Options: nosniff`；
+- 所有路由要求控制台会话；配置变更也写审计。
 
 ## 9. 审计
 
-- 记录点：配置新增/修改/删除、列目录（可采样，默认不记）、上传、下载（签发 URL 时）、删除；
-- 字段：`session_id`、`actor`、`action`、`bucket`、`object_key`、`size_bytes`、`ok`、`error`、`detail`；
-- 审计页筛选：动作、时间范围、对象名包含；分页 20 条；
-- 失败也记录（如上传超限、删除 404），便于排查。
+- 记录点：配置保存/清空、上传、下载（签发链接时）、删除；列表默认不记；
+- 字段：`session_id`、`actor`、`action`、`object_key`、`size_bytes`、`ok`、`error`、`detail`；
+- 失败也记录（超限、404、权限不足），方便排查；
+- 审计页筛选：动作、时间范围、对象名包含。
 
 ## 10. 分阶段实施
 
 | 阶段 | 内容 | 验收 |
 | --- | --- | --- |
-| P1 | 插件骨架、桶配置页/接口、迁移、列表（目录 + 对象） | 能配置桶并浏览根前缀 |
-| P2 | 上传（流式）、下载（签名跳转）、删除、审计写入 | 四类操作都成功且审计有记录 |
-| P3 | 搜索、审计页、空态与错误打磨 | 搜索有截断提示；审计可筛选分页 |
-| P4 | 可选：AI 只读工具、>100 MB 预签名直传、批量删除、新建文件夹占位对象 | 按需评审 |
+| P1 | 插件骨架、迁移、对象存储设置页与配置接口、测试连接 | 能保存并验证一个桶 |
+| P2 | 文件列表（目录 + 对象）、面包屑、刷新 | 能浏览根前缀与子前缀 |
+| P3 | 上传（流式 + 进度）、下载（签名跳转）、删除、审计写入 | 四类操作成功且审计有记录 |
+| P4 | 搜索（含截断提示）、审计记录页 | 搜索与筛选可用 |
+| P5 | AI 4 个工具、>上限预签名直传、新建文件夹占位对象 | 会话内工具可调用，写操作弹审批 |
 
 ## 11. 测试与验收
 
-- 单元：key 规范化（空、`..`、前导 `/`、超长）、签名 URL 参数、审计筛选 SQL、上传大小限制；
-- 接口：未登录 401；未配置桶 `cos_not_configured`；不存在对象 404；超限 413；
-- 集成（手动）：用真实桶跑上传 → 列表 → 下载 → 删除，核对 COS 控制台与审计页；
-- 安全：响应中不出现 `secretKey`；签名 URL 过期后不可用。
+- 单元：key 规范化、上限解析与范围、签名 URL 参数、审计筛选、配置脱敏；
+- 接口：未登录 401；未配置 `cos_not_configured`；禁用 `cos_disabled`；超限 413；不存在对象 404；
+- 集成（手动）：真实桶完成 上传 → 列表 → 下载 → 删除，核对 COS 控制台与审计页；
+- 安全：响应中不出现 `secretKey`；签名 URL 过期不可用；AI 上传越界路径被拒。
 
 ## 12. 风险与开放问题
 
-1. **多桶 vs 单桶**：本方案支持多桶（表结构 + 顶部选择），若你只用一个桶，UI 可隐藏选择器。
-2. **上传上限**：默认 100 MB；超过走 P4 的预签名直传，需要配置桶 CORS。
-3. **搜索成本**：COS 无全文检索，只能按前缀扫描；大桶下搜索会受限，方案已给出截断提示。
-4. **SDK 版本**：`cos-nodejs-sdk-v5@3.0.0` 是 2026-07 的新版本，实施时先核对 `putObject` 流式上传与 `getObjectUrl` 的回调签名是否与文档一致。
-5. **是否要文件预览/分享链接**：当前不做，后续可加。
+1. **单桶的取舍**：切换桶需要改设置，旧桶对象不再显示；如果以后要多桶，需要把 `cos_config` 扩成多行并加桶选择器。
+2. **上传上限**：代理上传占宿主带宽与内存（流式转发，不整包缓冲），默认 100 MB；大文件建议用 P5 预签名直传。
+3. **SDK 版本**：`cos-nodejs-sdk-v5@3.0.0` 较新，实施前核对 `putObject` 流式 Body 与 `getObjectUrl` 回调签名。
+4. **搜索成本**：COS 无全文检索，扫描上限 5×1000，超出提示缩小前缀（已确认接受）。
+5. **AI 上传的路径边界**：只允许工作区内文件；是否需要「只读模式」开关（禁止 AI 删除）待定，默认沿用审批。

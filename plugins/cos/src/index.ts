@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { queryAudit, recordAudit } from './host/audit.ts'
 import { clearBuckets, isRole, loadBucket, loadBuckets, saveBucket, validateInput, type BucketInput, type Queryable, type Role, type Secrets } from './host/config.ts'
 import { createClient, invoke, mapError, sanitizeKey } from './host/cos.ts'
-import { deleteObject, listObjects, putObject, signedDownloadUrl, statObject } from './host/objects.ts'
+import { deleteObject, listObjects, putObject, readObjectText, signedDownloadUrl, signedInlineUrl, statObject } from './host/objects.ts'
 import { registerCosTools } from './host/tools.ts'
 
 const PREFIX = '/console-api/cos'
@@ -50,6 +50,8 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
     if (path === '/objects' && request.method === 'POST') return await upload(ctx, request, url, response)
     if (path === '/objects' && request.method === 'DELETE') return await remove(ctx, url, request, response)
     if (path === '/objects/download' && request.method === 'GET') return await download(ctx, url, request, response)
+    if (path === '/objects/raw' && request.method === 'GET') return await raw(ctx, url, response)
+    if (path === '/objects/text' && request.method === 'GET') return await text(ctx, url, response)
     if (path === '/audit' && request.method === 'GET') return await readAudit(ctx, url, response)
     sendJson(response, 404, { code: 'not_found', detail: '没有这个接口' })
   } catch (cause) {
@@ -314,6 +316,39 @@ async function download(ctx: HostCtx, url: URL, request: IncomingMessage, respon
       error: mapped.detail,
       detail: {},
     })
+    sendJson(response, 502, mapped)
+  }
+}
+
+async function raw(ctx: HostCtx, url: URL, response: ServerResponse): Promise<void> {
+  const settings = await requireDefault(ctx.database.pool, ctx.secrets, response)
+  if (settings === undefined) return
+  const key = url.searchParams.get('key') ?? ''
+  if (key === '') return sendJson(response, 400, { code: 'key_invalid', detail: '缺少 key' })
+  try {
+    const name = key.split('/').pop() ?? 'file'
+    const signed = await signedInlineUrl(settings, createClient(settings), key, name)
+    response.writeHead(302, { location: signed, 'cache-control': 'no-store' })
+    response.end()
+  } catch (cause) {
+    sendJson(response, 502, mapError(cause))
+  }
+}
+
+async function text(ctx: HostCtx, url: URL, response: ServerResponse): Promise<void> {
+  const settings = await requireDefault(ctx.database.pool, ctx.secrets, response)
+  if (settings === undefined) return
+  const key = url.searchParams.get('key') ?? ''
+  if (key === '') return sendJson(response, 400, { code: 'key_invalid', detail: '缺少 key' })
+  try {
+    const result = await readObjectText(settings, createClient(settings), key, 512 * 1024)
+    sendJson(response, 200, result)
+  } catch (cause) {
+    const mapped = mapError(cause)
+    if (cause instanceof Error && cause.message.includes('预览上限')) {
+      sendJson(response, 413, { code: 'preview_too_large', detail: cause.message })
+      return
+    }
     sendJson(response, 502, mapped)
   }
 }

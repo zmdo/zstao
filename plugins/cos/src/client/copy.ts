@@ -22,6 +22,11 @@ export interface Copy {
   perPage: string
   items: string
   total: string
+  previewLoading: string
+  previewFailed: string
+  unsupportedTitle: string
+  unsupportedBody: string
+  close: string
   truncated: string
   folders: string
   files: string
@@ -90,6 +95,11 @@ const ZH: Copy = {
   perPage: '每页',
   items: '项',
   total: '共 {count} 项',
+  previewLoading: '加载预览…',
+  previewFailed: '预览加载失败',
+  unsupportedTitle: '无法打开',
+  unsupportedBody: '这个文件类型不支持在线预览，请下载后查看。',
+  close: '关闭',
   truncated: '结果已截断，请缩小前缀或搜索范围',
   folders: '目录',
   files: '文件',
@@ -158,6 +168,11 @@ const EN: Copy = {
   perPage: 'Per page',
   items: 'items',
   total: '{count} items',
+  previewLoading: 'Loading preview…',
+  previewFailed: 'Failed to load preview',
+  unsupportedTitle: 'Cannot open',
+  unsupportedBody: 'This file type cannot be previewed. Download it to open it.',
+  close: 'Close',
   truncated: 'Results truncated; narrow the prefix or search',
   folders: 'Folders',
   files: 'Files',

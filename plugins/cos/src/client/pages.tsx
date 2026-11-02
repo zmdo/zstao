@@ -88,6 +88,9 @@ function formatSize(bytes: number | null, copy: Copy): string {
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
+const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif'])
+const TEXT_EXT = new Set(['txt', 'md', 'json', 'csv', 'log', 'yaml', 'yml', 'ts', 'js', 'css', 'html', 'xml', 'sh', 'ini', 'toml'])
+
 export function FilesPage(props: { locale: LocaleFace }) {
   const copy = useCopy(props.locale)
   const active = activeLocale(props.locale)
@@ -101,6 +104,11 @@ export function FilesPage(props: { locale: LocaleFace }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [progress, setProgress] = useState<Record<string, number>>({})
+  const [preview, setPreview] = useState<{ key: string; name: string; kind: 'text' | 'image' | 'pdf' } | null>(null)
+  const [previewText, setPreviewText] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState('')
+  const [unsupported, setUnsupported] = useState('')
   const input = useRef<HTMLInputElement>(null)
 
   const load = async (nextPrefix: string, marker: string, query: string, size = pageSize) => {
@@ -130,6 +138,28 @@ export function FilesPage(props: { locale: LocaleFace }) {
   const openFolder = (key: string) => {
     setMarkers([''])
     void load(key, '', '')
+  }
+
+  const openPreview = async (item: ObjectItem) => {
+    const ext = item.name.includes('.') ? item.name.split('.').pop()!.toLowerCase() : ''
+    const kind = IMAGE_EXT.has(ext) ? 'image' : ext === 'pdf' ? 'pdf' : TEXT_EXT.has(ext) ? 'text' : null
+    if (kind === null) {
+      setUnsupported(item.name)
+      return
+    }
+    setPreview({ key: item.key, name: item.name, kind })
+    setPreviewText('')
+    setPreviewError('')
+    if (kind !== 'text') return
+    setPreviewLoading(true)
+    try {
+      const data = await requestJson<{ text: string }>(`/objects/text?key=${encodeURIComponent(item.key)}`)
+      setPreviewText(data.text)
+    } catch (cause) {
+      setPreviewError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setPreviewLoading(false)
+    }
   }
 
   const upload = (files: FileList | null) => {
@@ -232,10 +262,24 @@ export function FilesPage(props: { locale: LocaleFace }) {
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.key} className="smp-plugin-row">
+              <tr
+                key={item.key}
+                className="smp-plugin-row"
+                onClick={() => {
+                  if (item.kind === 'folder') openFolder(item.key)
+                  else void openPreview(item)
+                }}
+              >
                 <td>
                   {item.kind === 'folder' ? (
-                    <button type="button" className="smp-cos-folder" onClick={() => openFolder(item.key)}>
+                    <button
+                      type="button"
+                      className="smp-cos-folder"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openFolder(item.key)
+                      }}
+                    >
                       {item.name}/
                     </button>
                   ) : (
@@ -251,13 +295,21 @@ export function FilesPage(props: { locale: LocaleFace }) {
                         <button
                           type="button"
                           className="secondary"
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.stopPropagation()
                             window.location.href = `${API}/objects/download?key=${encodeURIComponent(item.key)}`
                           }}
                         >
                           {copy.download}
                         </button>
-                        <button type="button" className="secondary" onClick={() => void remove(item.key)}>
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            void remove(item.key)
+                          }}
+                        >
                           {copy.delete}
                         </button>
                       </>
@@ -333,6 +385,57 @@ export function FilesPage(props: { locale: LocaleFace }) {
           </button>
         </div>
       </div>
+      {preview !== null && (
+        <aside className="smp-cos-drawer" role="dialog" aria-label={preview.name}>
+          <header className="smp-cos-drawer-head">
+            <strong className="smp-cos-drawer-title">{preview.name}</strong>
+            <div className="row">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  window.location.href = `${API}/objects/download?key=${encodeURIComponent(preview.key)}`
+                }}
+              >
+                {copy.download}
+              </button>
+              <button type="button" className="secondary" onClick={() => setPreview(null)}>
+                {copy.close}
+              </button>
+            </div>
+          </header>
+          <div className="smp-cos-drawer-body">
+            {preview.kind === 'text' &&
+              (previewLoading ? (
+                <p className="muted">{copy.previewLoading}</p>
+              ) : previewError !== '' ? (
+                <p className="banner error">{previewError}</p>
+              ) : (
+                <pre className="smp-cos-preview-text">{previewText}</pre>
+              ))}
+            {preview.kind === 'image' && (
+              <img className="smp-cos-preview-image" src={`${API}/objects/raw?key=${encodeURIComponent(preview.key)}`} alt={preview.name} />
+            )}
+            {preview.kind === 'pdf' && (
+              <iframe className="smp-cos-preview-frame" src={`${API}/objects/raw?key=${encodeURIComponent(preview.key)}`} title={preview.name} />
+            )}
+          </div>
+        </aside>
+      )}
+      {unsupported !== '' && (
+        <div className="smp-cos-modal" role="alertdialog" aria-modal="true">
+          <div className="smp-cos-modal-card">
+            <h3>{copy.unsupportedTitle}</h3>
+            <p>{copy.unsupportedBody}</p>
+            <p className="mono">{unsupported}</p>
+            <div className="row">
+              <button type="button" onClick={() => setUnsupported('')}>
+                {copy.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Panel>
   )
 }

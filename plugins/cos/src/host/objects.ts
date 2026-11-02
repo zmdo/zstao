@@ -149,3 +149,36 @@ export async function statObject(settings: BucketSettings, client: CosClient, re
   const data = await invoke(client, 'headObject', { Bucket: settings.bucket, Region: settings.region, Key: key })
   return { size: Number(data.headers?.['content-length'] ?? 0), etag: String(data.headers?.etag ?? data.ETag ?? '') }
 }
+
+export function signedInlineUrl(settings: BucketSettings, client: CosClient, relativeKey: string, name: string): Promise<string> {
+  const key = sanitizeKey(relativeKey, settings.basePrefix)
+  return new Promise((resolve, reject) => {
+    const disposition = `inline; filename*=UTF-8''${encodeURIComponent(name)}`
+    ;(client.getObjectUrl as any)(
+      {
+        Bucket: settings.bucket,
+        Region: settings.region,
+        Key: key,
+        Sign: true,
+        Expires: 300,
+        Protocol: 'https:',
+        Query: { 'response-content-disposition': disposition },
+      },
+      (error: unknown, data: { Url?: string }) => (error ? reject(toRequestError(error)) : resolve(String(data?.Url ?? ''))),
+    )
+  })
+}
+
+export async function readObjectText(
+  settings: BucketSettings,
+  client: CosClient,
+  relativeKey: string,
+  maxBytes: number,
+): Promise<{ size: number; text: string }> {
+  const stat = await statObject(settings, client, relativeKey)
+  if (stat.size > maxBytes) throw new Error(`文件超过预览上限 ${Math.floor(maxBytes / 1024)}KB`)
+  const key = sanitizeKey(relativeKey, settings.basePrefix)
+  const data = await invoke(client, 'getObject', { Bucket: settings.bucket, Region: settings.region, Key: key })
+  const body = Buffer.isBuffer(data.Body) ? data.Body : Buffer.from(data.Body)
+  return { size: stat.size, text: body.toString('utf8') }
+}

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Panel } from '@smp/console-kit'
 import { Dialog, DialogButton } from '@smp/console-kit/dialog'
+import { CosTree } from './tree.tsx'
 import { copyFor, type Copy } from './copy.ts'
 
 export interface LocaleFace {
@@ -111,6 +112,8 @@ export function FilesPage(props: { locale: LocaleFace }) {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState('')
   const [unsupported, setUnsupported] = useState('')
+  const [query, setQuery] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
   const input = useRef<HTMLInputElement>(null)
 
   const load = async (nextPrefix: string, marker: string, query: string, size = pageSize) => {
@@ -181,7 +184,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
           return next
         })
         if (xhr.status < 200 || xhr.status > 299) setError(parseError(xhr.responseText) ?? copy.uploadFailed)
-        void load(prefix, markers[markers.length - 1] ?? '', search)
+        setRefreshKey((value) => value + 1)
       }
       xhr.onerror = () => setError(copy.uploadFailed)
       xhr.send(file)
@@ -194,7 +197,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
     try {
       const response = await fetch(`${API}/objects?key=${encodeURIComponent(key)}`, { method: 'DELETE', credentials: 'same-origin' })
       if (!response.ok) throw new Error(parseError(await response.text()) ?? `HTTP ${response.status}`)
-      void load(prefix, markers[markers.length - 1] ?? '', search)
+      setRefreshKey((value) => value + 1)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     }
@@ -216,10 +219,17 @@ export function FilesPage(props: { locale: LocaleFace }) {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') void load(prefix, '', search)
+              if (event.key === 'Enter') setQuery(search.trim())
             }}
           />
-          <button type="button" className="secondary" onClick={() => void load(prefix, '', search)}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              setQuery(search.trim())
+              setRefreshKey((value) => value + 1)
+            }}
+          >
             {copy.refresh}
           </button>
           <button type="button" className="primary" onClick={() => input.current?.click()}>
@@ -229,163 +239,29 @@ export function FilesPage(props: { locale: LocaleFace }) {
         </div>
       }
     >
-      <nav className="smp-cos-crumbs">
-        {crumbs.map((crumb, index) => (
-          <Fragment key={crumb.prefix}>
-            {index > 0 && <span>/</span>}
-            <button type="button" className="smp-cos-crumb" onClick={() => void load(crumb.prefix, '', '')}>
-              {crumb.label}
-            </button>
-          </Fragment>
-        ))}
-      </nav>
       {error !== '' && (
         <p className="banner error" role="alert">
           {error}
         </p>
       )}
-      {truncated && <p className="smp-cos-note">{copy.truncated}</p>}
       {Object.keys(progress).length > 0 && (
         <p className="smp-cos-note">
           {Object.entries(progress)
             .map(([name, value]) => `${name} ${value}%`)
-            .join(' · ')}
+            .join(' 路 ')}
         </p>
       )}
-      <div className="table-wrap smp-list-scroll">
-        <table className="smp-plugins smp-table">
-          <thead>
-            <tr>
-              <th>{copy.name}</th>
-              <th>{copy.size}</th>
-              <th>{copy.updated}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr
-                key={item.key}
-                className="smp-plugin-row"
-                onClick={() => {
-                  if (item.kind === 'folder') openFolder(item.key)
-                  else void openPreview(item)
-                }}
-              >
-                <td>
-                  {item.kind === 'folder' ? (
-                    <button
-                      type="button"
-                      className="smp-cos-folder"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        openFolder(item.key)
-                      }}
-                    >
-                      {item.name}/
-                    </button>
-                  ) : (
-                    item.name
-                  )}
-                </td>
-                <td className="nowrap">{item.kind === 'folder' ? copy.folders : formatSize(item.size, copy)}</td>
-                <td className="nowrap">{formatTime(item.lastModified, active)}</td>
-                <td>
-                  <div className="row">
-                    {item.kind === 'file' && (
-                      <>
-                        <button
-                          type="button"
-                          className="secondary"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            window.location.href = `${API}/objects/download?key=${encodeURIComponent(item.key)}`
-                          }}
-                        >
-                          {copy.download}
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            void remove(item.key)
-                          }}
-                        >
-                          {copy.delete}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!loading && items.length === 0 && (
-              <tr>
-                <td colSpan={4} className="empty">
-                  {error === '' ? copy.empty : copy.loadFailed}
-                </td>
-              </tr>
-            )}
-            {loading && (
-              <tr>
-                <td colSpan={4} className="empty">
-                  {copy.loading}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="smp-plugins-pager smp-list-pager">
-        <span className="muted">{`${items.length} ${copy.items}`}</span>
-        <div className="row">
-          <label>
-            {copy.perPage}
-            <select
-              className="smp-page-size"
-              aria-label={copy.perPage}
-              value={pageSize}
-              onChange={(event) => {
-                const size = Number(event.target.value)
-                setPageSize(size)
-                setMarkers([''])
-                void load(prefix, '', '', size)
-              }}
-            >
-              {[20, 50, 100].map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className="secondary"
-            disabled={markers.length <= 1}
-            onClick={() => {
-              const next = markers.slice(0, -1)
-              setMarkers(next)
-              void load(prefix, next[next.length - 1] ?? '', search)
-            }}
-          >
-            {copy.previous}
-          </button>
-          <span>{copy.pageOf.replace('{page}', String(markers.length))}</span>
-          <button
-            type="button"
-            className="secondary"
-            disabled={nextMarker === ''}
-            onClick={() => {
-              const next = [...markers, nextMarker]
-              setMarkers(next)
-              void load(prefix, nextMarker, '')
-            }}
-          >
-            {copy.next}
-          </button>
-        </div>
+      <div className="smp-cos-page-tree">
+        <CosTree
+          locale={props.locale}
+          search={query}
+          refreshKey={refreshKey}
+          onOpen={(item) => void openPreview(item)}
+          onDownload={(item) => {
+            window.location.href = `${API}/objects/download?key=${encodeURIComponent(item.key)}`
+          }}
+          onDelete={(item) => void remove(item.key)}
+        />
       </div>
       {preview !== null && (
         <aside className="smp-cos-drawer" role="dialog" aria-label={preview.name}>

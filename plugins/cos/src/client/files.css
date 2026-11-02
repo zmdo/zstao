@@ -53,3 +53,8 @@
 .smp-cos-file-icon.is-pdf { color: var(--dsw-static-red-600); }
 .smp-cos-folder-icon { color: var(--dsw-static-amber-400); }
 .smp-cos-title-icon { flex: none; margin-right: 6px; }
+.smp-cos-page-tree { max-height: calc(100vh - 240px); overflow: auto; padding: 8px 0 8px 8px; }
+.smp-cos-tree-time { color: var(--dsw-alias-label-tertiary); font-size: 12px; flex: none; margin-left: 8px; }
+.smp-cos-tree-actions { display: none; gap: 6px; margin-left: 8px; flex: none; }
+.smp-cos-tree-row:hover .smp-cos-tree-actions, .smp-cos-tree-row:focus-within .smp-cos-tree-actions { display: inline-flex; }
+.smp-cos-tree-row { box-sizing: border-box; }

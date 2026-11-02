@@ -2,7 +2,7 @@
 
 状态：已实现。本文记录会话侧栏如何按工作区组切换。登记一组、绑定目录、声明自己可在哪些组使用，都由插件通过 `workspaceGroups` 扩展。实现前以本文为准，实现后以代码为准。
 
-运行版本钉在 `dsh` `0.2.1-alpha.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。不修改 `tmp/deepseek-harness`。
+运行版本钉在 `dsh` `0.2.1-rc.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。不修改 `tmp/deepseek-harness`。
 
 ## 1. 要解决的事
 

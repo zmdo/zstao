@@ -2,7 +2,7 @@
 
 状态：待实现。本文记录会话如何创建分组、把服务器移入分组，以及修改服务器名称。看见服务器和执行命令仍以 [session-shell.md](session-shell.md) 为准。页面、登记和分组规则仍以 [design.md](design.md) 为准。
 
-运行版本钉在 `dsh` `0.2.1-alpha.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。
+运行版本钉在 `dsh` `0.2.1-rc.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。
 
 ## 1. 要解决的事
 

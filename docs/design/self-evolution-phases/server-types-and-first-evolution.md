@@ -112,7 +112,7 @@ backup：pg_dump/restic 定时任务，按基础设施方案 §8 实现
 | PostgreSQL | `16.15` | A/B/C 相同主版本；镜像按 digest 固定 |
 | Caddy | `2.10.2` | 三台相同版本 |
 | CoreDNS | `1.12.0` | 第一版仅 A 单实例 |
-| dsh 基线 | `0.2.1-alpha.5` | CES 镜像内固定；插件 `engines.dsh` 已钉住 |
+| dsh 基线 | `0.2.1-rc.5` | CES 镜像内固定；插件 `engines.dsh` 已钉住 |
 | Docker/Compose/Buildx | 部署时核定 | 在部署清单登记具体版本 |
 
 镜像引用统一写成 `名称:标签@sha256:摘要`。Compose 与 Job 中使用 digest，不以浮动 `latest` 决定版本。

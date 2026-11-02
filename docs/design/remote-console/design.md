@@ -4,7 +4,7 @@
 
 状态：待评审。本文描述插件和构建方式，不贴实现。基座里已经有的插件以仓库代码为准。
 
-运行版本钉在 `dsh` `0.2.1-alpha.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。
+运行版本钉在 `dsh` `0.2.1-rc.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。
 
 ## 1. 背景
 
@@ -195,7 +195,7 @@ flowchart LR
 
 ## 7. 怎么构建
 
-每个插件是独立的 ESM 包，包名 `@smp/console-<栏目>`，`"private": true`，`engines.dsh` 为 `0.2.1-alpha.5`。`dsh.bundle.patch` 指向 `./cordis.patch.yml`。有页面的包再声明 `dsh.client.platform: web`，并导出 `./client`。运行入口是构建后的 `lib/`。
+每个插件是独立的 ESM 包，包名 `@smp/console-<栏目>`，`"private": true`，`engines.dsh` 为 `0.2.1-rc.5`。`dsh.bundle.patch` 指向 `./cordis.patch.yml`。有页面的包再声明 `dsh.client.platform: web`，并导出 `./client`。运行入口是构建后的 `lib/`。
 
 补丁只追加自己这一行：
 

@@ -2,7 +2,7 @@
 
 本仓库是 Smart Management Platform（SMP）的基座。本文件规定插件的目录和包怎么放。已经在基座里的插件，和以后装到基座上的栏目，用同一套规则。插件行为、生命周期和补丁方言以 `.agents/skills/dsh-plugin/` 为准。要做哪些插件、各自负责什么，以 `docs/design/remote-console/design.md` 为准。
 
-运行版本是 `dsh` `0.2.1-alpha.5`。
+运行版本是 `dsh` `0.2.1-rc.5`。
 
 ## 仓库
 
@@ -82,7 +82,7 @@ plugins/server-management/
 - `"main": "./lib/index.js"`
 - `exports` 有 `.`、`./client`、`./package.json`、`./locale/*.json`、`./icon`
 - `files` 列出 `lib/index.js`、`lib/client.js`、`cordis.patch.yml`、`locale/*.json`、`icon.svg`
-- `engines.dsh` 为 `0.2.1-alpha.5`
+- `engines.dsh` 为 `0.2.1-rc.5`
 - `dsh.bundle.patch` 为 `./cordis.patch.yml`
 - `dsh.client.platform` 为 `web`
 

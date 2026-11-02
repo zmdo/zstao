@@ -2,7 +2,7 @@
 
 状态：待实现。本文记录会话如何看见服务器，以及如何在可操作的服务器上自行执行命令。和 `plugins/server-management` 不一致时，实现前以本文为准，实现后以代码为准。页面、登记、巡检、采指标和浏览器终端仍以 [design.md](design.md) 为准。创建分组、移动服务器和修改名称见 [session-catalog.md](session-catalog.md)。
 
-运行版本钉在 `dsh` `0.2.1-alpha.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。
+运行版本钉在 `dsh` `0.2.1-rc.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。
 
 ## 1. 要解决的事
 

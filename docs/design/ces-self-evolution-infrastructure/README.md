@@ -62,7 +62,7 @@ OneDev 首次初始化和 Agent 自动接入的独立验证结果见 [ONEDEV_BOO
 | HTTPS 入口 | Caddy | A、B、C | 每台提供自己的域名入口，持久化证书数据 |
 | 数据库 | PostgreSQL | A、B、C | A、B、C 各自独立实例；B、C 使用与现有 CES 核对一致的主版本 |
 | 开发工具链 | Git CLI、Node.js、npm、TOD | C 开发环境；B 按任务提供工具链 | Node.js 版本结合现有测试及 dsh 兼容性固定；TOD 与 OneDev 16.9.7 联调后固定版本 |
-| CES 宿主 | dsh 与 CES 插件 | B、C 的 CES 镜像 | 当前 dsh 基线为 `0.2.1-alpha.5`；插件、patch、迁移及运行依赖一起打包 |
+| CES 宿主 | dsh 与 CES 插件 | B、C 的 CES 镜像 | 当前 dsh 基线为 `0.2.1-rc.5`；插件、patch、迁移及运行依赖一起打包 |
 | 页面和接口测试 | Playwright、Chromium、项目现有测试 | B；C 按开发任务需要提供 | Playwright 包与浏览器镜像版本匹配 |
 | 场景评估 | CES 场景评估脚本 | B | 待开发，验证任务完成情况、工具调用和回归行为 |
 | 备份与恢复 | PostgreSQL 导出/恢复工具、restic | A、C；B 按需 | 数据库一致性导出和文件备份分开处理，备份发送到异机或对象存储 |

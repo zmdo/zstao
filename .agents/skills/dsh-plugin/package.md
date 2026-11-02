@@ -20,7 +20,7 @@
     "./icon": "./icon.svg"
   },
   "files": ["lib/index.js", "lib/client.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
-  "engines": { "dsh": "0.2.1-alpha.5" },
+  "engines": { "dsh": "0.2.1-rc.5" },
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },
     "client": { "platform": "web" }

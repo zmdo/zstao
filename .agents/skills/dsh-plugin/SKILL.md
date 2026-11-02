@@ -10,7 +10,7 @@ description: >-
 
 # dsh 插件规范
 
-源码在 `tmp/deepseek-harness`，提交 `1517a4db`，对应运行版本 `0.2.1-alpha.5`。不要改这棵检出。本文件和检出冲突时，以检出为准，去读下面点名的文件，不要凭记忆补 API。
+源码在 `tmp/deepseek-harness`，提交 `1517a4db`，对应运行版本 `0.2.1-rc.5`。不要改这棵检出。本文件和检出冲突时，以检出为准，去读下面点名的文件，不要凭记忆补 API。
 
 本规范从这些文件改写而来，去掉了只在 Harness 仓库内部使用的安装器和覆盖率门禁。清单用的 locale 和图标仍然要做：
 
@@ -40,7 +40,7 @@ export function apply(ctx: Context): void {}
 本仓库是 Smart Management Platform（SMP）的基座。基座和以后装上来的栏目都是独立的 bundle，不放进 Harness 的 pnpm workspace。
 
 - `"type": "module"`。包名 `@smp/console-<栏目>`。`"private": true`。
-- `engines.dsh` 钉在 `0.2.1-alpha.5`。
+- `engines.dsh` 钉在 `0.2.1-rc.5`。
 - `dsh.bundle.patch` 指向 `./cordis.patch.yml`。
 - 有页面时再声明 `dsh.client.platform: web`，并导出 `./client`。
 - `exports` 至少有 `.`、`./client`（有页面时）、`./package.json`。运行入口是构建后的 `lib/`，不要把 `src` 当运行入口。

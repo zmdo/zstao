@@ -1,6 +1,6 @@
 # 工作区组问题清单
 
-状态：保留修复前的问题与原因记录，实施结果在对应小节补充；整体方案和验收范围见 `solution.md`。对应实现是 `@smp/console-workspace-groups`。运行版本是 `dsh` `0.2.1-alpha.5`。官方界面在 `tmp/deepseek-harness`，这里只引用，不修改。
+状态：保留修复前的问题与原因记录，实施结果在对应小节补充；整体方案和验收范围见 `solution.md`。对应实现是 `@smp/console-workspace-groups`。运行版本是 `dsh` `0.2.1-rc.5`。官方界面在 `tmp/deepseek-harness`，这里只引用，不修改。
 
 ## 1. 切换工作区组时弹出「搜索会话名称」
 

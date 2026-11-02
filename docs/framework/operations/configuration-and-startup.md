@@ -4,7 +4,7 @@
 
 ## 运行前置条件
 
-1. 可运行本仓库 TypeScript 测试与 dsh `0.2.1-alpha.5` 的 Node 环境。
+1. 可运行本仓库 TypeScript 测试与 dsh `0.2.1-rc.5` 的 Node 环境。
 2. 仓库 npm workspace 依赖已安装，实际 dsh CLI／profile 另行可用。
 3. 可连接的 PostgreSQL 和既有 SMP 基线。特别核对 `accounts`、`wallets`，见[存储缺口](../data/storage-and-migrations.md)。
 4. 实际 profile 能解析各 `@smp/console-*` 包、组合相应 bundle patch，且插件已经构建。

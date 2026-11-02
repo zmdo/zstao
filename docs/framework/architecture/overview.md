@@ -4,7 +4,7 @@
 
 ## 系统组成
 
-CES（Cyber Evolving System）构建在 SMP（Smart Management Platform）基座之上。这个仓库是一组由 DeepSeek Harness（dsh）加载的 Cordis 插件及一个界面共享包，不是独立的 Node Web 服务。插件的 `engines.dsh` 当前钉在 `0.2.1-alpha.5`。
+CES（Cyber Evolving System）构建在 SMP（Smart Management Platform）基座之上。这个仓库是一组由 DeepSeek Harness（dsh）加载的 Cordis 插件及一个界面共享包，不是独立的 Node Web 服务。插件的 `engines.dsh` 当前钉在 `0.2.1-rc.5`。
 
 ```mermaid
 flowchart LR

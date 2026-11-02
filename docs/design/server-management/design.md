@@ -4,7 +4,7 @@
 
 本文保留早期基础能力的设计说明。当前 `ces/develop` 的改造进度、数据库结构问题及后续顺序见 [database-redesign.md](database-redesign.md#6-当前改造进度与下一步)，新的字段与插件契约见 [data-model.md](data-model.md)；新增需求不因本文的「已在基座里」状态而视为已经实现。
 
-运行版本钉在 `dsh` `0.2.1-alpha.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。
+运行版本钉在 `dsh` `0.2.1-rc.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。
 
 ## 1. 要解决的事
 

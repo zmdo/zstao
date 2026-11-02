@@ -2,7 +2,7 @@
 
 状态：已在基座里。本文记录这个插件怎么做；和 `plugins/install` 不一致时以代码为准。
 
-运行版本钉在 `dsh` `0.2.1-alpha.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。栏目划分仍以 `docs/design/remote-console/design.md` 为准。安装插件是 Smart Management Platform（SMP）基座的一部分。
+运行版本钉在 `dsh` `0.2.1-rc.5`。插件写法以 `.agents/skills/dsh-plugin/` 为准。栏目划分仍以 `docs/design/remote-console/design.md` 为准。安装插件是 Smart Management Platform（SMP）基座的一部分。
 
 ## 1. 要解决的事
 

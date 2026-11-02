@@ -11,6 +11,7 @@ interface DomainRow {
   accountId: string
   accountName: string
   status: string
+  description: string
   createdAt: string
 }
 
@@ -60,6 +61,8 @@ export function DomainsPage(props: { locale: LocaleFace }) {
   const [failure, setFailure] = useState<Failure | null>(null)
   const [reload, setReload] = useState(0)
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<DomainRow | null>(null)
+  const [removing, setRemoving] = useState<DomainRow | null>(null)
 
   const loadDomains = useCallback(async (prefer?: string) => {
     setLoadingDomains(true)
@@ -119,20 +122,60 @@ export function DomainsPage(props: { locale: LocaleFace }) {
         </header>
         <nav className="smp-domain-list" aria-label={copy.domains}>
           {domains?.map((domain) => (
-            <button
-              className={`smp-domain-item${domain.id === selected ? ' is-on' : ''}`}
-              key={domain.id}
-              type="button"
-              aria-current={domain.id === selected ? 'true' : undefined}
-              onClick={() => {
-                setFailure(null)
-                setSelected(domain.id)
-              }}
-              title={domain.name}
-            >
-              <span className="smp-domain-name">{domain.name}</span>
-              <span className="smp-domain-account">{domain.accountName}</span>
-            </button>
+            <div className={`smp-domain-row${domain.id === selected ? ' is-on' : ''}`} key={domain.id}>
+              <button
+                className="smp-domain-item"
+                type="button"
+                aria-current={domain.id === selected ? 'true' : undefined}
+                onClick={() => {
+                  setFailure(null)
+                  setSelected(domain.id)
+                }}
+                title={domain.name}
+              >
+                <span className="smp-domain-name">{domain.name}</span>
+                <span className={`smp-domain-desc${domain.description === '' ? ' is-empty' : ''}`}>
+                  {domain.description === '' ? copy.noDescription : domain.description}
+                </span>
+              </button>
+              <div className="smp-domain-item-actions">
+                <button
+                  className="smp-domain-icon-button"
+                  type="button"
+                  aria-label={`${copy.edit} ${domain.name}`}
+                  title={copy.edit}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setEditing(domain)
+                  }}
+                >
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <path d="M10.5 2.8 13.2 5.5 6 12.7l-3.2.7.7-3.2z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  className="smp-domain-icon-button is-danger"
+                  type="button"
+                  aria-label={`${copy.remove} ${domain.name}`}
+                  title={copy.remove}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setRemoving(domain)
+                  }}
+                >
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <path
+                      d="M3 4.5h10M6 4.5V2.8h4v1.7M4.5 4.5l.6 9h5.8l.6-9M6.5 7v4M9.5 7v4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
           ))}
           {domains !== null && domains.length === 0 && <p className="smp-domain-hint">{copy.empty}</p>}
           {domains === null && <p className="smp-domain-hint">{copy.loading}</p>}
@@ -148,8 +191,24 @@ export function DomainsPage(props: { locale: LocaleFace }) {
           }
           extra={
             <div className="row smp-domain-tools">
-              <button className="secondary" type="button" disabled={selected === '' || loadingDns} onClick={() => setReload((value) => value + 1)}>
-                {copy.refresh}
+              <button
+                className={`smp-domain-header-icon${loadingDns ? ' is-busy' : ''}`}
+                type="button"
+                aria-label={copy.refresh}
+                title={copy.refresh}
+                disabled={selected === '' || loadingDns}
+                onClick={() => setReload((value) => value + 1)}
+              >
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <path
+                    d="M13 5.2A5.5 5.5 0 0 0 3.5 4M13 2.5v3.2h-3.2M3 10.8A5.5 5.5 0 0 0 12.5 12M3 13.5v-3.2h3.2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </button>
             </div>
           }
@@ -206,6 +265,25 @@ export function DomainsPage(props: { locale: LocaleFace }) {
         onAdded={(domain) => {
           setAdding(false)
           void loadDomains(domain.id)
+        }}
+      />
+      <EditDomainDialog
+        domain={editing}
+        copy={copy}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null)
+          void loadDomains()
+        }}
+      />
+      <DeleteDomainDialog
+        domain={removing}
+        copy={copy}
+        onClose={() => setRemoving(null)}
+        onDeleted={(id) => {
+          setRemoving(null)
+          setSelected((current) => (current === id ? '' : current))
+          void loadDomains()
         }}
       />
     </div>
@@ -319,6 +397,146 @@ function AddDomainDialog(props: {
         )}
         <button type="submit" hidden />
       </form>
+    </Dialog>
+  )
+}
+
+function EditDomainDialog(props: {
+  domain: DomainRow | null
+  copy: Copy
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const { copy } = props
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<Failure | null>(null)
+
+  useEffect(() => {
+    setValue(props.domain?.description ?? '')
+    setFailure(null)
+    setBusy(false)
+  }, [props.domain])
+
+  const submit = async () => {
+    if (props.domain === null) return
+    setBusy(true)
+    setFailure(null)
+    try {
+      await api<{ domain: DomainRow }>(`/console-api/domains/${props.domain.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ description: value }),
+      })
+      props.onSaved()
+    } catch (cause) {
+      setFailure(failureOf(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={props.domain !== null}
+      title={copy.editTitle}
+      closeLabel={copy.cancel}
+      onClose={() => {
+        if (!busy) props.onClose()
+      }}
+      footer={
+        <>
+          <DialogButton disabled={busy} onClick={props.onClose}>
+            {copy.cancel}
+          </DialogButton>
+          <DialogButton variant="primary" disabled={busy} onClick={() => void submit()}>
+            {busy ? copy.verifying : copy.save}
+          </DialogButton>
+        </>
+      }
+    >
+      <form
+        className="smp-domain-form"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!busy) void submit()
+        }}
+      >
+        <label>
+          {copy.descriptionLabel}
+          <textarea
+            value={value}
+            maxLength={200}
+            rows={3}
+            placeholder={copy.descriptionPlaceholder}
+            disabled={busy}
+            onChange={(event) => setValue(event.target.value)}
+          />
+        </label>
+        {failure !== null && (
+          <p className="banner error" role="alert">
+            {messageOf(copy, failure)}
+          </p>
+        )}
+      </form>
+    </Dialog>
+  )
+}
+
+function DeleteDomainDialog(props: {
+  domain: DomainRow | null
+  copy: Copy
+  onClose: () => void
+  onDeleted: (id: string) => void
+}) {
+  const { copy } = props
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<Failure | null>(null)
+
+  useEffect(() => {
+    setFailure(null)
+    setBusy(false)
+  }, [props.domain])
+
+  const submit = async () => {
+    if (props.domain === null) return
+    setBusy(true)
+    setFailure(null)
+    try {
+      await api<undefined>(`/console-api/domains/${props.domain.id}`, { method: 'DELETE' })
+      props.onDeleted(props.domain.id)
+    } catch (cause) {
+      setFailure(failureOf(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={props.domain !== null}
+      title={copy.deleteTitle}
+      closeLabel={copy.cancel}
+      onClose={() => {
+        if (!busy) props.onClose()
+      }}
+      footer={
+        <>
+          <DialogButton disabled={busy} onClick={props.onClose}>
+            {copy.cancel}
+          </DialogButton>
+          <DialogButton variant="danger" disabled={busy} onClick={() => void submit()}>
+            {copy.remove}
+          </DialogButton>
+        </>
+      }
+    >
+      <p>{copy.deleteHint}</p>
+      <p className="mono">{props.domain?.name ?? ''}</p>
+      {failure !== null && (
+        <p className="banner error" role="alert">
+          {messageOf(copy, failure)}
+        </p>
+      )}
     </Dialog>
   )
 }

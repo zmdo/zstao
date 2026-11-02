@@ -32,6 +32,7 @@ interface DomainRow {
   account_id: string
   account_name: string
   status: string
+  description: string
   created_at: string
 }
 
@@ -73,6 +74,10 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
       return
     }
     const one = /^\/([0-9a-f-]{36})$/.exec(path)
+    if (one !== null && request.method === 'PATCH') {
+      await updateDomain(ctx, one[1], request, response)
+      return
+    }
     if (one !== null && request.method === 'DELETE') {
       await ctx.database.pool.query('delete from domain_manager_domains where id = $1', [one[1]])
       response.writeHead(204, { 'cache-control': 'no-store' })
@@ -87,7 +92,7 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
 
 async function listDomains(pool: Queryable): Promise<unknown[]> {
   const { rows } = await pool.query<DomainRow>(
-    'select id, name, zone_id, account_id, account_name, status, created_at from domain_manager_domains order by created_at asc, name asc',
+    'select id, name, zone_id, account_id, account_name, status, description, created_at from domain_manager_domains order by created_at asc, name asc',
   )
   return rows.map((row) => ({
     id: row.id,
@@ -96,6 +101,7 @@ async function listDomains(pool: Queryable): Promise<unknown[]> {
     accountId: row.account_id,
     accountName: row.account_name,
     status: row.status,
+    description: row.description,
     createdAt: row.created_at,
   }))
 }
@@ -139,7 +145,7 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
   const { rows } = await ctx.database.pool.query<DomainRow>(
     `insert into domain_manager_domains (id, name, zone_id, account_id, account_name, status, token_ciphertext)
      values ($1, $2, $3, $4, $5, 'active', $6)
-     returning id, name, zone_id, account_id, account_name, status, created_at`,
+     returning id, name, zone_id, account_id, account_name, status, description, created_at`,
     [id, name, checked.zone.id, checked.zone.accountId, checked.zone.accountName, ciphertext],
   )
   const row = rows[0]
@@ -151,6 +157,49 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
       accountId: row.account_id,
       accountName: row.account_name,
       status: row.status,
+      description: row.description,
+      createdAt: row.created_at,
+    },
+  })
+}
+
+async function updateDomain(ctx: HostCtx, id: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  let body: unknown
+  try {
+    body = await readJson(request)
+  } catch {
+    sendJson(response, 400, { code: 'bad_request', detail: '请求无法读取' })
+    return
+  }
+  const description = field(body, 'description')
+  if (description === undefined) {
+    sendJson(response, 400, { code: 'invalid_argument', detail: '需要 description 字段' })
+    return
+  }
+  const text = description.trim()
+  if (text.length > 200) {
+    sendJson(response, 400, { code: 'invalid_description', detail: '说明最多 200 个字符' })
+    return
+  }
+  const { rows } = await ctx.database.pool.query<DomainRow>(
+    `update domain_manager_domains set description = $2 where id = $1
+     returning id, name, zone_id, account_id, account_name, status, description, created_at`,
+    [id, text],
+  )
+  const row = rows[0]
+  if (row === undefined) {
+    sendJson(response, 404, { code: 'not_found', detail: '域名不存在' })
+    return
+  }
+  sendJson(response, 200, {
+    domain: {
+      id: row.id,
+      name: row.name,
+      zoneId: row.zone_id,
+      accountId: row.account_id,
+      accountName: row.account_name,
+      status: row.status,
+      description: row.description,
       createdAt: row.created_at,
     },
   })
@@ -158,7 +207,7 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
 
 async function readDns(ctx: HostCtx, id: string, response: ServerResponse): Promise<void> {
   const { rows } = await ctx.database.pool.query<DomainRow & { token_ciphertext: string }>(
-    'select id, name, zone_id, account_id, account_name, status, created_at, token_ciphertext from domain_manager_domains where id = $1',
+    'select id, name, zone_id, account_id, account_name, status, description, created_at, token_ciphertext from domain_manager_domains where id = $1',
     [id],
   )
   const row = rows[0]
@@ -169,7 +218,7 @@ async function readDns(ctx: HostCtx, id: string, response: ServerResponse): Prom
   try {
     const page = await listDnsRecords(ctx.secrets.decrypt(row.token_ciphertext), row.zone_id, { perPage: 100 })
     sendJson(response, 200, {
-      domain: { id: row.id, name: row.name, zoneId: row.zone_id, accountId: row.account_id, accountName: row.account_name, status: row.status, createdAt: row.created_at },
+      domain: { id: row.id, name: row.name, zoneId: row.zone_id, accountId: row.account_id, accountName: row.account_name, status: row.status, description: row.description, createdAt: row.created_at },
       records: page.records,
       total: page.total,
       totalPages: page.totalPages,

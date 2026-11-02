@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Domain manager",
+    "description": "Attach Cloudflare domains and read their DNS records."
+  }
+}

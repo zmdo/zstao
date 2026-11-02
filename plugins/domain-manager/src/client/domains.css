@@ -1,0 +1,57 @@
+.smp-console .content:has(.smp-domain-shell) { display: flex; flex-direction: column; overflow: hidden; }
+.smp-console .content:has(.smp-domain-shell) > .banner { flex: none; }
+.smp-domain-shell {
+  flex: 1; min-height: 0; display: flex; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--dsw-alias-bg-layer-1);
+}
+.smp-domain-sidebar {
+  width: 232px; flex: none; min-height: 0; display: flex; flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+.smp-domain-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 12px 10px 8px 16px; flex: none;
+}
+.smp-domain-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+.smp-domain-list { flex: 1; min-height: 0; overflow: auto; padding: 4px 10px 16px; }
+.smp-domain-item {
+  display: grid; gap: 2px; width: 100%; min-width: 0; padding: 8px 10px; margin-bottom: 4px;
+  border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; cursor: pointer;
+}
+.smp-domain-item:hover, .smp-domain-item:focus-visible { background: var(--dsw-specific-sidebar-nav-item-hover); }
+.smp-domain-item.is-on { background: var(--primary-soft); color: var(--primary); }
+.smp-domain-item.is-on .smp-domain-name { font-weight: 600; }
+.smp-domain-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13px;
+}
+.smp-domain-account {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; color: var(--muted);
+}
+.smp-domain-item.is-on .smp-domain-account { color: inherit; opacity: 0.75; }
+.smp-domain-hint { margin: 8px 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.smp-domain-main {
+  flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column;
+  gap: 12px; padding: 20px 24px 24px;
+}
+.smp-console .smp-domain-main > .panel {
+  flex: 1; min-width: 0; min-height: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden;
+}
+.smp-console .smp-domain-main .panel-head { flex: none; flex-wrap: wrap; min-height: 56px; padding: 12px 16px; box-sizing: border-box; }
+.smp-console .smp-domain-main .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; }
+.smp-domain-current {
+  max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 400; font-size: 12px; color: var(--muted);
+}
+.smp-domain-tools { margin-left: auto; }
+.smp-domain-table-scroll { flex: 1; min-height: 0; }
+.smp-console .smp-domain-table-scroll table th {
+  position: sticky; top: 0; z-index: 1; background: var(--dsw-alias-bg-layer-2); white-space: nowrap;
+}
+.smp-console .smp-domain-table-scroll table td.mono { font-size: 12px; max-width: 340px; overflow-wrap: anywhere; }
+.smp-domain-type { font-weight: 600; font-size: 12px; letter-spacing: 0.02em; }
+.smp-domain-empty { padding: 36px 16px; text-align: center; color: var(--muted); }
+.smp-domain-form { display: grid; gap: 14px; }
+.smp-console .smp-domain-form label { display: grid; gap: 6px; color: var(--dsw-alias-label-secondary); }
+.smp-console .smp-domain-form .banner { margin: 0; }

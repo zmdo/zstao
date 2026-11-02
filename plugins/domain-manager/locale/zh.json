@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "域名管理",
+    "description": "接入 Cloudflare 域名并查看对应的 DNS 记录。"
+  }
+}

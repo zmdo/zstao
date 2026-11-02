@@ -4,6 +4,7 @@
   "dependencies": {
     "@smp/console-container-runtime": "file:/app/plugins/container-runtime",
     "@smp/console-database": "file:/app/plugins/database",
+    "@smp/console-domain-manager": "file:/app/plugins/domain-manager",
     "@smp/console-encryption-key": "file:/app/plugins/encryption-key",
     "@smp/console-frame": "file:/app/plugins/frame",
     "@smp/console-harness-settings": "file:/app/plugins/harness-settings",
@@ -24,6 +25,7 @@
         "@deepseek-ai/dsh-web-app",
         "@smp/console-container-runtime",
         "@smp/console-database",
+        "@smp/console-domain-manager",
         "@smp/console-encryption-key",
         "@smp/console-frame",
         "@smp/console-harness-settings",

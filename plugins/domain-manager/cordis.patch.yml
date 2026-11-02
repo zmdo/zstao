@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-domain-manager
+      name: '@smp/console-domain-manager'

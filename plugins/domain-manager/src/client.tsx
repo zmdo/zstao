@@ -26,12 +26,15 @@ export function apply(ctx: ClientCtx): void {
       tag.remove()
     }
   })
+  // The sidebar reads the icon off the label function, like pages carry their group.
+  const label: (() => string) & { icon?: string } = () => copyFor(ctx.locale.getSnapshot().active).title
+  label.icon = 'globe'
   ctx.slots.inject('console.page', () =>
     ctx.slots.register(
       {
         name: 'console.page',
         key: 'domain-manager',
-        label: () => copyFor(ctx.locale.getSnapshot().active).title,
+        label,
         order: 4,
         inject: () => ({ locale: ctx.locale }),
       },

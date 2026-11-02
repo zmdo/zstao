@@ -9,15 +9,13 @@
     "@smp/console-harness-settings": "file:/app/plugins/harness-settings",
     "@smp/console-install": "file:/app/plugins/install",
     "@smp/console-plugin-inventory": "file:/app/plugins/plugin-inventory",
-    "@smp/console-self-evolution": "file:/app/plugins/self-evolution",
     "@smp/console-server-containers": "file:/app/plugins/server-containers",
     "@smp/console-server-management": "file:/app/plugins/server-management",
     "@smp/console-session-persistence": "file:/app/plugins/session-persistence",
     "@smp/console-sessions": "file:/app/plugins/sessions",
     "@smp/console-settings-models": "file:/app/plugins/settings-models",
     "@smp/console-workspace-groups": "file:/app/plugins/workspace-groups",
-    "@smp/console-workspace-storage": "file:/app/plugins/workspace-storage",
-    "@smp/console-workspace-group-evolution-dev": "file:/app/plugins/evolution-workspace-group"
+    "@smp/console-workspace-storage": "file:/app/plugins/workspace-storage"
   },
   "dsh": {
     "profile": {
@@ -31,15 +29,13 @@
         "@smp/console-harness-settings",
         "@smp/console-install",
         "@smp/console-plugin-inventory",
-        "@smp/console-self-evolution",
         "@smp/console-server-containers",
         "@smp/console-server-management",
         "@smp/console-session-persistence",
         "@smp/console-sessions",
         "@smp/console-settings-models",
         "@smp/console-workspace-groups",
-        "@smp/console-workspace-storage",
-        "@smp/console-workspace-group-evolution-dev"
+        "@smp/console-workspace-storage"
       ]
     }
   }

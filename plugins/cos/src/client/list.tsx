@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { FileTypeIcon, FolderIcon } from './icons.tsx'
-import { copyFor } from './copy.ts'
+import { copyFor, type Copy } from './copy.ts'
 import type { TreeItem } from './tree.tsx'
 
 interface LocaleFace {
@@ -22,6 +22,8 @@ interface Props {
   onDownload?(item: TreeItem): void
   onDelete?(item: TreeItem): void
 }
+
+const PAGE_SIZES = [20, 50, 100]
 
 function formatSize(bytes: number | null): string {
   if (bytes === null) return ''
@@ -46,11 +48,12 @@ async function json<T>(path: string): Promise<T> {
 
 export function CosList(props: Props) {
   const active = props.locale.getSnapshot().active
-  const copy = copyFor(active)
+  const copy: Copy = copyFor(active)
   const [prefix, setPrefix] = useState('')
   const [items, setItems] = useState<TreeItem[]>([])
   const [markers, setMarkers] = useState<string[]>([''])
   const [nextMarker, setNextMarker] = useState('')
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [results, setResults] = useState<TreeItem[]>([])
@@ -58,15 +61,15 @@ export function CosList(props: Props) {
   const [searchError, setSearchError] = useState('')
   const query = (props.search ?? '').trim()
 
-  const load = async (nextPrefix: string, marker: string) => {
+  const load = async (nextPrefix: string, marker: string, size = pageSize) => {
     setLoading(true)
     setError('')
     try {
-      const page = await json<ObjectPage>(`/objects?prefix=${encodeURIComponent(nextPrefix)}&marker=${encodeURIComponent(marker)}&limit=100`)
+      const page = await json<ObjectPage>(`/objects?prefix=${encodeURIComponent(nextPrefix)}&marker=${encodeURIComponent(marker)}&limit=${size}`)
       setItems(page.items)
       setNextMarker(page.nextMarker)
       setPrefix(nextPrefix)
-      setMarkers((current) => (marker === '' ? [''] : current.length === 0 ? ['', marker] : current))
+      if (marker === '') setMarkers([''])
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
       setItems([])
@@ -77,7 +80,7 @@ export function CosList(props: Props) {
 
   useEffect(() => {
     setMarkers([''])
-    void load('', '')
+    void load('', '', pageSize)
   }, [props.refreshKey])
 
   useEffect(() => {
@@ -109,7 +112,10 @@ export function CosList(props: Props) {
       }}
     >
       {item.kind === 'folder' ? <FolderIcon size={16} /> : <FileTypeIcon name={item.name} size={16} />}
-      <span className="smp-cos-tree-name">{item.name}{item.kind === 'folder' ? '/' : ''}</span>
+      <span className="smp-cos-tree-name">
+        {item.name}
+        {item.kind === 'folder' ? '/' : ''}
+      </span>
       {item.kind === 'file' && <span className="smp-cos-tree-meta">{formatSize(item.size)}</span>}
       {item.kind === 'file' && <span className="smp-cos-tree-time">{formatTime(item.lastModified, active)}</span>}
       {(props.onDownload !== undefined || props.onDelete !== undefined) && item.kind === 'file' && (
@@ -130,10 +136,24 @@ export function CosList(props: Props) {
   )
 
   if (query !== '') {
-    if (searching) return <p className="smp-cos-tree-status">{copy.loading}</p>
-    if (searchError !== '') return <p className="smp-cos-tree-status">{searchError}</p>
-    if (results.length === 0) return <p className="smp-cos-tree-status">{copy.empty}</p>
-    return <div className="smp-cos-list">{results.map((item) => row(item))}</div>
+    return (
+      <div className="smp-cos-list">
+        <div className="smp-cos-list-body">
+          {searching ? (
+            <p className="smp-cos-tree-status">{copy.loading}</p>
+          ) : searchError !== '' ? (
+            <p className="smp-cos-tree-status">{searchError}</p>
+          ) : results.length === 0 ? (
+            <p className="smp-cos-tree-status">{copy.empty}</p>
+          ) : (
+            results.map((item) => row(item))
+          )}
+        </div>
+        <div className="smp-cos-list-footer">
+          <span>{results.length} {copy.items}</span>
+        </div>
+      </div>
+    )
   }
 
   const segments = prefix.split('/').filter((part) => part !== '')
@@ -141,27 +161,56 @@ export function CosList(props: Props) {
 
   return (
     <div className="smp-cos-list">
-      <nav className="smp-cos-crumbs">
-        {crumbs.map((crumb, index) => (
-          <Fragment key={crumb.prefix}>
-            {index > 0 && <span className="smp-cos-crumb-sep">/</span>}
-            <button type="button" className="smp-cos-crumb" onClick={() => { setMarkers(['']); void load(crumb.prefix, '') }}>
-              {crumb.label}
-            </button>
-          </Fragment>
-        ))}
-      </nav>
-      {error !== '' && <p className="smp-cos-tree-status">{error}</p>}
-      {loading ? (
-        <p className="smp-cos-tree-status">{copy.loading}</p>
-      ) : items.length === 0 ? (
-        <p className="smp-cos-tree-status">{copy.empty}</p>
-      ) : (
-        <div className="smp-cos-tree-level">{items.map((item) => row(item))}</div>
-      )}
-      <div className="smp-cos-pager">
+      <div className="smp-cos-list-body">
+        <nav className="smp-cos-crumbs">
+          {crumbs.map((crumb, index) => (
+            <Fragment key={crumb.prefix}>
+              {index > 0 && <span className="smp-cos-crumb-sep">/</span>}
+              <button
+                type="button"
+                className="smp-cos-crumb"
+                onClick={() => {
+                  setMarkers([''])
+                  void load(crumb.prefix, '')
+                }}
+              >
+                {crumb.label}
+              </button>
+            </Fragment>
+          ))}
+        </nav>
+        {error !== '' && <p className="smp-cos-tree-status">{error}</p>}
+        {loading ? (
+          <p className="smp-cos-tree-status">{copy.loading}</p>
+        ) : items.length === 0 ? (
+          <p className="smp-cos-tree-status">{copy.empty}</p>
+        ) : (
+          items.map((item) => row(item))
+        )}
+      </div>
+      <div className="smp-cos-list-footer">
         <span>{items.length} {copy.items}</span>
         <div className="row">
+          <label>
+            {copy.perPage}
+            <select
+              className="smp-page-size"
+              aria-label={copy.perPage}
+              value={pageSize}
+              onChange={(event) => {
+                const size = Number(event.target.value)
+                setPageSize(size)
+                setMarkers([''])
+                void load(prefix, '', size)
+              }}
+            >
+              {PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             className="secondary"
@@ -174,6 +223,7 @@ export function CosList(props: Props) {
           >
             {copy.previous}
           </button>
+          <span>{copy.pageOf.replace('{page}', String(markers.length))}</span>
           <button
             type="button"
             className="secondary"

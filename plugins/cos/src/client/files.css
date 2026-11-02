@@ -53,7 +53,7 @@
 .smp-cos-file-icon.is-pdf { color: var(--dsw-static-red-600); }
 .smp-cos-folder-icon { color: var(--dsw-static-amber-400); }
 .smp-cos-title-icon { flex: none; margin-right: 6px; }
-.smp-cos-page-tree { max-height: calc(100vh - 240px); overflow: auto; padding: 8px 0 8px 8px; }
+.smp-cos-page-tree { max-height: calc(100vh - 160px); overflow: auto; padding: 8px 0 8px 8px; }
 .smp-cos-tree-time { color: var(--dsw-alias-label-tertiary); font-size: 12px; flex: none; margin-left: 8px; }
 .smp-cos-tree-actions { display: none; gap: 6px; margin-left: 8px; flex: none; }
 .smp-cos-tree-row:hover .smp-cos-tree-actions, .smp-cos-tree-row:focus-within .smp-cos-tree-actions { display: inline-flex; }
@@ -86,3 +86,9 @@
 .smp-cos-list { padding: 8px 0 8px 8px; }
 .smp-cos-crumb-sep { color: var(--dsw-alias-label-tertiary); }
 .smp-cos-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.smp-cos-page-tree { height: calc(100vh - 160px); overflow: hidden; padding: 0; display: flex; }
+.smp-cos-list { display: flex; flex-direction: column; height: 100%; width: 100%; padding: 0; }
+.smp-cos-list-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 0 8px 8px; }
+.smp-cos-list-footer { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: .5px solid var(--dsw-alias-border-l3); color: var(--dsw-alias-label-tertiary); font-size: 12px; background: var(--dsw-alias-bg-layer-1); }
+.smp-cos-list-footer .row { gap: 8px; align-items: center; }
+

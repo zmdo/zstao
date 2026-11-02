@@ -35,22 +35,46 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T
 }
 
-function formatSize(bytes: number | null, copy: Copy): string {
-  if (bytes === null) return copy.folders
+function formatSize(bytes: number | null): string {
+  if (bytes === null) return ''
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
-function formatTime(iso: string | null, active: string): string {
-  if (iso === null) return '—'
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString(active.startsWith('en') ? 'en-US' : 'zh-CN')
+function extensionOf(name: string): string {
+  return name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
+}
+
+const ICON_COLOURS: Record<string, string> = {
+  md: '#4f8ef7', txt: '#7a8599', json: '#c9911c', csv: '#2f9e6b',
+  ts: '#3178c6', tsx: '#3178c6', js: '#c9a227', jsx: '#c9a227', css: '#b45bd6',
+  html: '#d2643c', yaml: '#2f9e6b', yml: '#2f9e6b', sh: '#4f8ef7',
+  png: '#2f9e6b', jpg: '#2f9e6b', jpeg: '#2f9e6b', webp: '#2f9e6b', gif: '#2f9e6b',
+  pdf: '#d94848',
+}
+
+function FileGlyph(props: { name: string }) {
+  const colour = ICON_COLOURS[extensionOf(props.name)] ?? 'var(--dsw-alias-label-tertiary)'
+  return (
+    <svg className="smp-cos-tree-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" style={{ color: colour }}>
+      <path d="M3.2 1.8h6l3.6 3.6v8.8H3.2Z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M9.2 1.8v3.6h3.6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function FolderGlyph() {
+  return (
+    <svg className="smp-cos-tree-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M1.8 3.6a1 1 0 0 1 1-1h3l1.3 1.5h6.1a1 1 0 0 1 1 1v6.8a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1Z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+    </svg>
+  )
 }
 
 export function CosFilesTitle(props: { locale?: LocaleFace }) {
   const active = props.locale?.getSnapshot().active ?? 'zh'
-  return <span>{copyFor(active).groupTitle}</span>
+  return <span>{copyFor(active).sidebarTitle}</span>
 }
 
 export function CosFilesBody(props: { locale: LocaleFace; sessionId: string; open(address: string): void }) {
@@ -114,67 +138,51 @@ export function CosFilesBody(props: { locale: LocaleFace; sessionId: string; ope
   const crumbs = [{ label: copy.root, prefix: '' }, ...segments.map((part, index) => ({ label: part, prefix: `${segments.slice(0, index + 1).join('/')}/` }))]
 
   return (
-    <div className="smp-cos-sidebar">
-      <nav className="smp-cos-crumbs">
-        {crumbs.map((crumb, index) => (
-          <Fragment key={crumb.prefix}>
-            {index > 0 && <span>/</span>}
-            <button type="button" className="smp-cos-crumb" onClick={() => void load(crumb.prefix, '')}>
-              {crumb.label}
-            </button>
-          </Fragment>
-        ))}
-      </nav>
-      {error !== '' && (
-        <p className="banner error" role="alert">
-          {error}
-        </p>
-      )}
-      {loading ? (
-        <p className="muted">{copy.loading}</p>
-      ) : items.length === 0 ? (
-        <p className="empty">{copy.empty}</p>
-      ) : (
-        <div className="table-wrap smp-list-scroll">
-          <table className="smp-plugins smp-table">
-            <thead>
-              <tr>
-                <th>{copy.name}</th>
-                <th>{copy.size}</th>
-                <th>{copy.updated}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.key} className="smp-plugin-row" onClick={() => void openFile(item)}>
-                  <td>
-                    {item.kind === 'folder' ? (
-                      <button
-                        type="button"
-                        className="smp-cos-folder"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          void openFile(item)
-                        }}
-                      >
-                        {item.name}/
-                      </button>
-                    ) : opening === item.key ? (
-                      `${item.name} …`
-                    ) : (
-                      item.name
-                    )}
-                  </td>
-                  <td className="nowrap">{item.kind === 'folder' ? copy.folders : formatSize(item.size, copy)}</td>
-                  <td className="nowrap">{formatTime(item.lastModified, active)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="smp-plugins-pager smp-list-pager">
-        <span className="muted">{`${items.length} ${copy.items}`}</span>        <div className="row">
+    <div className="smp-cos-tree">
+      <header className="smp-cos-tree-header">
+        <nav className="smp-cos-tree-path">
+          {crumbs.map((crumb, index) => (
+            <Fragment key={crumb.prefix}>
+              {index > 0 && <span className="smp-cos-tree-sep">/</span>}
+              <button type="button" className="smp-cos-tree-crumb" onClick={() => void load(crumb.prefix, '')}>
+                {crumb.label}
+              </button>
+            </Fragment>
+          ))}
+        </nav>
+        <button type="button" className="smp-cos-tree-tool" title={copy.refresh} aria-label={copy.refresh} onClick={() => void load(prefix, '')}>
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5V6h-3.5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </header>
+      <div className="smp-cos-tree-body">
+        {error !== '' && (
+          <p className="smp-cos-tree-status" role="alert">
+            {error}
+          </p>
+        )}
+        {loading ? (
+          <p className="smp-cos-tree-status">{copy.loading}</p>
+        ) : items.length === 0 ? (
+          <p className="smp-cos-tree-status">{copy.empty}</p>
+        ) : (
+          <ul className="smp-cos-tree-level">
+            {items.map((item) => (
+              <li key={item.key} className="smp-cos-tree-item">
+                <button type="button" className="smp-cos-tree-row" disabled={opening === item.key} onClick={() => void openFile(item)}>
+                  {item.kind === 'folder' ? <FolderGlyph /> : <FileGlyph name={item.name} />}
+                  <span className="smp-cos-tree-name">{item.name}</span>
+                  {item.kind === 'file' && <span className="smp-cos-tree-meta">{formatSize(item.size)}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <footer className="smp-cos-tree-footer">
+        <span>{`${items.length} ${copy.items}`}</span>
+        <div className="row">
           <button
             type="button"
             className="secondary"
@@ -199,7 +207,7 @@ export function CosFilesBody(props: { locale: LocaleFace; sessionId: string; ope
             {copy.next}
           </button>
         </div>
-      </div>
+      </footer>
       {unsupported !== '' && (
         <Dialog
           open

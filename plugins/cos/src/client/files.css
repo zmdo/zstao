@@ -1,4 +1,4 @@
-﻿.smp-cos-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; color: var(--muted); }
+.smp-cos-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; color: var(--muted); }
 .smp-cos-crumb { padding: 2px 4px; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; }
 .smp-cos-crumb:hover { text-decoration: underline; }
 .smp-cos-folder { padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: inherit; }
@@ -24,6 +24,22 @@
 .smp-cos-preview-image { display: block; max-width: 100%; margin: 0 auto; }
 .smp-cos-preview-frame { width: 100%; height: 100%; min-height: 70vh; border: 0; }
 
-.smp-cos-sidebar { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 10px; gap: 8px; }
-.smp-cos-sidebar .table-wrap { flex: 1; min-height: 0; }
-.smp-cos-sidebar .smp-plugins-pager { margin-top: 8px; }
+.smp-cos-tree { height: 100%; min-height: 0; display: flex; flex-direction: column; color: var(--dsw-alias-label-primary); font-size: var(--dsh-content-font-size-secondary, 13px); line-height: 1.5; }
+.smp-cos-tree-header { box-sizing: border-box; height: 38px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 16px; border-bottom: .5px solid var(--dsw-alias-border-l3); }
+.smp-cos-tree-path { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.smp-cos-tree-crumb { border: 0; background: none; color: var(--dsw-alias-label-secondary); font: inherit; cursor: pointer; padding: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-cos-tree-crumb:hover { color: var(--dsw-alias-label-primary); }
+.smp-cos-tree-sep { color: var(--dsw-alias-label-tertiary); }
+.smp-cos-tree-tool { width: 28px; height: 28px; border: 0; border-radius: var(--dsw-radius-sm); background: none; color: var(--dsw-alias-label-secondary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
+.smp-cos-tree-tool:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.smp-cos-tree-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 0 8px 8px; }
+.smp-cos-tree-level { list-style: none; margin: 0; padding: 0; }
+.smp-cos-tree-item { margin: 0; padding: 0; }
+.smp-cos-tree-row { width: 100%; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border: 0; border-radius: var(--dsw-radius-md); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.smp-cos-tree-row:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
+.smp-cos-tree-row:disabled { opacity: .6; cursor: default; }
+.smp-cos-tree-icon { flex: none; color: var(--dsw-alias-label-tertiary); }
+.smp-cos-tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smp-cos-tree-meta { color: var(--dsw-alias-label-tertiary); font-size: 12px; flex: none; margin-left: 8px; }
+.smp-cos-tree-status { margin: 0; padding: 3px 10px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.smp-cos-tree-footer { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-top: .5px solid var(--dsw-alias-border-l3); color: var(--dsw-alias-label-tertiary); font-size: 12px; }

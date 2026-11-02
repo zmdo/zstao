@@ -46,7 +46,10 @@ function formatTime(iso: string, active: string): string {
 }
 
 export function DomainsPage(props: { locale: LocaleFace }) {
-  const active = useSyncExternalStore(props.locale.subscribe, () => props.locale.getSnapshot().active)
+  const active = useSyncExternalStore(
+    (listener) => props.locale.subscribe(listener),
+    () => props.locale.getSnapshot().active,
+  )
   const copy = copyFor(active)
   const [domains, setDomains] = useState<DomainRow[] | null>(null)
   const [selected, setSelected] = useState('')

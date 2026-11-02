@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Panel } from '@smp/console-kit'
 import { Dialog, DialogButton } from '@smp/console-kit/dialog'
-import { CosTree } from './tree.tsx'
+import { CosList } from './list.tsx'
 import { FileTypeIcon } from './icons.tsx'
 import { copyFor, type Copy } from './copy.ts'
 
@@ -345,7 +345,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
         </p>
       )}
       <div className="smp-cos-page-tree">
-        <CosTree
+        <CosList
           locale={props.locale}
           search={query}
           refreshKey={refreshKey}

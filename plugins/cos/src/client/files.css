@@ -83,3 +83,6 @@
 .smp-cos-tree-row .smp-cos-tree-actions button.secondary { height: 20px; min-height: 20px; padding: 0 8px; font-size: 12px; line-height: 1; margin: 0; box-sizing: border-box; }
 
 
+.smp-cos-list { padding: 8px 0 8px 8px; }
+.smp-cos-crumb-sep { color: var(--dsw-alias-label-tertiary); }
+.smp-cos-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; }

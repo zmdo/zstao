@@ -79,7 +79,7 @@ export interface Copy {
 }
 
 const ZH: Copy = {
-  groupTitle: '文件管理',
+  groupTitle: '网络文件管理',
   filesTitle: '文件管理',
   auditTitle: '审计记录',
   settingsTitle: '对象存储',
@@ -159,7 +159,7 @@ const ZH: Copy = {
 }
 
 const EN: Copy = {
-  groupTitle: 'Files',
+  groupTitle: 'Network files',
   filesTitle: 'Files',
   auditTitle: 'Audit log',
   settingsTitle: 'Object storage',

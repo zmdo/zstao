@@ -10,6 +10,7 @@ export interface DomainRow {
   account_name: string
   status: string
   description: string
+  filed: boolean
   created_at: string
   token_ciphertext: string
 }
@@ -22,6 +23,7 @@ export interface ManagedDomain {
   accountName: string
   status: string
   description: string
+  filed: boolean
   createdAt: string
 }
 
@@ -36,13 +38,14 @@ export function publicDomain(row: DomainRow): ManagedDomain {
     accountName: row.account_name,
     status: row.status,
     description: row.description,
+    filed: row.filed,
     createdAt: row.created_at,
   }
 }
 
 export async function loadDomains(pool: Queryable): Promise<ManagedDomain[]> {
   const { rows } = await pool.query<DomainRow>(
-    'select id, name, zone_id, account_id, account_name, status, description, created_at, token_ciphertext from domain_manager_domains order by created_at asc, name asc',
+    'select id, name, zone_id, account_id, account_name, status, description, filed, created_at, token_ciphertext from domain_manager_domains order by created_at asc, name asc',
   )
   return rows.map(publicDomain)
 }

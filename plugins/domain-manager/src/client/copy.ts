@@ -46,6 +46,10 @@ export interface Copy {
   deleteHint: string
   remove: string
   edit: string
+  filedLabel: string
+  filedHint: string
+  filedYes: string
+  filedNo: string
   auditTool: string
   auditAllTools: string
   auditCreate: string
@@ -126,12 +130,16 @@ const ZH: Copy = {
   noDescription: '未填写说明',
   descriptionLabel: '域名说明',
   descriptionPlaceholder: '例如：公司主站，用于官网和邮件',
-  editTitle: '修改域名说明',
+  editTitle: '修改域名',
   save: '保存',
   deleteTitle: '删除域名',
   deleteHint: '删除后这个域名不再受平台管理，Cloudflare 上的 DNS 记录不会被修改。',
   remove: '删除',
   edit: '修改',
+  filedLabel: '已在中国备案（ICP）',
+  filedHint: '只有备案过的域名才能用于中国大陆服务器。',
+  filedYes: '已备案',
+  filedNo: '未备案',
   auditTool: '操作工具',
   auditAllTools: '全部操作',
   auditCreate: '新增',
@@ -212,12 +220,16 @@ const EN: Copy = {
   noDescription: 'No description',
   descriptionLabel: 'Description',
   descriptionPlaceholder: 'For example: company site used for the website and mail',
-  editTitle: 'Edit domain description',
+  editTitle: 'Edit domain',
   save: 'Save',
   deleteTitle: 'Delete domain',
   deleteHint: 'The domain is removed from this platform. Its Cloudflare DNS records are not touched.',
   remove: 'Delete',
   edit: 'Edit',
+  filedLabel: 'Filed in mainland China (ICP)',
+  filedHint: 'Only filed domains may be used with mainland China servers.',
+  filedYes: 'Filed',
+  filedNo: 'Not filed',
   auditTool: 'Tool',
   auditAllTools: 'All actions',
   auditCreate: 'Create',

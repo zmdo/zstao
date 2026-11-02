@@ -12,6 +12,7 @@ interface DomainRow {
   accountName: string
   status: string
   description: string
+  filed: boolean
   createdAt: string
 }
 
@@ -133,7 +134,12 @@ export function DomainsPage(props: { locale: LocaleFace }) {
                 }}
                 title={domain.name}
               >
-                <span className="smp-domain-name">{domain.name}</span>
+                <span className="smp-domain-name-row">
+                  <span className="smp-domain-name">{domain.name}</span>
+                  <span className={`smp-domain-filed${domain.filed ? ' is-on' : ''}`}>
+                    {domain.filed ? copy.filedYes : copy.filedNo}
+                  </span>
+                </span>
                 <span className={`smp-domain-desc${domain.description === '' ? ' is-empty' : ''}`}>
                   {domain.description === '' ? copy.noDescription : domain.description}
                 </span>
@@ -299,6 +305,7 @@ function AddDomainDialog(props: {
   const { copy } = props
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [filed, setFiled] = useState(false)
   const [accountId, setAccountId] = useState('')
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
@@ -308,6 +315,7 @@ function AddDomainDialog(props: {
     if (props.open) return
     setName('')
     setDescription('')
+    setFiled(false)
     setAccountId('')
     setToken('')
     setFailure(null)
@@ -320,7 +328,7 @@ function AddDomainDialog(props: {
     try {
       const data = await api<{ domain: DomainRow }>('/console-api/domains', {
         method: 'POST',
-        body: JSON.stringify({ name, accountId, token, description }),
+        body: JSON.stringify({ name, accountId, token, description, filed }),
       })
       props.onAdded(data.domain)
     } catch (cause) {
@@ -380,6 +388,18 @@ function AddDomainDialog(props: {
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>
+        <label className="smp-domain-check">
+          <input
+            type="checkbox"
+            checked={filed}
+            disabled={busy}
+            onChange={(event) => setFiled(event.target.checked)}
+          />
+          <span>
+            {copy.filedLabel}
+            <small className="smp-domain-check-hint">{copy.filedHint}</small>
+          </span>
+        </label>
         <label>
           {copy.accountIdLabel}
           <input
@@ -423,11 +443,13 @@ function EditDomainDialog(props: {
 }) {
   const { copy } = props
   const [value, setValue] = useState('')
+  const [filed, setFiled] = useState(false)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<Failure | null>(null)
 
   useEffect(() => {
     setValue(props.domain?.description ?? '')
+    setFiled(props.domain?.filed === true)
     setFailure(null)
     setBusy(false)
   }, [props.domain])
@@ -439,7 +461,7 @@ function EditDomainDialog(props: {
     try {
       await api<{ domain: DomainRow }>(`/console-api/domains/${props.domain.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ description: value }),
+        body: JSON.stringify({ description: value, filed }),
       })
       props.onSaved()
     } catch (cause) {
@@ -485,6 +507,18 @@ function EditDomainDialog(props: {
             disabled={busy}
             onChange={(event) => setValue(event.target.value)}
           />
+        </label>
+        <label className="smp-domain-check">
+          <input
+            type="checkbox"
+            checked={filed}
+            disabled={busy}
+            onChange={(event) => setFiled(event.target.checked)}
+          />
+          <span>
+            {copy.filedLabel}
+            <small className="smp-domain-check-hint">{copy.filedHint}</small>
+          </span>
         </label>
         {failure !== null && (
           <p className="banner error" role="alert">

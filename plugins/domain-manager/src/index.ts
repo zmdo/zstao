@@ -33,6 +33,7 @@ interface DomainRow {
   account_name: string
   status: string
   description: string
+  filed: boolean
   created_at: string
 }
 
@@ -92,7 +93,7 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
 
 async function listDomains(pool: Queryable): Promise<unknown[]> {
   const { rows } = await pool.query<DomainRow>(
-    'select id, name, zone_id, account_id, account_name, status, description, created_at from domain_manager_domains order by created_at asc, name asc',
+    'select id, name, zone_id, account_id, account_name, status, description, filed, created_at from domain_manager_domains order by created_at asc, name asc',
   )
   return rows.map((row) => ({
     id: row.id,
@@ -102,6 +103,7 @@ async function listDomains(pool: Queryable): Promise<unknown[]> {
     accountName: row.account_name,
     status: row.status,
     description: row.description,
+    filed: row.filed,
     createdAt: row.created_at,
   }))
 }
@@ -118,6 +120,7 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
   const accountId = field(body, 'accountId')?.trim() ?? ''
   const token = field(body, 'token')?.trim() ?? ''
   const description = field(body, 'description')?.trim() ?? ''
+  const filed = booleanField(body, 'filed') === true
   const name = normalizeDomain(rawName)
   if (name === undefined) {
     sendJson(response, 400, { code: 'invalid_domain', detail: '域名格式不正确' })
@@ -148,10 +151,10 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
   const id = randomUUID()
   const ciphertext = ctx.secrets.encrypt(token)
   const { rows } = await ctx.database.pool.query<DomainRow>(
-    `insert into domain_manager_domains (id, name, zone_id, account_id, account_name, status, token_ciphertext, description)
-     values ($1, $2, $3, $4, $5, 'active', $6, $7)
-     returning id, name, zone_id, account_id, account_name, status, description, created_at`,
-    [id, name, checked.zone.id, checked.zone.accountId, checked.zone.accountName, ciphertext, description],
+    `insert into domain_manager_domains (id, name, zone_id, account_id, account_name, status, token_ciphertext, description, filed)
+     values ($1, $2, $3, $4, $5, 'active', $6, $7, $8)
+     returning id, name, zone_id, account_id, account_name, status, description, filed, created_at`,
+    [id, name, checked.zone.id, checked.zone.accountId, checked.zone.accountName, ciphertext, description, filed],
   )
   const row = rows[0]
   sendJson(response, 201, {
@@ -163,6 +166,7 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
       accountName: row.account_name,
       status: row.status,
       description: row.description,
+      filed: row.filed,
       createdAt: row.created_at,
     },
   })
@@ -177,19 +181,22 @@ async function updateDomain(ctx: HostCtx, id: string, request: IncomingMessage, 
     return
   }
   const description = field(body, 'description')
-  if (description === undefined) {
-    sendJson(response, 400, { code: 'invalid_argument', detail: '需要 description 字段' })
+  const filed = booleanField(body, 'filed')
+  if (description === undefined && filed === undefined) {
+    sendJson(response, 400, { code: 'invalid_argument', detail: '需要 description 或 filed 字段' })
     return
   }
-  const text = description.trim()
-  if (text.length > 200) {
+  const text = description === undefined ? null : description.trim()
+  if (text !== null && text.length > 200) {
     sendJson(response, 400, { code: 'invalid_description', detail: '说明最多 200 个字符' })
     return
   }
   const { rows } = await ctx.database.pool.query<DomainRow>(
-    `update domain_manager_domains set description = $2 where id = $1
-     returning id, name, zone_id, account_id, account_name, status, description, created_at`,
-    [id, text],
+    `update domain_manager_domains
+     set description = coalesce($2, description), filed = coalesce($3, filed)
+     where id = $1
+     returning id, name, zone_id, account_id, account_name, status, description, filed, created_at`,
+    [id, text, filed ?? null],
   )
   const row = rows[0]
   if (row === undefined) {
@@ -205,6 +212,7 @@ async function updateDomain(ctx: HostCtx, id: string, request: IncomingMessage, 
       accountName: row.account_name,
       status: row.status,
       description: row.description,
+      filed: row.filed,
       createdAt: row.created_at,
     },
   })
@@ -212,7 +220,7 @@ async function updateDomain(ctx: HostCtx, id: string, request: IncomingMessage, 
 
 async function readDns(ctx: HostCtx, id: string, response: ServerResponse): Promise<void> {
   const { rows } = await ctx.database.pool.query<DomainRow & { token_ciphertext: string }>(
-    'select id, name, zone_id, account_id, account_name, status, description, created_at, token_ciphertext from domain_manager_domains where id = $1',
+    'select id, name, zone_id, account_id, account_name, status, description, filed, created_at, token_ciphertext from domain_manager_domains where id = $1',
     [id],
   )
   const row = rows[0]
@@ -223,7 +231,7 @@ async function readDns(ctx: HostCtx, id: string, response: ServerResponse): Prom
   try {
     const page = await listDnsRecords(ctx.secrets.decrypt(row.token_ciphertext), row.zone_id, { perPage: 100 })
     sendJson(response, 200, {
-      domain: { id: row.id, name: row.name, zoneId: row.zone_id, accountId: row.account_id, accountName: row.account_name, status: row.status, description: row.description, createdAt: row.created_at },
+      domain: { id: row.id, name: row.name, zoneId: row.zone_id, accountId: row.account_id, accountName: row.account_name, status: row.status, description: row.description, filed: row.filed, createdAt: row.created_at },
       records: page.records,
       total: page.total,
       totalPages: page.totalPages,
@@ -265,6 +273,12 @@ function field(body: unknown, name: string): string | undefined {
   if (body === null || typeof body !== 'object' || !(name in body)) return undefined
   const value = (body as Record<string, unknown>)[name]
   return typeof value === 'string' ? value : undefined
+}
+
+function booleanField(body: unknown, name: string): boolean | undefined {
+  if (body === null || typeof body !== 'object' || !(name in body)) return undefined
+  const value = (body as Record<string, unknown>)[name]
+  return typeof value === 'boolean' ? value : undefined
 }
 
 async function readJson(request: IncomingMessage): Promise<unknown> {

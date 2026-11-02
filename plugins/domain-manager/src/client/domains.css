@@ -107,3 +107,15 @@
 .smp-domain-pager { display: flex; align-items: center; justify-content: space-between; }
 
 .smp-dialog.smp-domain-dialog { width: min(560px, 100%); }
+
+.smp-domain-name-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.smp-domain-name-row .smp-domain-name { flex: 0 1 auto; }
+.smp-domain-filed {
+  flex: none; height: 16px; padding: 0 5px; border-radius: 8px;
+  font-size: 10px; line-height: 16px; background: #f2f3f5; color: var(--muted);
+}
+.smp-domain-filed.is-on { background: var(--green-bg); color: var(--green); }
+.smp-console .smp-domain-form label.smp-domain-check { display: flex; align-items: flex-start; gap: 8px; }
+.smp-console .smp-domain-check input { width: 14px; height: 14px; margin: 3px 0 0; padding: 0; }
+.smp-domain-check > span { display: grid; gap: 2px; }
+.smp-domain-check-hint { color: var(--muted); font-size: 12px; font-weight: 400; }

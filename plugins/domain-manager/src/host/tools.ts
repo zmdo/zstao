@@ -150,7 +150,8 @@ export function registerDomainTools(scope: Context, deps: ToolDeps): void {
       name: 'platform_domain_list',
       description:
         'List domains managed by this platform. Only domains returned here can be addressed by the other domain tools. ' +
-        'Each domain carries its id, Cloudflare account and status.',
+        'Each domain carries its id, Cloudflare account, description and China ICP filing flag. ' +
+        'A domain with filed=false must not be used with mainland China servers.',
       parameters: LIST_PARAMETERS,
       output: TEXT_OUTPUT,
       isConcurrencySafe: () => true,

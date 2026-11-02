@@ -64,6 +64,7 @@ export interface Copy {
   auditAction: string
   auditDomain: string
   auditSummary: string
+  auditReason: string
   auditStatus: string
   auditSession: string
   auditSucceeded: string
@@ -156,6 +157,7 @@ const ZH: Copy = {
   auditAction: '操作',
   auditDomain: '域名',
   auditSummary: '摘要',
+  auditReason: '原因',
   auditStatus: '状态',
   auditSession: '会话',
   auditSucceeded: '成功',
@@ -248,6 +250,7 @@ const EN: Copy = {
   auditAction: 'Action',
   auditDomain: 'Domain',
   auditSummary: 'Summary',
+  auditReason: 'Reason',
   auditStatus: 'Status',
   auditSession: 'Session',
   auditSucceeded: 'Succeeded',

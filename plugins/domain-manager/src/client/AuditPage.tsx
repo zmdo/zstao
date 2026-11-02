@@ -10,6 +10,7 @@ interface AuditItem {
   action: string
   domainName: string
   summary: string
+  reason: string
   args: Record<string, unknown>
   ok: boolean
   error: string | null
@@ -137,6 +138,7 @@ export function AuditPage(props: { locale: LocaleFace }) {
               <th>{copy.auditAction}</th>
               <th>{copy.auditDomain}</th>
               <th>{copy.auditSummary}</th>
+              <th>{copy.auditReason}</th>
               <th>{copy.auditStatus}</th>
               <th>{copy.auditSession}</th>
             </tr>
@@ -160,6 +162,9 @@ export function AuditPage(props: { locale: LocaleFace }) {
                   <td className="nowrap">{actionLabel(copy, item.action)}</td>
                   <td>{item.domainName}</td>
                   <td className="smp-domain-audit-summary">{item.summary}</td>
+                  <td className="smp-domain-audit-reason" title={item.reason}>
+                    {item.reason === '' ? '—' : item.reason}
+                  </td>
                   <td className="nowrap">
                     <span className={`smp-audit-status is-${item.ok ? 'succeeded' : 'failed'}`}>{item.ok ? copy.auditSucceeded : copy.auditFailed}</span>
                   </td>
@@ -169,7 +174,7 @@ export function AuditPage(props: { locale: LocaleFace }) {
                 </tr>
                 {openId === item.id && (
                   <tr>
-                    <td className="smp-record-detail" colSpan={6}>
+                    <td className="smp-record-detail" colSpan={7}>
                       <AuditDetail item={item} copy={copy} />
                     </td>
                   </tr>
@@ -178,7 +183,7 @@ export function AuditPage(props: { locale: LocaleFace }) {
             ))}
             {(data?.items.length ?? 0) === 0 && (
               <tr>
-                <td colSpan={6} className="empty">
+                <td colSpan={7} className="empty">
                   {error !== '' ? copy.auditLoadFailed : copy.auditEmpty}
                 </td>
               </tr>
@@ -243,6 +248,10 @@ function AuditDetail(props: { item: AuditItem; copy: Copy }) {
           <div className="smp-json-row">
             <dt>{props.copy.auditDomain}</dt>
             <dd>{item.domainName}</dd>
+          </div>
+          <div className="smp-json-row">
+            <dt>{props.copy.auditReason}</dt>
+            <dd>{item.reason === '' ? '—' : item.reason}</dd>
           </div>
           <div className="smp-json-row">
             <dt>{props.copy.auditArgs}</dt>

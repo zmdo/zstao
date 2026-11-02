@@ -127,3 +127,4 @@
 .smp-console .smp-domain-check input { width: 14px; height: 14px; margin: 3px 0 0; padding: 0; }
 .smp-domain-check > span { display: grid; gap: 2px; }
 .smp-domain-check-hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+.smp-domain-audit-reason { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }

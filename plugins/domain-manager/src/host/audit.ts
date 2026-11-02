@@ -7,6 +7,7 @@ export interface AuditEntry {
   domainId: string | null
   domainName: string
   summary: string
+  reason: string
   args: unknown
   ok: boolean
   error: string | null
@@ -28,6 +29,7 @@ export interface AuditItem {
   domainId: string | null
   domainName: string
   summary: string
+  reason: string
   args: unknown
   ok: boolean
   error: string | null
@@ -43,9 +45,9 @@ export interface AuditPage {
 
 export async function recordAudit(pool: Queryable, entry: AuditEntry): Promise<void> {
   await pool.query(
-    `insert into domain_manager_audit (session_id, tool, action, domain_id, domain_name, summary, args, ok, error)
-     values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)`,
-    [entry.sessionId, entry.tool, entry.action, entry.domainId, entry.domainName, entry.summary, JSON.stringify(entry.args ?? {}), entry.ok, entry.error],
+    `insert into domain_manager_audit (session_id, tool, action, domain_id, domain_name, summary, args, reason, ok, error)
+     values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10)`,
+    [entry.sessionId, entry.tool, entry.action, entry.domainId, entry.domainName, entry.summary, JSON.stringify(entry.args ?? {}), entry.reason, entry.ok, entry.error],
   )
 }
 
@@ -76,12 +78,13 @@ export async function queryAudit(pool: Queryable, filters: AuditFilters): Promis
     domain_id: string | null
     domain_name: string
     summary: string
+    reason: string
     args: unknown
     ok: boolean
     error: string | null
     created_at: string
   }>(
-    `select id::text, session_id, tool, action, domain_id::text, domain_name, summary, args, ok, error, created_at
+    `select id::text, session_id, tool, action, domain_id::text, domain_name, summary, reason, args, ok, error, created_at
      from domain_manager_audit ${clause}
      order by created_at desc, id desc
      limit $${values.length - 1} offset $${values.length}`,
@@ -96,6 +99,7 @@ export async function queryAudit(pool: Queryable, filters: AuditFilters): Promis
       domainId: row.domain_id,
       domainName: row.domain_name,
       summary: row.summary,
+      reason: row.reason,
       args: row.args,
       ok: row.ok,
       error: row.error,

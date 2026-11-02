@@ -120,7 +120,7 @@ plugins/cos-file-manager/
 
 ## 5. 数据模型
 
-迁移 `plugins/database/migrations/0040_cos.sql`：
+迁移 `plugins/database/migrations/0041_cos.sql`：
 
 ```sql
 -- 单行配置：id 恒为 true。

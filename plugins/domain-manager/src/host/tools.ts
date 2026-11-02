@@ -27,6 +27,13 @@ const DOMAIN_PARAMETER = {
   description: 'Managed domain id or its exact name, for example zstao.com. Only domains returned by platform_domain_list are accepted.',
 } as const
 
+const REASON_PARAMETER = {
+  type: 'string',
+  required: true,
+  description:
+    'Why this DNS change is needed, in one sentence. It is shown to the user for approval and stored in the audit log.',
+} as const
+
 const LIST_PARAMETERS = {
   query: { type: 'string', description: 'Optional text matched against the managed domain name or Cloudflare account name.' },
 } as const
@@ -47,6 +54,7 @@ const DNS_WRITE_PARAMETERS = {
   proxied: { type: 'boolean', description: 'Proxy through Cloudflare. Only valid for A, AAAA and CNAME. Defaults to false.' },
   priority: { type: 'integer', description: 'MX priority. Only valid for MX records.' },
   comment: { type: 'string', description: 'Optional comment stored with the record.' },
+  reason: REASON_PARAMETER,
 } as const
 
 const DNS_UPDATE_PARAMETERS = {
@@ -59,11 +67,20 @@ const DNS_UPDATE_PARAMETERS = {
   proxied: { type: 'boolean', description: 'Proxy through Cloudflare. Only valid for A, AAAA and CNAME.' },
   priority: { type: 'integer', description: 'MX priority. Only valid for MX records.' },
   comment: { type: 'string', description: 'New comment.' },
+  reason: REASON_PARAMETER,
 } as const
 
 const DNS_DELETE_PARAMETERS = {
   domain: DOMAIN_PARAMETER,
   record_id: { type: 'string', required: true, description: 'Record id returned by platform_domain_dns_list for this domain.' },
+  reason: REASON_PARAMETER,
+} as const
+
+const AUDIT_PARAMETERS = {
+  domain: { type: 'string', description: 'Optional managed domain id or exact name.' },
+  action: { type: 'string', enum: ['create', 'update', 'delete'], description: 'Optional action filter.' },
+  hours: { type: 'integer', description: 'Only records newer than this many hours.' },
+  limit: { type: 'integer', description: 'Maximum records from 1 to 100. Defaults to 20.' },
 } as const
 
 function fail(code: string, detail: string, extra: Record<string, unknown> = {}): string {
@@ -116,6 +133,7 @@ export function registerDomainTools(scope: Context, deps: ToolDeps): void {
     tool: string,
     action: string,
     summary: string,
+    reason: string,
     args: Record<string, unknown>,
     ok: boolean,
     error: string | null,
@@ -127,6 +145,7 @@ export function registerDomainTools(scope: Context, deps: ToolDeps): void {
       domainId: row.id,
       domainName: row.name,
       summary,
+      reason,
       args,
       ok,
       error,
@@ -219,23 +238,25 @@ export function registerDomainTools(scope: Context, deps: ToolDeps): void {
           return fail('invalid_argument', cause instanceof Error ? cause.message : String(cause))
         }
         const summary = summaryOf('create', input)
+        const reason = String(args.reason ?? '').trim()
+        if (reason === '') return fail('invalid_argument', 'reason is required')
         const decision = await approve(
           exec,
           'platform_domain_dns_create',
-          `Create ${input.type} ${input.name} -> ${input.content} on ${row.name}`,
-          `在 ${row.name} 上${summary}`,
+          `Create ${input.type} ${input.name} -> ${input.content} on ${row.name}. Reason: ${reason}`,
+          `在 ${row.name} 上${summary}；原因：${reason}`,
         )
         if (!decision.allowed) {
-          await audit(exec, row, 'platform_domain_dns_create', 'create', summary, args, false, `approval_${decision.outcome}`)
+          await audit(exec, row, 'platform_domain_dns_create', 'create', summary, reason, args, false, `approval_${decision.outcome}`)
           return fail('approval_denied', `The user did not approve this change (${decision.outcome}).`, { outcome: decision.outcome })
         }
         try {
           const record = await createDnsRecord(deps.secrets.decrypt(row.token_ciphertext), row.zone_id, input)
-          await audit(exec, row, 'platform_domain_dns_create', 'create', summary, args, true, null)
+          await audit(exec, row, 'platform_domain_dns_create', 'create', summary, reason, args, true, null)
           return JSON.stringify({ domain: { id: row.id, name: row.name }, record })
         } catch (cause) {
           const message = cfFailure(cause)
-          await audit(exec, row, 'platform_domain_dns_create', 'create', summary, args, false, message)
+          await audit(exec, row, 'platform_domain_dns_create', 'create', summary, reason, args, false, message)
           return message
         }
       },
@@ -265,23 +286,25 @@ export function registerDomainTools(scope: Context, deps: ToolDeps): void {
           return fail('invalid_argument', cause instanceof Error ? cause.message : String(cause))
         }
         const summary = `修改记录 ${String(args.record_id)}`
+        const reason = String(args.reason ?? '').trim()
+        if (reason === '') return fail('invalid_argument', 'reason is required')
         const decision = await approve(
           exec,
           'platform_domain_dns_update',
-          `Update record ${String(args.record_id)} on ${row.name}: ${JSON.stringify(input)}`,
-          `修改 ${row.name} 的 DNS 记录（${String(args.record_id)}）`,
+          `Update record ${String(args.record_id)} on ${row.name}: ${JSON.stringify(input)}. Reason: ${reason}`,
+          `修改 ${row.name} 的 DNS 记录（${String(args.record_id)}）；原因：${reason}`,
         )
         if (!decision.allowed) {
-          await audit(exec, row, 'platform_domain_dns_update', 'update', summary, args, false, `approval_${decision.outcome}`)
+          await audit(exec, row, 'platform_domain_dns_update', 'update', summary, reason, args, false, `approval_${decision.outcome}`)
           return fail('approval_denied', `The user did not approve this change (${decision.outcome}).`, { outcome: decision.outcome })
         }
         try {
           const record = await updateDnsRecord(deps.secrets.decrypt(row.token_ciphertext), row.zone_id, String(args.record_id), input)
-          await audit(exec, row, 'platform_domain_dns_update', 'update', summary, args, true, null)
+          await audit(exec, row, 'platform_domain_dns_update', 'update', summary, reason, args, true, null)
           return JSON.stringify({ domain: { id: row.id, name: row.name }, record })
         } catch (cause) {
           const message = cfFailure(cause)
-          await audit(exec, row, 'platform_domain_dns_update', 'update', summary, args, false, message)
+          await audit(exec, row, 'platform_domain_dns_update', 'update', summary, reason, args, false, message)
           return message
         }
       },
@@ -304,24 +327,94 @@ export function registerDomainTools(scope: Context, deps: ToolDeps): void {
           return fail('invalid_argument', 'record_id is required')
         }
         const summary = `删除记录 ${String(args.record_id)}`
+        const reason = String(args.reason ?? '').trim()
+        if (reason === '') return fail('invalid_argument', 'reason is required')
         const decision = await approve(
           exec,
           'platform_domain_dns_delete',
-          `Delete DNS record ${String(args.record_id)} on ${row.name}`,
-          `删除 ${row.name} 的 DNS 记录（${String(args.record_id)}）`,
+          `Delete DNS record ${String(args.record_id)} on ${row.name}. Reason: ${reason}`,
+          `删除 ${row.name} 的 DNS 记录（${String(args.record_id)}）；原因：${reason}`,
         )
         if (!decision.allowed) {
-          await audit(exec, row, 'platform_domain_dns_delete', 'delete', summary, args, false, `approval_${decision.outcome}`)
+          await audit(exec, row, 'platform_domain_dns_delete', 'delete', summary, reason, args, false, `approval_${decision.outcome}`)
           return fail('approval_denied', `The user did not approve this change (${decision.outcome}).`, { outcome: decision.outcome })
         }
         try {
           const record = await deleteDnsRecord(deps.secrets.decrypt(row.token_ciphertext), row.zone_id, String(args.record_id))
-          await audit(exec, row, 'platform_domain_dns_delete', 'delete', summary, args, true, null)
+          await audit(exec, row, 'platform_domain_dns_delete', 'delete', summary, reason, args, true, null)
           return JSON.stringify({ domain: { id: row.id, name: row.name }, deleted: record ?? null })
         } catch (cause) {
           const message = cfFailure(cause)
-          await audit(exec, row, 'platform_domain_dns_delete', 'delete', summary, args, false, message)
+          await audit(exec, row, 'platform_domain_dns_delete', 'delete', summary, reason, args, false, message)
           return message
+        }
+      },
+    }),
+  )
+
+  scope.tools.register(
+    defineTool({
+      name: 'platform_domain_audit_list',
+      description:
+        'List recent DNS change audit records for managed domains, including the reason given for each change. ' +
+        'Use it to answer what was changed, why, by which session and whether it succeeded.',
+      parameters: AUDIT_PARAMETERS,
+      output: TEXT_OUTPUT,
+      isConcurrencySafe: () => true,
+      async execute(args: Record<string, unknown>) {
+        const domain = String(args.domain ?? '').trim()
+        const action = String(args.action ?? '').trim()
+        const hours = args.hours === undefined ? undefined : Number(args.hours)
+        const limit = Math.min(Math.max(Number(args.limit ?? 20) || 20, 1), 100)
+        const where: string[] = []
+        const values: unknown[] = []
+        if (domain !== '') {
+          values.push(domain)
+          where.push(`lower(domain_name) = lower($${values.length})`)
+        }
+        if (action !== '') {
+          values.push(action)
+          where.push(`action = $${values.length}`)
+        }
+        if (hours !== undefined && Number.isFinite(hours) && hours > 0) {
+          values.push(hours)
+          where.push(`created_at >= now() - make_interval(hours => $${values.length})`)
+        }
+        const clause = where.length === 0 ? '' : `where ${where.join(' and ')}`
+        values.push(limit)
+        try {
+          const { rows } = await deps.pool.query<{
+            id: string
+            tool: string
+            action: string
+            domain_name: string
+            summary: string
+            reason: string
+            ok: boolean
+            error: string | null
+            created_at: string
+          }>(
+            `select id::text, tool, action, domain_name, summary, reason, ok, error, created_at
+             from domain_manager_audit ${clause}
+             order by created_at desc, id desc
+             limit $${values.length}`,
+            values,
+          )
+          return JSON.stringify({
+            count: rows.length,
+            items: rows.map((row) => ({
+              time: row.created_at,
+              tool: row.tool,
+              action: row.action,
+              domain: row.domain_name,
+              summary: row.summary,
+              reason: row.reason,
+              ok: row.ok,
+              error: row.error,
+            })),
+          })
+        } catch (cause) {
+          return fail('internal', cause instanceof Error ? cause.message : String(cause))
         }
       },
     }),

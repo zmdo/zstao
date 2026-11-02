@@ -149,7 +149,7 @@ export function DomainsPage(props: { locale: LocaleFace }) {
                     setEditing(domain)
                   }}
                 >
-                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
                     <path d="M10.5 2.8 13.2 5.5 6 12.7l-3.2.7.7-3.2z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
                   </svg>
                 </button>
@@ -163,7 +163,7 @@ export function DomainsPage(props: { locale: LocaleFace }) {
                     setRemoving(domain)
                   }}
                 >
-                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
                     <path
                       d="M3 4.5h10M6 4.5V2.8h4v1.7M4.5 4.5l.6 9h5.8l.6-9M6.5 7v4M9.5 7v4"
                       fill="none"

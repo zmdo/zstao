@@ -43,11 +43,13 @@
 .smp-domain-row:hover .smp-domain-item-actions,
 .smp-domain-row:focus-within .smp-domain-item-actions { opacity: 1; pointer-events: auto; }
 .smp-domain-icon-button {
-  display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
-  border: 0; border-radius: 4px; background: var(--dsw-alias-bg-layer-1);
-  color: var(--muted); cursor: pointer; box-shadow: 0 0 0 1px var(--line);
+  display: inline-grid; place-items: center; box-sizing: border-box;
+  width: 26px; height: 28px; min-height: 28px; padding: 0;
+  border: 0; border-radius: 4px; background: transparent;
+  color: var(--muted); cursor: pointer;
 }
-.smp-domain-icon-button:hover { color: var(--primary); background: var(--primary-soft); }
+.smp-domain-icon-button + .smp-domain-icon-button { margin-left: 2px; }
+.smp-domain-icon-button:hover { background: var(--dsw-specific-sidebar-nav-item-hover); color: var(--primary); }
 .smp-domain-icon-button.is-danger:hover { color: var(--red); background: var(--red-bg); }
 .smp-domain-header-icon {
   display: grid; place-items: center; width: 32px; height: 32px; padding: 0;

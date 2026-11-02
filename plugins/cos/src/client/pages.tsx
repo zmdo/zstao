@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Panel } from '@smp/console-kit'
+import { Dialog, DialogButton } from '@smp/console-kit/dialog'
 import { copyFor, type Copy } from './copy.ts'
 
 export interface LocaleFace {
@@ -220,7 +221,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
           <button type="button" className="secondary" onClick={() => void load(prefix, '', search)}>
             {copy.refresh}
           </button>
-          <button type="button" onClick={() => input.current?.click()}>
+          <button type="button" className="primary" onClick={() => input.current?.click()}>
             {copy.upload}
           </button>
           <input ref={input} type="file" multiple hidden onChange={(event) => upload(event.target.files)} />
@@ -423,18 +424,20 @@ export function FilesPage(props: { locale: LocaleFace }) {
         </aside>
       )}
       {unsupported !== '' && (
-        <div className="smp-cos-modal" role="alertdialog" aria-modal="true">
-          <div className="smp-cos-modal-card">
-            <h3>{copy.unsupportedTitle}</h3>
-            <p>{copy.unsupportedBody}</p>
-            <p className="mono">{unsupported}</p>
-            <div className="row">
-              <button type="button" onClick={() => setUnsupported('')}>
-                {copy.close}
-              </button>
-            </div>
-          </div>
-        </div>
+        <Dialog
+          open
+          title={copy.unsupportedTitle}
+          closeLabel={copy.close}
+          description={copy.unsupportedBody}
+          onClose={() => setUnsupported('')}
+          footer={
+            <DialogButton variant="primary" onClick={() => setUnsupported('')}>
+              {copy.close}
+            </DialogButton>
+          }
+        >
+          <p className="mono">{unsupported}</p>
+        </Dialog>
       )}
     </Panel>
   )
@@ -665,6 +668,9 @@ export function SettingsPage(props: { locale: LocaleFace }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [testing, setTesting] = useState('')
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [stored, setStored] = useState({ attachments: false, default: false })
 
   const loadConfig = async () => {
     setLoading(true)
@@ -672,6 +678,8 @@ export function SettingsPage(props: { locale: LocaleFace }) {
       const data = await requestJson<ConfigResponse>('/config')
       setAttachments(toDraft(data.attachments))
       setFallback(toDraft(data.default))
+      setStored({ attachments: data.attachments?.hasSecretKey ?? false, default: data.default?.hasSecretKey ?? false })
+      setDirty(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
@@ -713,6 +721,7 @@ export function SettingsPage(props: { locale: LocaleFace }) {
   }
 
   const save = async () => {
+    setSaving(true)
     setError('')
     setMessage('')
     try {
@@ -725,11 +734,25 @@ export function SettingsPage(props: { locale: LocaleFace }) {
         }),
       })
       setMessage(copy.saved)
-      await loadConfig()
+      setDirty(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setSaving(false)
     }
   }
+
+  const ready = (draft: Draft, role: 'attachments' | 'default') =>
+    draft.bucket.trim() !== '' && draft.region.trim() !== '' && (draft.secretKey.trim() !== '' || stored[role])
+
+  useEffect(() => {
+    if (!dirty || loading || saving) return
+    if (!ready(attachments, 'attachments') || !ready(fallback, 'default')) return
+    const handle = window.setTimeout(() => {
+      void save()
+    }, 800)
+    return () => window.clearTimeout(handle)
+  }, [dirty, attachments, fallback, loading, saving])
 
   const card = (role: 'attachments' | 'default', title: string, hint: string, draft: Draft, update: (next: Draft) => void) => (
     <section className="panel smp-cos-card">
@@ -781,7 +804,7 @@ export function SettingsPage(props: { locale: LocaleFace }) {
   return (
     <Panel
       title={copy.settingsTitle}
-      extra={<button type="button" disabled={loading} onClick={() => void save()}>{copy.save}</button>}
+      extra={<span className="muted">{saving ? copy.saving : ''}</span>}
     >
       {message !== '' && <p className="smp-cos-note">{message}</p>}
       {error !== '' && (
@@ -790,8 +813,14 @@ export function SettingsPage(props: { locale: LocaleFace }) {
         </p>
       )}
       <div className="smp-cos-cards">
-        {card('attachments', copy.attachmentsTitle, copy.attachmentsHint, attachments, setAttachments)}
-        {card('default', copy.defaultTitle, copy.requiredBoth, fallback, setFallback)}
+        {card('attachments', copy.attachmentsTitle, copy.attachmentsHint, attachments, (next) => {
+          setAttachments(next)
+          setDirty(true)
+        })}
+        {card('default', copy.defaultTitle, copy.requiredBoth, fallback, (next) => {
+          setFallback(next)
+          setDirty(true)
+        })}
       </div>
     </Panel>
   )

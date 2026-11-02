@@ -47,6 +47,7 @@ export interface Copy {
   testOk: string
   save: string
   saved: string
+  saving: string
   saveFailed: string
   requiredBoth: string
   time: string
@@ -120,6 +121,7 @@ const ZH: Copy = {
   testOk: '连接正常',
   save: '保存',
   saved: '已保存',
+  saving: '保存中…',
   saveFailed: '保存失败',
   requiredBoth: '两个桶都必须配置',
   time: '时间',
@@ -193,6 +195,7 @@ const EN: Copy = {
   testOk: 'Connection OK',
   save: 'Save',
   saved: 'Saved',
+  saving: 'Saving…',
   saveFailed: 'Failed to save',
   requiredBoth: 'Both buckets are required',
   time: 'Time',

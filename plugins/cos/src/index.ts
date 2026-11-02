@@ -4,6 +4,7 @@ import { queryAudit, recordAudit } from './host/audit.ts'
 import { clearBuckets, isRole, loadBucket, loadBuckets, saveBucket, validateInput, type BucketInput, type Queryable, type Role, type Secrets } from './host/config.ts'
 import { createClient, invoke, mapError, sanitizeKey } from './host/cos.ts'
 import { deleteObject, listObjects, putObject, readObjectText, signedDownloadUrl, signedInlineUrl, statObject } from './host/objects.ts'
+import { materialize, PreviewError, startPreviewCleanup } from './host/preview.ts'
 import { registerCosTools } from './host/tools.ts'
 
 const PREFIX = '/console-api/cos'
@@ -32,6 +33,7 @@ export async function* apply(ctx: HostCtx): AsyncGenerator<() => void> {
     path: PREFIX,
     handler: (request, response) => handle(ctx, request, response),
   })
+  yield startPreviewCleanup()
 }
 
 async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -52,6 +54,7 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
     if (path === '/objects/download' && request.method === 'GET') return await download(ctx, url, request, response)
     if (path === '/objects/raw' && request.method === 'GET') return await raw(ctx, url, response)
     if (path === '/objects/text' && request.method === 'GET') return await text(ctx, url, response)
+    if (path === '/materialize' && request.method === 'POST') return await materializeObject(ctx, request, response)
     if (path === '/audit' && request.method === 'GET') return await readAudit(ctx, url, response)
     sendJson(response, 404, { code: 'not_found', detail: '没有这个接口' })
   } catch (cause) {
@@ -61,7 +64,7 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
 
 async function readConfig(ctx: HostCtx, response: ServerResponse): Promise<void> {
   const both = await loadBuckets(ctx.database.pool, ctx.secrets)
-  const mask = (settings: { role: Role; bucket: string; region: string; secretId: string; basePrefix: string; maxUploadBytes: number; enabled: boolean; secretKey: string } | undefined) =>
+  const mask = (settings: { role: Role; bucket: string; region: string; secretId: string; basePrefix: string; maxUploadBytes: number; maxPreviewBytes: number; enabled: boolean; secretKey: string } | undefined) =>
     settings === undefined
       ? null
       : {
@@ -72,6 +75,7 @@ async function readConfig(ctx: HostCtx, response: ServerResponse): Promise<void>
           hasSecretKey: settings.secretKey !== '',
           basePrefix: settings.basePrefix,
           maxUploadBytes: settings.maxUploadBytes,
+          maxPreviewBytes: settings.maxPreviewBytes,
           enabled: settings.enabled,
         }
   sendJson(response, 200, { attachments: mask(both.attachments), default: mask(both.default) })
@@ -105,6 +109,7 @@ async function writeConfig(ctx: HostCtx, request: IncomingMessage, response: Ser
       secretKey,
       basePrefix: input.basePrefix ?? '',
       maxUploadBytes: input.maxUploadBytes ?? 104_857_600,
+      maxPreviewBytes: input.maxPreviewBytes ?? 20_971_520,
       enabled: input.enabled !== false,
     }
     try {
@@ -168,6 +173,7 @@ async function testConfig(ctx: HostCtx, request: IncomingMessage, response: Serv
     secretKey,
     basePrefix: input.basePrefix ?? '',
     maxUploadBytes: input.maxUploadBytes ?? 104_857_600,
+    maxPreviewBytes: input.maxPreviewBytes ?? 20_971_520,
     enabled: true,
   }
   const started = Date.now()
@@ -349,6 +355,38 @@ async function text(ctx: HostCtx, url: URL, response: ServerResponse): Promise<v
       sendJson(response, 413, { code: 'preview_too_large', detail: cause.message })
       return
     }
+    sendJson(response, 502, mapped)
+  }
+}
+
+async function materializeObject(ctx: HostCtx, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const settings = await requireDefault(ctx.database.pool, ctx.secrets, response)
+  if (settings === undefined) return
+  const body = await readJson(request)
+  if (body === undefined) return sendJson(response, 400, { code: 'bad_request', detail: '请求无法读取' })
+  const sessionId = String(body.sessionId ?? '')
+  const key = String(body.key ?? '')
+  if (sessionId === '' || key === '') return sendJson(response, 400, { code: 'key_invalid', detail: '需要 sessionId 与 key' })
+  try {
+    const result = await materialize(ctx, settings, sessionId, key)
+    await recordAudit(ctx.database.pool, {
+      sessionId: null,
+      actor: 'console',
+      action: 'download',
+      objectKey: sanitizeKey(key, settings.basePrefix),
+      sizeBytes: result.size,
+      ok: true,
+      error: null,
+      detail: { mode: 'materialize', etag: result.etag, linked: result.linked },
+    })
+    sendJson(response, 200, result)
+  } catch (cause) {
+    if (cause instanceof PreviewError) {
+      const status = cause.code === 'preview_too_large' ? 413 : cause.code === 'session_not_found' ? 404 : 400
+      sendJson(response, status, { code: cause.code, detail: cause.message })
+      return
+    }
+    const mapped = mapError(cause)
     sendJson(response, 502, mapped)
   }
 }

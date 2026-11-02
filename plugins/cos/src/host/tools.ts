@@ -8,6 +8,7 @@ import { recordAudit } from './audit.ts'
 import { createClient, invoke, mapError, sanitizeKey, type CosClient } from './cos.ts'
 import { loadBucket, type BucketSettings, type Queryable, type Secrets } from './config.ts'
 import { deleteObject, listObjects, signedDownloadUrl, statObject } from './objects.ts'
+import { materialize, PreviewError } from './preview.ts'
 
 const TEXT_OUTPUT = {
   schema: { type: 'string' as const },
@@ -244,6 +245,64 @@ export function registerCosTools(scope: Context, deps: ToolDeps): void {
         } catch (cause) {
           const mapped = mapError(cause)
           await audit(exec, 'delete', key, null, false, mapped.detail, {})
+          return fail(mapped.code, mapped.detail)
+        }
+      },
+    }),
+  )
+
+  scope.tools.register(
+    defineTool({
+      name: 'platform_cos_materialize',
+      description:
+        'Download one default-bucket object into the session workspace cache and return its workspace-relative path, so read/grep can open it.',
+      parameters: { key: { type: 'string', required: true, description: 'Object key relative to the configured root.' } },
+      output: TEXT_OUTPUT,
+      timeoutMs: 300_000,
+      async execute(args: Record<string, unknown>, exec: ExecLike) {
+        const target = await defaultBucket(deps)
+        if ('error' in target) return target.error
+        if (exec.agent?.id === undefined) return fail('session_not_found', '当前会话不可用')
+        try {
+          const result = await materialize(scope, target.settings, String(exec.agent.id), String(args.key ?? ''))
+          return JSON.stringify({ path: result.path, size: result.size, etag: result.etag, linked: result.linked, readonly: true })
+        } catch (cause) {
+          if (cause instanceof PreviewError) return fail(cause.code, cause.message)
+          return fail(mapError(cause).code, mapError(cause).detail)
+        }
+      },
+    }),
+  )
+
+  scope.tools.register(
+    defineTool({
+      name: 'platform_cos_read',
+      description: 'Read a small text object from the default bucket and return its content.',
+      parameters: {
+        key: { type: 'string', required: true, description: 'Object key relative to the configured root.' },
+        max_bytes: { type: 'integer', description: 'Maximum bytes to read, capped at 64KB and the preview limit.' },
+      },
+      output: TEXT_OUTPUT,
+      isConcurrencySafe: () => true,
+      async execute(args: Record<string, unknown>) {
+        const target = await defaultBucket(deps)
+        if ('error' in target) return target.error
+        const limit = Math.min(Number(args.max_bytes ?? 65_536), 65_536, target.settings.maxPreviewBytes)
+        try {
+          const client = createClient(target.settings)
+          const stat = await statObject(target.settings, client, String(args.key ?? ''))
+          if (stat.size > limit) return fail('preview_too_large', `文件 ${stat.size} 字节，超过读取上限 ${limit}`)
+          const data = await invoke(client, 'getObject', {
+            Bucket: target.settings.bucket,
+            Region: target.settings.region,
+            Key: sanitizeKey(String(args.key ?? ''), target.settings.basePrefix),
+          })
+          const body = Buffer.isBuffer(data.Body) ? data.Body : Buffer.from(data.Body)
+          const text = body.toString('utf8')
+          if (text.includes('\u0000')) return fail('unsupported_preview', '二进制文件不支持读取')
+          return text
+        } catch (cause) {
+          const mapped = mapError(cause)
           return fail(mapped.code, mapped.detail)
         }
       },

@@ -6,6 +6,10 @@ export interface Copy {
   refresh: string
   upload: string
   uploadHint: string
+  openSidebar: string
+  sidebarHint: string
+  sidebarNoSession: string
+  sidebarTitle: string
   searchPlaceholder: string
   empty: string
   loading: string
@@ -43,6 +47,7 @@ export interface Copy {
   secretKeyHint: string
   basePrefix: string
   maxUpload: string
+  maxPreview: string
   test: string
   testOk: string
   save: string
@@ -80,6 +85,10 @@ const ZH: Copy = {
   refresh: '刷新',
   upload: '上传',
   uploadHint: '拖入文件或点击上传',
+  openSidebar: '在侧边栏打开',
+  sidebarHint: '浏览 COS 默认桶，点击文件用内置预览打开',
+  sidebarNoSession: '请先打开一个会话',
+  sidebarTitle: '网络文件管理',
   searchPlaceholder: '在当前前缀内搜索',
   empty: '这里还没有文件。',
   loading: '加载中…',
@@ -117,6 +126,7 @@ const ZH: Copy = {
   secretKeyHint: '留空表示保持原值',
   basePrefix: '根前缀',
   maxUpload: '上传上限（MB）',
+  maxPreview: '预览上限（MB）',
   test: '测试连接',
   testOk: '连接正常',
   save: '保存',
@@ -154,6 +164,10 @@ const EN: Copy = {
   refresh: 'Refresh',
   upload: 'Upload',
   uploadHint: 'Drop files or click to upload',
+  openSidebar: 'Open in sidebar',
+  sidebarHint: 'Browse the default COS bucket and open files with the built-in preview',
+  sidebarNoSession: 'Open a conversation first',
+  sidebarTitle: 'Network files',
   searchPlaceholder: 'Search in the current prefix',
   empty: 'No files here yet.',
   loading: 'Loading…',
@@ -191,6 +205,7 @@ const EN: Copy = {
   secretKeyHint: 'Leave blank to keep the current value',
   basePrefix: 'Base prefix',
   maxUpload: 'Upload limit (MB)',
+  maxPreview: 'Preview limit (MB)',
   test: 'Test connection',
   testOk: 'Connection OK',
   save: 'Save',

@@ -3,6 +3,7 @@ import test from 'node:test'
 import { normalizePrefix, validateInput } from '../src/host/config.ts'
 import { mapError, sanitizeKey, attachmentKey, CosRequestError } from '../src/host/cos.ts'
 import { listObjects, signedDownloadUrl } from '../src/host/objects.ts'
+import { isPreviewable } from '../src/host/preview.ts'
 
 const settings = {
   role: 'default' as const,
@@ -37,6 +38,14 @@ test('config validation checks bucket format and upload range', () => {
   assert.equal(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing' }), undefined)
   assert.match(validateInput('default', { bucket: 'demo', region: 'ap-beijing' }) ?? '', /name-appid/)
   assert.match(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxUploadBytes: 10 }) ?? '', /上限/)
+  assert.match(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxPreviewBytes: 1000 }) ?? '', /预览/)
+})
+
+test('only previewable media types are materialised', () => {
+  assert.equal(isPreviewable('text/markdown', 'README.md'), true)
+  assert.equal(isPreviewable('image/png', 'pic'), true)
+  assert.equal(isPreviewable('application/pdf', 'doc.pdf'), true)
+  assert.equal(isPreviewable('application/octet-stream', 'blob.bin'), false)
 })
 
 test('cos errors map to stable codes', () => {

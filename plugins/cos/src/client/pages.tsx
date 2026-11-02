@@ -18,6 +18,7 @@ interface ConfigEntry {
   hasSecretKey: boolean
   basePrefix: string
   maxUploadBytes: number
+  maxPreviewBytes?: number
   enabled: boolean
 }
 
@@ -642,10 +643,11 @@ interface Draft {
   secretKey: string
   basePrefix: string
   maxUpload: string
+  maxPreview: string
   enabled: boolean
 }
 
-const EMPTY: Draft = { bucket: '', region: '', secretId: '', secretKey: '', basePrefix: '', maxUpload: '100', enabled: true }
+const EMPTY: Draft = { bucket: '', region: '', secretId: '', secretKey: '', basePrefix: '', maxUpload: '100', maxPreview: '20', enabled: true }
 
 function toDraft(entry: ConfigEntry | null): Draft {
   if (entry === null) return { ...EMPTY }
@@ -656,6 +658,7 @@ function toDraft(entry: ConfigEntry | null): Draft {
     secretKey: '',
     basePrefix: entry.basePrefix,
     maxUpload: String(Math.round(entry.maxUploadBytes / 1048576)),
+    maxPreview: String(Math.round((entry.maxPreviewBytes ?? 20_971_520) / 1048576)),
     enabled: entry.enabled,
   }
 }
@@ -699,6 +702,7 @@ export function SettingsPage(props: { locale: LocaleFace }) {
     secretKey: draft.secretKey,
     basePrefix: draft.basePrefix,
     maxUploadBytes: Math.round(Number(draft.maxUpload || '100') * 1048576),
+    maxPreviewBytes: Math.round(Number(draft.maxPreview || '20') * 1048576),
     enabled: draft.enabled,
   })
 
@@ -788,10 +792,16 @@ export function SettingsPage(props: { locale: LocaleFace }) {
           <input value={draft.basePrefix} onChange={(event) => update({ ...draft, basePrefix: event.target.value })} placeholder={role === 'attachments' ? 'v1/' : ''} />
         </label>
         {role === 'default' && (
-          <label className="smp-cos-field">
-            <span>{copy.maxUpload}</span>
-            <input type="number" min={1} max={2048} value={draft.maxUpload} onChange={(event) => update({ ...draft, maxUpload: event.target.value })} />
-          </label>
+          <>
+            <label className="smp-cos-field">
+              <span>{copy.maxUpload}</span>
+              <input type="number" min={1} max={2048} value={draft.maxUpload} onChange={(event) => update({ ...draft, maxUpload: event.target.value })} />
+            </label>
+            <label className="smp-cos-field">
+              <span>{copy.maxPreview}</span>
+              <input type="number" min={1} max={200} value={draft.maxPreview} onChange={(event) => update({ ...draft, maxPreview: event.target.value })} />
+            </label>
+          </>
         )}
         <label className="smp-cos-check">
           <input type="checkbox" checked={draft.enabled} onChange={(event) => update({ ...draft, enabled: event.target.checked })} />

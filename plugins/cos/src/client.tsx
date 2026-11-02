@@ -1,4 +1,5 @@
-import { AuditPage, FilesPage, SettingsPage, type LocaleFace } from './client/pages.tsx'
+﻿import { AuditPage, FilesPage, SettingsPage, type LocaleFace } from './client/pages.tsx'
+import { CosFilesBody, CosFilesTitle } from './client/sidebar.tsx'
 import { copyFor } from './client/copy.ts'
 import styles from './client/files.css'
 
@@ -11,7 +12,28 @@ interface ClientCtx {
   slots: PageSlots
   locale: LocaleFace
   effect(run: () => () => void): void
+  inject(names: string[], run: (scope: ClientCtx) => void): void
+  shortcuts: {
+    register(definition: {
+      id: string
+      label: () => string
+      aliases?: string[]
+      defaults?: Record<string, { code: string; modifiers: string[] }>
+      regions: string[]
+      modals: string[]
+      resolve(input: { target: Element }): unknown
+    }): () => void
+  }
+  sidebarRightTabs: { register(definition: object): () => void }
+  sidebarRight: {
+    openResource(address: string): void
+    commandTarget(element: Element): unknown
+    openTabFromTarget(kind: string, target: unknown): void
+  }
 }
+
+const SIDEBAR_ID = 'smp-cos-sidebar'
+const SIDEBAR_KIND = 'cos-files'
 
 interface PageLabel {
   (): string
@@ -22,7 +44,7 @@ interface PageLabel {
   icon?: string
 }
 
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight']
 
 function pageLabel(text: () => string, place: { group: string; groupLabel: string; navigation?: 'tabs' | 'sidebar'; placement?: 'footer'; icon?: string }): PageLabel {
   const label: PageLabel = () => text()
@@ -65,11 +87,66 @@ export function apply(ctx: ClientCtx): void {
       {
         name: 'console.page',
         key: 'cos-settings',
-        label: pageLabel(() => copy().settingsTitle, { group: 'platform', groupLabel: '平台设置', placement: 'footer', icon: 'settings' }),
+        label: pageLabel(() => copy().settingsTitle, { group: 'platform', groupLabel: '楠炲啿褰寸拋鍓х枂', placement: 'footer', icon: 'settings' }),
         order: 8,
         inject: () => ({ locale: ctx.locale }),
       },
       SettingsPage,
     ),
   )
+
+  ctx.effect(() =>
+    ctx.sidebarRightTabs.register({
+      id: SIDEBAR_ID,
+      kind: SIDEBAR_KIND,
+      priority: 'extension',
+      title: () => copy().sidebarTitle,
+      keepMounted: true,
+      guide: [
+        {
+          id: SIDEBAR_KIND,
+          commandId: 'cos.files',
+          order: 30,
+          title: () => copy().sidebarTitle,
+          description: () => copy().sidebarHint,
+        },
+      ],
+    }),
+  )
+  ctx.inject(['shortcuts'], (scope) => {
+    scope.effect(() =>
+      scope.shortcuts.register({
+        id: 'cos.files',
+        label: () => copy().sidebarTitle,
+        aliases: ['cos files', 'network files'],
+        defaults: {
+          'desktop:windows': { code: 'KeyO', modifiers: ['primary', 'shift'] },
+          'desktop:macos': { code: 'KeyO', modifiers: ['primary', 'shift'] },
+          'desktop:linux': { code: 'KeyO', modifiers: ['primary', 'shift'] },
+          'web:windows': { code: 'KeyO', modifiers: ['primary', 'shift'] },
+          'web:macos': { code: 'KeyO', modifiers: ['primary', 'shift'] },
+        },
+        regions: ['page', 'editable', 'terminal'],
+        modals: [],
+        resolve: ({ target }) => {
+          const found = ctx.sidebarRight.commandTarget(target)
+          if (found === undefined) return { status: 'blocked', reason: copy().sidebarNoSession }
+          return { status: 'handled', run: () => ctx.sidebarRight.openTabFromTarget(SIDEBAR_KIND, found) }
+        },
+      }),
+    )
+  })
+  ctx.slots.inject('sidebar.right.pane.tab', () =>
+    ctx.slots.register(
+      {
+        name: 'sidebar.right.pane.tab',
+        key: SIDEBAR_ID,
+        inject: () => ({ locale: ctx.locale, open: (address: string) => ctx.sidebarRight.openResource(address) }),
+      },
+      CosFilesBody,
+    ),
+  )
+  ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({ name: 'sidebar.right.pane.tab.title', key: SIDEBAR_ID }, CosFilesTitle))
 }
+
+

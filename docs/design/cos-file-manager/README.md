@@ -136,6 +136,7 @@ create table if not exists cos_buckets (
   secret_key_ciphertext text not null,
   base_prefix text not null default '',
   max_upload_bytes bigint not null default 104857600, -- 仅 default 使用
+  max_preview_bytes bigint not null default 20971520, -- 仅 default 使用，侧边栏预览/物化上限
   enabled boolean not null default false,
   updated_at timestamptz not null default now()
 );
@@ -173,6 +174,7 @@ create index if not exists cos_audit_key_idx on cos_audit (object_key);
 | SecretKey | 必填（留空表示保持原值） | 必填（留空表示保持原值） |
 | 根前缀 `basePrefix` | 可选（默认 `v1/`） | 可选（默认空） |
 | 上传上限 MB | 不适用 | 1–2048，默认 100 |
+| 预览上限 MB | 不适用 | 1–200，默认 20（侧边栏物化/预览用） |
 | 测试连接 | 单独按钮 | 单独按钮 |
 
 保存前分别用 `getBucket(MaxKeys=1)` 验证两个桶；任一失败则整体不保存。SecretKey 永不回传。
@@ -232,7 +234,7 @@ SDK 错误映射：`NoSuchKey` → `object_not_found`；`AccessDenied` → `cos_
 - 两个桶各自独立的 SecretId/SecretKey，Fernet 加密存储，任何接口都不返回。
 - 桶 A 私有不公开：无签名链接、无页面、无工具；仅宿主 SDK 读写。
 - key 规范化：去空白、拒绝空、拒绝 `..`、限制 1024 字节、禁止以 `/` 开头；所有操作必须落在对应角色的 `basePrefix` 内。
-- 默认桶上传上限来自配置（1 MB–2 GB，默认 100 MB）；附件桶大小受 DSH 图片/文件策略约束（沿用本地限制）。
+- 默认桶上传上限来自配置（1 MB–2 GB，默认 100 MB）；预览上限来自配置（1–200 MB，默认 20 MB）；附件桶大小受 DSH 图片/文件策略约束（沿用本地限制）。
 - 会话鉴权沿用控制台 cookie；上传/删除额外校验 `Origin` / `Sec-Fetch-Site`（存在时必须同源）。
 - 超时：上传请求关闭默认短超时，按上限估算（至少 10 分钟）。
 

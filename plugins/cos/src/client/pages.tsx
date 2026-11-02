@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Panel } from '@smp/console-kit'
 import { Dialog, DialogButton } from '@smp/console-kit/dialog'
 import { CosTree } from './tree.tsx'
+import { FileTypeIcon } from './icons.tsx'
 import { copyFor, type Copy } from './copy.ts'
 
 export interface LocaleFace {
@@ -93,6 +94,98 @@ function formatSize(bytes: number | null, copy: Copy): string {
 
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif'])
 const TEXT_EXT = new Set(['txt', 'md', 'json', 'csv', 'log', 'yaml', 'yml', 'ts', 'js', 'css', 'html', 'xml', 'sh', 'ini', 'toml'])
+
+function typeLabel(name: string): string {
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toUpperCase() : 'TEXT'
+  if (ext === 'MD' || ext === 'MARKDOWN') return 'Markdown'
+  if (['PNG', 'JPG', 'JPEG', 'WEBP', 'GIF'].includes(ext)) return 'Image'
+  if (ext === 'PDF') return 'PDF'
+  return ext
+}
+
+function InlineText(props: { text: string }) {
+  const parts: ReactNode[] = []
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*)/g
+  let last = 0
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(props.text)) !== null) {
+    if (match.index > last) parts.push(props.text.slice(last, match.index))
+    const token = match[0]
+    if (token.startsWith('`')) parts.push(<code key={`${match.index}-c`}>{token.slice(1, -1)}</code>)
+    else parts.push(<strong key={`${match.index}-b`}>{token.slice(2, -2)}</strong>)
+    last = match.index + token.length
+  }
+  if (last < props.text.length) parts.push(props.text.slice(last))
+  return <>{parts}</>
+}
+
+function MarkdownView(props: { text: string }) {
+  const blocks: ReactNode[] = []
+  const lines = props.text.split(/\r?\n/)
+  let code: string[] | null = null
+  let list: string[] | null = null
+  const flushList = () => {
+    if (list === null) return
+    blocks.push(
+      <ul key={`ul-${blocks.length}`}>
+        {list.map((entry, index) => (
+          <li key={index}>
+            <InlineText text={entry} />
+          </li>
+        ))}
+      </ul>,
+    )
+    list = null
+  }
+  for (const line of lines) {
+    if (line.startsWith('```')) {
+      if (code !== null) {
+        blocks.push(
+          <pre key={`code-${blocks.length}`} className="smp-cos-md-code">
+            {code.join('\n')}
+          </pre>,
+        )
+        code = null
+      } else {
+        flushList()
+        code = []
+      }
+      continue
+    }
+    if (code !== null) {
+      code.push(line)
+      continue
+    }
+    if (/^\s*[-*]\s+/.test(line)) {
+      list ??= []
+      list.push(line.replace(/^\s*[-*]\s+/, ''))
+      continue
+    }
+    flushList()
+    if (line.trim() === '') continue
+    const heading = /^(#{1,3})\s+(.*)$/.exec(line)
+    if (heading !== null) {
+      const level = heading[1].length
+      const content = <InlineText text={heading[2]} />
+      blocks.push(level === 1 ? <h1 key={`h-${blocks.length}`}>{content}</h1> : level === 2 ? <h2 key={`h-${blocks.length}`}>{content}</h2> : <h3 key={`h-${blocks.length}`}>{content}</h3>)
+      continue
+    }
+    blocks.push(
+      <p key={`p-${blocks.length}`}>
+        <InlineText text={line} />
+      </p>,
+    )
+  }
+  flushList()
+  if (code !== null) {
+    blocks.push(
+      <pre key={`code-${blocks.length}`} className="smp-cos-md-code">
+        {code.join('\n')}
+      </pre>,
+    )
+  }
+  return <div className="smp-cos-markdown">{blocks}</div>
+}
 
 export function FilesPage(props: { locale: LocaleFace }) {
   const copy = useCopy(props.locale)
@@ -264,32 +357,47 @@ export function FilesPage(props: { locale: LocaleFace }) {
         />
       </div>
       {preview !== null && (
-        <aside className="smp-cos-drawer" role="dialog" aria-label={preview.name}>
-          <header className="smp-cos-drawer-head">
-            <strong className="smp-cos-drawer-title">{preview.name}</strong>
+        <aside className="smp-cos-preview" role="dialog" aria-label={preview.name}>
+          <header className="smp-cos-preview-head">
+            <div className="smp-cos-preview-title">
+              <FileTypeIcon name={preview.name} size={16} />
+              <span>{preview.name}</span>
+            </div>
             <div className="row">
               <button
                 type="button"
-                className="secondary"
+                className="smp-cos-preview-tool"
+                title={copy.download}
+                aria-label={copy.download}
                 onClick={() => {
                   window.location.href = `${API}/objects/download?key=${encodeURIComponent(preview.key)}`
                 }}
               >
-                {copy.download}
+                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+                  <path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13h10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
-              <button type="button" className="secondary" onClick={() => setPreview(null)}>
-                {copy.close}
+              <button type="button" className="smp-cos-preview-tool" title={copy.close} aria-label={copy.close} onClick={() => setPreview(null)}>
+                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+                  <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
               </button>
             </div>
           </header>
-          <div className="smp-cos-drawer-body">
+          <div className="smp-cos-preview-bar">
+            <span className="smp-cos-preview-path">{preview.key}</span>
+            <span className="smp-cos-preview-type">{typeLabel(preview.name)}</span>
+          </div>
+          <div className="smp-cos-preview-body">
             {preview.kind === 'text' &&
               (previewLoading ? (
                 <p className="muted">{copy.previewLoading}</p>
               ) : previewError !== '' ? (
                 <p className="banner error">{previewError}</p>
+              ) : /\.(md|markdown|mdx)$/i.test(preview.name) ? (
+                <MarkdownView text={previewText} />
               ) : (
-                <pre className="smp-cos-preview-text">{previewText}</pre>
+                <pre className="smp-cos-md-code">{previewText}</pre>
               ))}
             {preview.kind === 'image' && (
               <img className="smp-cos-preview-image" src={`${API}/objects/raw?key=${encodeURIComponent(preview.key)}`} alt={preview.name} />

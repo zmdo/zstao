@@ -1,4 +1,4 @@
-.smp-cos-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; color: var(--muted); }
+﻿.smp-cos-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; color: var(--muted); }
 .smp-cos-crumb { padding: 2px 4px; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; }
 .smp-cos-crumb:hover { text-decoration: underline; }
 .smp-cos-folder { padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: inherit; }
@@ -78,3 +78,8 @@
 .smp-cos-markdown ul { margin: 0 0 12px; padding-left: 22px; }
 .smp-cos-markdown code { padding: 1px 5px; border-radius: 4px; background: var(--dsw-alias-bg-layer-2); font-size: 12.5px; }
 .smp-cos-md-code { margin: 0 0 12px; padding: 12px 14px; border-radius: 6px; background: var(--dsw-alias-bg-layer-2); border: .5px solid var(--dsw-alias-border-l2); font-size: 12.5px; line-height: 1.6; overflow: auto; }
+.smp-cos-tree-row { min-height: 30px; }
+.smp-cos-tree-actions { align-items: center; }
+.smp-cos-tree-row .smp-cos-tree-actions button.secondary { height: 20px; min-height: 20px; padding: 0 8px; font-size: 12px; line-height: 1; margin: 0; box-sizing: border-box; }
+
+

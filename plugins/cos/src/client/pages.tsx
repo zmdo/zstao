@@ -97,17 +97,18 @@ export function FilesPage(props: { locale: LocaleFace }) {
   const [nextMarker, setNextMarker] = useState('')
   const [truncated, setTruncated] = useState(false)
   const [search, setSearch] = useState('')
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [progress, setProgress] = useState<Record<string, number>>({})
   const input = useRef<HTMLInputElement>(null)
 
-  const load = async (nextPrefix: string, marker: string, query: string) => {
+  const load = async (nextPrefix: string, marker: string, query: string, size = pageSize) => {
     setLoading(true)
     setError('')
     try {
       const page = await requestJson<ObjectPage>(
-        `/objects?prefix=${encodeURIComponent(nextPrefix)}&marker=${encodeURIComponent(marker)}&limit=100&search=${encodeURIComponent(query)}`,
+        `/objects?prefix=${encodeURIComponent(nextPrefix)}&marker=${encodeURIComponent(marker)}&limit=${size}&search=${encodeURIComponent(query)}`,
       )
       setItems(page.items)
       setNextMarker(page.nextMarker)
@@ -123,7 +124,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
   }
 
   useEffect(() => {
-    void load('', '', '')
+    void load('', '', '', 20)
   }, [])
 
   const openFolder = (key: string) => {
@@ -172,11 +173,13 @@ export function FilesPage(props: { locale: LocaleFace }) {
 
   return (
     <Panel
+      className="smp-list-panel"
       title={copy.filesTitle}
       extra={
-        <div className="smp-cos-toolbar">
+        <div className="row smp-plugins-head-extra">
           <input
-            className="smp-cos-search"
+            className="search"
+            type="search"
             placeholder={copy.searchPlaceholder}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -217,8 +220,8 @@ export function FilesPage(props: { locale: LocaleFace }) {
             .join(' · ')}
         </p>
       )}
-      <div className="smp-list-scroll">
-        <table className="smp-table smp-cos-table">
+      <div className="table-wrap smp-list-scroll">
+        <table className="smp-plugins smp-table">
           <thead>
             <tr>
               <th>{copy.name}</th>
@@ -229,7 +232,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.key}>
+              <tr key={item.key} className="smp-plugin-row">
                 <td>
                   {item.kind === 'folder' ? (
                     <button type="button" className="smp-cos-folder" onClick={() => openFolder(item.key)}>
@@ -241,17 +244,25 @@ export function FilesPage(props: { locale: LocaleFace }) {
                 </td>
                 <td className="nowrap">{item.kind === 'folder' ? copy.folders : formatSize(item.size, copy)}</td>
                 <td className="nowrap">{formatTime(item.lastModified, active)}</td>
-                <td className="smp-cos-actions">
-                  {item.kind === 'file' && (
-                    <>
-                      <a className="smp-cos-icon" title={copy.download} href={`${API}/objects/download?key=${encodeURIComponent(item.key)}`}>
-                        ↓
-                      </a>
-                      <button type="button" className="smp-cos-icon" title={copy.delete} onClick={() => void remove(item.key)}>
-                        ×
-                      </button>
-                    </>
-                  )}
+                <td>
+                  <div className="row">
+                    {item.kind === 'file' && (
+                      <>
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => {
+                            window.location.href = `${API}/objects/download?key=${encodeURIComponent(item.key)}`
+                          }}
+                        >
+                          {copy.download}
+                        </button>
+                        <button type="button" className="secondary" onClick={() => void remove(item.key)}>
+                          {copy.delete}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -272,11 +283,29 @@ export function FilesPage(props: { locale: LocaleFace }) {
           </tbody>
         </table>
       </div>
-      <footer className="smp-list-pager smp-cos-pager">
-        <span>
-          {markers.length} / {nextMarker === '' ? markers.length : markers.length + 1}
-        </span>
+      <div className="smp-plugins-pager smp-list-pager">
+        <span className="muted">{`${items.length} ${copy.items}`}</span>
         <div className="row">
+          <label>
+            {copy.perPage}
+            <select
+              className="smp-page-size"
+              aria-label={copy.perPage}
+              value={pageSize}
+              onChange={(event) => {
+                const size = Number(event.target.value)
+                setPageSize(size)
+                setMarkers([''])
+                void load(prefix, '', '', size)
+              }}
+            >
+              {[20, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             className="secondary"
@@ -289,6 +318,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
           >
             {copy.previous}
           </button>
+          <span>{copy.pageOf.replace('{page}', String(markers.length))}</span>
           <button
             type="button"
             className="secondary"
@@ -302,7 +332,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
             {copy.next}
           </button>
         </div>
-      </footer>
+      </div>
     </Panel>
   )
 }
@@ -332,6 +362,7 @@ export function AuditPage(props: { locale: LocaleFace }) {
   const [items, setItems] = useState<AuditItem[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [action, setAction] = useState('')
   const [hours, setHours] = useState('')
   const [key, setKey] = useState('')
@@ -342,7 +373,7 @@ export function AuditPage(props: { locale: LocaleFace }) {
   const load = async () => {
     setLoading(true)
     try {
-      const query = new URLSearchParams({ page: String(page), page_size: '20' })
+      const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
       if (action !== '') query.set('action', action)
       if (hours !== '') query.set('hours', hours)
       if (key !== '') query.set('key', key)
@@ -359,15 +390,17 @@ export function AuditPage(props: { locale: LocaleFace }) {
 
   useEffect(() => {
     void load()
-  }, [page, action, hours])
+  }, [page, pageSize, action, hours])
 
   return (
     <Panel
+      className="smp-list-panel"
       title={copy.auditTitle}
       extra={
-        <div className="smp-cos-toolbar">
+        <div className="row smp-plugins-head-extra">
           <input
-            className="smp-cos-search"
+            className="search"
+            type="search"
             placeholder={copy.keyFilter}
             value={key}
             onChange={(event) => setKey(event.target.value)}
@@ -381,7 +414,7 @@ export function AuditPage(props: { locale: LocaleFace }) {
           <button type="button" className="secondary" onClick={() => { setPage(1); void load() }}>
             {copy.refresh}
           </button>
-          <select value={action} onChange={(event) => { setAction(event.target.value); setPage(1) }}>
+          <select className="smp-status-filter" value={action} onChange={(event) => { setAction(event.target.value); setPage(1) }}>
             <option value="">{copy.allActions}</option>
             {ACTIONS.map((value) => (
               <option key={value} value={value}>
@@ -389,7 +422,7 @@ export function AuditPage(props: { locale: LocaleFace }) {
               </option>
             ))}
           </select>
-          <select value={hours} onChange={(event) => { setHours(event.target.value); setPage(1) }}>
+          <select className="smp-status-filter" value={hours} onChange={(event) => { setHours(event.target.value); setPage(1) }}>
             <option value="">{copy.allTime}</option>
             <option value="24">{copy.last24h}</option>
             <option value="168">{copy.last7d}</option>
@@ -403,8 +436,8 @@ export function AuditPage(props: { locale: LocaleFace }) {
           {error}
         </p>
       )}
-      <div className="smp-list-scroll">
-        <table className="smp-table smp-cos-table">
+      <div className="table-wrap smp-list-scroll">
+        <table className="smp-plugins smp-table">
           <thead>
             <tr>
               <th>{copy.time}</th>
@@ -418,7 +451,7 @@ export function AuditPage(props: { locale: LocaleFace }) {
             {items.map((item) => (
               <Fragment key={item.id}>
                 <tr
-                  className={openId === item.id ? 'smp-cos-row is-open' : 'smp-cos-row'}
+                  className={openId === item.id ? 'smp-plugin-row is-open' : 'smp-plugin-row'}
                   role="button"
                   tabIndex={0}
                   onClick={() => setOpenId((current) => (current === item.id ? '' : item.id))}
@@ -431,18 +464,21 @@ export function AuditPage(props: { locale: LocaleFace }) {
                   <td className="nowrap">{formatTime(item.createdAt, active)}</td>
                   <td className="nowrap">{item.actor}</td>
                   <td className="nowrap">{actionLabel(copy, item.action)}</td>
-                  <td className="smp-cos-key">{item.objectKey === '' ? '—' : item.objectKey}</td>
+                  <td className="mono smp-cos-key">{item.objectKey === '' ? '—' : item.objectKey}</td>
                   <td className="nowrap">
-                    <span className={item.ok ? 'smp-cos-ok' : 'smp-cos-bad'}>{item.ok ? copy.succeeded : copy.failed}</span>
+                    <span className={`pill ${item.ok ? 'succeeded' : 'failed'}`}>{item.ok ? copy.succeeded : copy.failed}</span>
                   </td>
                 </tr>
                 {openId === item.id && (
                   <tr>
-                    <td colSpan={5} className="smp-cos-detail">
-                      <dl className="smp-cos-json">
-                        <div><dt>{copy.object}</dt><dd>{item.objectKey === '' ? '—' : item.objectKey}</dd></div>
-                        <div><dt>{copy.size}</dt><dd>{item.sizeBytes === null ? '—' : formatSize(item.sizeBytes, copy)}</dd></div>
-                        <div><dt>{copy.error}</dt><dd>{item.error ?? '—'}</dd></div>
+                    <td colSpan={5} className="detail">
+                      <dl className="smp-plugin-detail">
+                        <dt>{copy.object}</dt>
+                        <dd className="mono">{item.objectKey === '' ? '—' : item.objectKey}</dd>
+                        <dt>{copy.size}</dt>
+                        <dd>{item.sizeBytes === null ? '—' : formatSize(item.sizeBytes, copy)}</dd>
+                        <dt>{copy.error}</dt>
+                        <dd>{item.error ?? '—'}</dd>
                       </dl>
                     </td>
                   </tr>
@@ -459,18 +495,36 @@ export function AuditPage(props: { locale: LocaleFace }) {
           </tbody>
         </table>
       </div>
-      <footer className="smp-list-pager smp-cos-pager">
-        <span>{total}</span>
+      <div className="smp-plugins-pager smp-list-pager">
+        <span className="muted">{copy.total.replace('{count}', String(total))}</span>
         <div className="row">
+          <label>
+            {copy.perPage}
+            <select
+              className="smp-page-size"
+              aria-label={copy.perPage}
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value))
+                setPage(1)
+              }}
+            >
+              {[20, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
           <button type="button" className="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
             {copy.previous}
           </button>
-          <span>{page}</span>
-          <button type="button" className="secondary" disabled={page * 20 >= total} onClick={() => setPage((value) => value + 1)}>
+          <span>{`${page} / ${Math.max(1, Math.ceil(total / pageSize))}`}</span>
+          <button type="button" className="secondary" disabled={page * pageSize >= total} onClick={() => setPage((value) => value + 1)}>
             {copy.next}
           </button>
         </div>
-      </footer>
+      </div>
     </Panel>
   )
 }

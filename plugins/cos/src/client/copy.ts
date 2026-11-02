@@ -18,6 +18,10 @@ export interface Copy {
   tooLarge: string
   previous: string
   next: string
+  pageOf: string
+  perPage: string
+  items: string
+  total: string
   truncated: string
   folders: string
   files: string
@@ -82,6 +86,10 @@ const ZH: Copy = {
   tooLarge: '文件超过上传上限',
   previous: '上一页',
   next: '下一页',
+  pageOf: '第 {page} 页',
+  perPage: '每页',
+  items: '项',
+  total: '共 {count} 项',
   truncated: '结果已截断，请缩小前缀或搜索范围',
   folders: '目录',
   files: '文件',
@@ -146,6 +154,10 @@ const EN: Copy = {
   tooLarge: 'File exceeds the upload limit',
   previous: 'Previous',
   next: 'Next',
+  pageOf: 'Page {page}',
+  perPage: 'Per page',
+  items: 'items',
+  total: '{count} items',
   truncated: 'Results truncated; narrow the prefix or search',
   folders: 'Folders',
   files: 'Files',

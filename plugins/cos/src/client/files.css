@@ -1,25 +1,10 @@
-.smp-cos-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.smp-cos-search { width: 240px; }
 .smp-cos-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; color: var(--muted); }
 .smp-cos-crumb { padding: 2px 4px; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; }
 .smp-cos-crumb:hover { text-decoration: underline; }
 .smp-cos-folder { padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: inherit; }
 .smp-cos-folder:hover { text-decoration: underline; }
-.smp-cos-actions { display: flex; gap: 6px; justify-content: flex-end; }
-.smp-cos-icon { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; text-decoration: none; }
-.smp-cos-icon:hover { border-color: var(--line); color: var(--fg); background: var(--dsw-alias-bg-layer-2); }
+.smp-cos-key { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .smp-cos-note { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
-.smp-cos-table td.smp-cos-key { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.smp-cos-ok { color: var(--green); }
-.smp-cos-bad { color: var(--red); }
-.smp-cos-detail { padding: 14px 16px !important; background: var(--dsw-alias-bg-layer-2); }
-.smp-cos-json { display: grid; gap: 6px; margin: 0; }
-.smp-cos-json > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; }
-.smp-cos-json dt { color: var(--muted); }
-.smp-cos-json dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.smp-cos-row { cursor: pointer; }
-.smp-cos-row:hover td, .smp-cos-row.is-open td { background: #f7f9fc; }
-.smp-cos-pager { display: flex; align-items: center; justify-content: space-between; }
 .smp-cos-cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
 .smp-cos-card { margin: 0; }
 .smp-cos-field { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 10px; margin-bottom: 8px; }

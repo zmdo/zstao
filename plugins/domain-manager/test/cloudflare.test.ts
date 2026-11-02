@@ -15,20 +15,18 @@ function fakeFetch(route: Route): typeof fetch {
 }
 
 const ACCOUNT = '0123456789abcdef0123456789abcdef'
-const verifyOk = { status: 200, body: { success: true, result: { status: 'active' } } }
 const zonesOk = {
   status: 200,
   body: { success: true, result: [{ id: 'zone-1', name: 'example.com', account: { id: ACCOUNT, name: 'Acme' } }] },
 }
 const zonesEmpty = { status: 200, body: { success: true, result: [] } }
 const readOk = { status: 200, body: { success: true, result: [] } }
-const probeRejected = { status: 400, body: { success: false, errors: [{ code: 9003, message: 'invalid type' }] } }
+const probeRejected = { status: 400, body: { success: false, errors: [{ code: 9002, message: 'invalid type' }] } }
 
 test('checkZone passes a token that can read and edit the account zone', async () => {
   const urls: string[] = []
   const fetchImpl = fakeFetch((url) => {
     urls.push(url)
-    if (url.endsWith('/user/tokens/verify')) return verifyOk
     if (url.includes('/zones?name=')) return zonesOk
     if (url.includes('/dns_records?per_page=1')) return readOk
     return probeRejected
@@ -39,17 +37,17 @@ test('checkZone passes a token that can read and edit the account zone', async (
     zone: { id: 'zone-1', name: 'example.com', accountId: ACCOUNT, accountName: 'Acme' },
   })
   assert.ok(urls.some((url) => url.includes(`account.id=${ACCOUNT}`)), 'zone lookup must filter by account')
+  assert.ok(!urls.some((url) => url.includes('/user/tokens/verify')), 'scoped tokens may fail verify, so it must not be called')
 })
 
 test('checkZone reports rejected tokens, foreign accounts, missing zones and missing permissions', async () => {
   const unauthorized = await checkZone('t', 'example.com', ACCOUNT, {
-    fetch: fakeFetch(() => ({ status: 401, body: { success: false, errors: [{ message: 'bad token' }] } })),
+    fetch: fakeFetch(() => ({ status: 403, body: { success: false, errors: [{ code: 10000, message: 'Authentication error' }] } })),
   })
   assert.equal(unauthorized.ok === false && unauthorized.code, 'unauthorized')
 
   const foreignAccount = await checkZone('t', 'example.com', ACCOUNT, {
     fetch: fakeFetch((url) => {
-      if (url.endsWith('/user/tokens/verify')) return verifyOk
       if (url.includes('account.id=')) return zonesEmpty
       return { status: 200, body: { success: true, result: [{ id: 'z', name: 'example.com', account: { id: 'other' } }] } }
     }),
@@ -57,16 +55,12 @@ test('checkZone reports rejected tokens, foreign accounts, missing zones and mis
   assert.equal(foreignAccount.ok === false && foreignAccount.code, 'account_mismatch')
 
   const missingZone = await checkZone('t', 'example.com', ACCOUNT, {
-    fetch: fakeFetch((url) => {
-      if (url.endsWith('/user/tokens/verify')) return verifyOk
-      return zonesEmpty
-    }),
+    fetch: fakeFetch(() => zonesEmpty),
   })
   assert.equal(missingZone.ok === false && missingZone.code, 'zone_not_found')
 
   const readForbidden = await checkZone('t', 'example.com', ACCOUNT, {
     fetch: fakeFetch((url) => {
-      if (url.endsWith('/user/tokens/verify')) return verifyOk
       if (url.includes('/zones?name=')) return zonesOk
       return { status: 403, body: { success: false, errors: [{ message: 'forbidden' }] } }
     }),
@@ -75,7 +69,6 @@ test('checkZone reports rejected tokens, foreign accounts, missing zones and mis
 
   const writeForbidden = await checkZone('t', 'example.com', ACCOUNT, {
     fetch: fakeFetch((url, init) => {
-      if (url.endsWith('/user/tokens/verify')) return verifyOk
       if (url.includes('/zones?name=')) return zonesOk
       if (init.method === 'POST') return { status: 403, body: { success: false, errors: [{ message: 'no dns edit' }] } }
       return readOk

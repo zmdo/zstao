@@ -78,6 +78,16 @@ function rows(body: Envelope | undefined): ZoneRow[] {
 }
 
 /**
+ * Scoped tokens can fail `/user/tokens/verify` while still reading zones, so
+ * authentication is judged by the resource call instead of the verify endpoint.
+ */
+function isAuthError(status: number, body: Envelope | undefined): boolean {
+  if (status === 401 || status === 403) return true
+  const code = body?.errors?.[0]?.code
+  return code === 1000 || code === 10000 || code === 9109
+}
+
+/**
  * Verify one token can see this zone under the given account and edit its DNS.
  *
  * Zones are looked up with an `account.id` filter so a zone in a different
@@ -92,16 +102,6 @@ export async function checkZone(
   accountId: string,
   options: FetchOptions = {},
 ): Promise<ZoneCheck> {
-  let verify
-  try {
-    verify = await call(token, '/user/tokens/verify', { method: 'GET' }, options)
-  } catch (cause) {
-    return { ok: false, code: 'network', detail: cause instanceof Error ? cause.message : String(cause) }
-  }
-  if (!verify.ok || verify.body?.success === false) {
-    return { ok: false, code: 'unauthorized', detail: failureDetail(verify.body, 'token rejected') }
-  }
-
   let zones
   try {
     zones = await call(
@@ -113,10 +113,10 @@ export async function checkZone(
   } catch (cause) {
     return { ok: false, code: 'network', detail: cause instanceof Error ? cause.message : String(cause) }
   }
-  if (zones.status === 401 || zones.status === 403) {
-    return { ok: false, code: 'unauthorized', detail: failureDetail(zones.body, 'token rejected') }
-  }
   if (!zones.ok) {
+    if (isAuthError(zones.status, zones.body)) {
+      return { ok: false, code: 'unauthorized', detail: failureDetail(zones.body, 'token rejected') }
+    }
     return { ok: false, code: 'network', detail: failureDetail(zones.body, `cloudflare status ${zones.status}`) }
   }
 
@@ -128,6 +128,9 @@ export async function checkZone(
       anywhere = await call(token, `/zones?name=${encodeURIComponent(domain)}&per_page=50`, { method: 'GET' }, options)
     } catch (cause) {
       return { ok: false, code: 'network', detail: cause instanceof Error ? cause.message : String(cause) }
+    }
+    if (isAuthError(anywhere.status, anywhere.body)) {
+      return { ok: false, code: 'unauthorized', detail: failureDetail(anywhere.body, 'token rejected') }
     }
     const seen = rows(anywhere.body).some((row) => typeof row.name === 'string' && row.name.toLowerCase() === domain)
     return seen

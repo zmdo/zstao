@@ -52,3 +52,4 @@
 .smp-cos-file-icon.is-image { color: rgb(139 118 246); }
 .smp-cos-file-icon.is-pdf { color: var(--dsw-static-red-600); }
 .smp-cos-folder-icon { color: var(--dsw-static-amber-400); }
+.smp-cos-title-icon { flex: none; margin-right: 6px; }

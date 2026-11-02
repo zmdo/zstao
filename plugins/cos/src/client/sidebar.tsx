@@ -52,7 +52,12 @@ function formatSize(bytes: number | null): string {
 
 export function CosFilesTitle(props: { locale?: LocaleFace }) {
   const active = props.locale?.getSnapshot().active ?? 'zh'
-  return <span>{copyFor(active).sidebarTitle}</span>
+  return (
+    <>
+      <FolderIcon size={16} className="smp-cos-title-icon" />
+      <span>{copyFor(active).sidebarTitle}</span>
+    </>
+  )
 }
 
 export function CosFilesBody(props: { locale: LocaleFace; sessionId: string; open(address: string): void }) {

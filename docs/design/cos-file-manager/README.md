@@ -111,10 +111,11 @@ plugins/cos-file-manager/
 
 - 顶部：面包屑前缀、搜索框、上传按钮、刷新图标（无桶选择器——单桶）。
 - 列表：目录行（`CommonPrefixes`）+ 对象行；列：名称、大小、修改时间、操作（下载 / 删除，悬浮显示）。
-- 上传：拖入或点上传 → `POST /console-api/cos/objects?key=`，原始字节流，宿主直接 `putObject` 转发，XHR 显示进度；超过设置页上限返回 413。
-- 下载：`GET /console-api/cos/objects/download?key=` → 302 到 5 分钟签名 URL，记 `download` 审计。
-- 删除：确认弹窗 → `DELETE`；只删单个对象，文案里明确不会递归删除前缀。
+- 上传：拖入或点上传 → `POST /console-api/cos/objects?key=`，原始字节流；`Content-Length` 必填（缺失 411），超过配置上限 413；宿主以 `putObject({ Body: stream, ContentLength })` 流式转发，不整包缓冲；key 相对 `basePrefix` 解析，越界拒绝。
+- 下载：`GET /console-api/cos/objects/download?key=` → 302 到 300 秒签名 URL（`getObjectUrl({ Sign: true, Expires: 300 })`）；附件名通过 `Query['response-content-disposition']` 传入并做 RFC 5987 编码；跳转前写 `download` 审计。
+- 删除：确认弹窗 → `DELETE`；只删单个对象，文案里明确不会递归删除前缀；目录行不提供删除按钮。
 - 搜索：以当前前缀为界，宿主最多扫描 5 页 × 1000 个 key 做名称包含匹配，返回 `truncated`；超出提示缩小前缀。
+- 分页：COS 列表没有总数，用 marker 栈（上一页/下一页保存历史 marker），不显示页码比例。
 
 **审计记录页**：筛选动作 / 时间 / 对象名，分页 20 条，行展开看 detail JSON。
 
@@ -154,6 +155,8 @@ create index if not exists cos_audit_created_idx on cos_audit (created_at desc);
 create index if not exists cos_audit_key_idx on cos_audit (object_key);
 ```
 
+配置只有一行，写入使用 `insert into cos_config (id) values (true) on conflict (id) do update set ...`，避免重复行。
+
 ## 6. 宿主接口
 
 全部挂在 `/console-api/cos` 下，`consoleSession.read()` 鉴权，错误统一 `{ code, detail }`。
@@ -165,16 +168,29 @@ create index if not exists cos_audit_key_idx on cos_audit (object_key);
 | POST | `/console-api/cos/config/test` | 用当前表单或已存配置测试连通性，返回 `{ ok, latencyMs, bucket }` |
 | DELETE | `/console-api/cos/config` | 清空配置（不删桶） |
 | GET | `/console-api/cos/objects?prefix=&marker=&limit=&search=` | 列目录/对象；`Delimiter='/'`；返回 `items`、`nextMarker`、`truncated` |
-| POST | `/console-api/cos/objects?key=&overwrite=` | 上传；`Content-Length` 必填；上限取配置；key 服务端规范化 |
+| POST | `/console-api/cos/objects?key=&overwrite=` | 上传；`Content-Length` 必填（缺失 411）；上限取配置；key 必须落在 `basePrefix` 内 |
 | GET | `/console-api/cos/objects/download?key=` | 302 到签名 URL（300 秒）；记录下载审计 |
 | DELETE | `/console-api/cos/objects?key=` | 删除单个对象；记录审计 |
 | GET | `/console-api/cos/audit?page=&page_size=&action=&hours=&key=` | 审计分页 |
 
 错误码：`cos_not_configured`、`cos_disabled`、`key_invalid`、`upload_too_large`（413）、`object_not_found`、`cos_forbidden`、`cos_error`。
 
+### 6.1 SDK 错误映射
+
+`cos-nodejs-sdk-v5` 的错误对象是 `{ statusCode, code, message, error, RequestId }`（旧字段 `error` 可能是 `{ Code, Message }`）。映射规则：
+
+| COS 错误码 / 状态 | 返回 |
+| --- | --- |
+| `NoSuchKey`（404） | `object_not_found` |
+| `AccessDenied` / `Forbidden`（403） | `cos_forbidden` |
+| `InvalidAccessKeyId` / `SignatureDoesNotMatch` | `cos_credentials_invalid` |
+| `NoSuchBucket` / `BucketNotFound` | `cos_bucket_not_found` |
+| `RequestTimeTooSkewed` | `cos_clock_skew` |
+| 其他 | `cos_error`，附 `RequestId` 便于查腾讯云工单 |
+
 ## 7. AI 工具
 
-在 Harness 会话中注册 4 个工具，写操作沿用域名插件的审批模式（full-access 直通，否则逐次批准），全部记 `actor='tool'` 审计。
+在 Harness 会话中注册 5 个工具，写操作沿用域名插件的审批模式（full-access 直通，否则逐次批准），全部记 `actor='tool'` 审计。
 
 | 工具 | 参数 | 审批 | 说明 |
 | --- | --- | --- | --- |
@@ -182,6 +198,7 @@ create index if not exists cos_audit_key_idx on cos_audit (object_key);
 | `platform_cos_get` | `key` | 否 | 返回对象元数据 + 300 秒签名下载链接 |
 | `platform_cos_upload` | `path`（工作区内本地文件）、`key`、`overwrite?` | 是 | 读本地文件流上传到 COS |
 | `platform_cos_delete` | `key` | 是 | 删除单个对象 |
+| `platform_cos_audit_list` | `prefix?`、`action?`、`hours?`、`limit?` | 否 | 查询 COS 操作审计，含失败原因 |
 
 约束：
 
@@ -196,9 +213,12 @@ create index if not exists cos_audit_key_idx on cos_audit (object_key);
 - `secretId` 只回传脱敏值；
 - 浏览器只接触对象 key 与 5 分钟签名 URL；
 - key 规范化：去空白、拒绝空、拒绝 `..` 段、限制 1024 字节、禁止以 `/` 开头；
+- **前缀边界**：列表、上传、下载、删除都先把 key 解析为 `basePrefix + 相对路径`，解析后必须以 `basePrefix` 开头，否则 `key_invalid`；`basePrefix` 非空时自动补 `/`；
 - 上传上限来自配置（1 MB–2 GB，默认 100 MB），超限 413；
-- 下载 302 时设置 `response-content-disposition` 指定附件名；代理下载（P5 可选）加 `X-Content-Type-Options: nosniff`；
-- 所有路由要求控制台会话；配置变更也写审计。
+- 下载 302 时设置 `response-content-disposition` 指定附件名（非 ASCII 用 RFC 5987 编码）；代理下载（P5 可选）加 `X-Content-Type-Options: nosniff`；
+- 所有路由要求控制台会话；配置变更也写审计；
+- CSRF：沿用控制台现有模式（同源 cookie、无 CSRF token）。上传/删除接口额外校验 `Origin`/`Sec-Fetch-Site`（存在时必须是 same-origin），降低跨站表单提交风险；
+- 超时：宿主对上传请求关闭默认 2 分钟 socket 超时，按 `max_upload_bytes` 估算超时（至少 10 分钟），避免大文件被中途掐断。
 
 ## 9. 审计
 
@@ -215,7 +235,7 @@ create index if not exists cos_audit_key_idx on cos_audit (object_key);
 | P2 | 文件列表（目录 + 对象）、面包屑、刷新 | 能浏览根前缀与子前缀 |
 | P3 | 上传（流式 + 进度）、下载（签名跳转）、删除、审计写入 | 四类操作成功且审计有记录 |
 | P4 | 搜索（含截断提示）、审计记录页 | 搜索与筛选可用 |
-| P5 | AI 4 个工具、>上限预签名直传、新建文件夹占位对象 | 会话内工具可调用，写操作弹审批 |
+| P5 | AI 5 个工具、>上限预签名直传、新建文件夹占位对象 | 会话内工具可调用，写操作弹审批 |
 
 ## 11. 测试与验收
 
@@ -231,3 +251,32 @@ create index if not exists cos_audit_key_idx on cos_audit (object_key);
 3. **SDK 版本**：`cos-nodejs-sdk-v5@3.0.0` 较新，实施前核对 `putObject` 流式 Body 与 `getObjectUrl` 回调签名。
 4. **搜索成本**：COS 无全文检索，扫描上限 5×1000，超出提示缩小前缀（已确认接受）。
 5. **AI 上传的路径边界**：只允许工作区内文件；是否需要「只读模式」开关（禁止 AI 删除）待定，默认沿用审批。
+
+
+
+## 13. 复核记录（2026-11-03）
+
+对照 `cos-nodejs-sdk-v5@3.0.0` 的 `index.d.ts`、仓库现有插件与 dsh 能力逐条核对，结论与修正如下：
+
+| # | 复核项 | 结论 | 处理 |
+| --- | --- | --- | --- |
+| 1 | 流式上传 | `UploadBody = Buffer \| String \| Stream`，`ContentLength` 可选（流式时走服务端流式上传） | 仍强制要求 `Content-Length`，用于上限校验；缺失返回 411 |
+| 2 | 签名 URL | `getObjectUrl` 支持 `Expires`（默认 900 秒）与 `Query`；没有 `ResponseContentDisposition` 字段 | 附件名改由 `Query['response-content-disposition']` 传入并签名 |
+| 3 | 错误对象 | `{ statusCode, code, message, error, RequestId }`，旧字段 `error` 可能是 `{ Code, Message }` | 新增 6.1 错误映射表，统一返回 `code/detail` 并带 `RequestId` |
+| 4 | 列表分页 | `getBucket` 只返回 `IsTruncated` / `NextMarker`，没有总数 | 文件页分页改为 marker 栈，不显示页码比例 |
+| 5 | 单行配置 | `id boolean primary key check (id)` 需要幂等写入 | 明确使用 `insert ... on conflict (id) do update` |
+| 6 | 前缀边界 | 原方案只在列表提了 `basePrefix` | 列表、上传、下载、删除全部强制校验前缀，越界 `key_invalid` |
+| 7 | 侧栏图标 | `NavGlyph` 目前只有 `chat` / `settings` / `server` / `audit` / `globe` | P1 增加 `folder` 图标 |
+| 8 | 工作区边界 | 服务器管理用 `ctx.get('workingDirectory')` 的 `ensure(agent)` | AI 上传沿用该服务，未注入时工具返回不可用 |
+| 9 | 审批 | 域名插件已有 `authorizeOperation`（full-access 直通，否则逐次批准） | COS 写工具直接复用同一模式 |
+| 10 | 会话内审计 | 域名插件已提供 `platform_domain_audit_list` | 对称新增 `platform_cos_audit_list`，工具数 4 → 5 |
+| 11 | 迁移编号 | `0040` 已被 `0040_domain_audit_reason.sql` 占用 | COS 迁移改为 `0041_cos.sql` |
+| 12 | 连接测试权限 | `getBucket` 需要 ListBucket 权限，只有对象读写权限的密钥会失败 | 设置页文案注明；保存前必须通过该测试 |
+| 13 | 测试注入 | SDK 是回调式 CJS，直接 mock 困难 | `host/cos.ts` 接受 client factory，单测注入 fake 客户端 |
+| 14 | 非 ASCII key | COS 列表对特殊字符需要 `encoding-type` | 列表请求带 `EncodingType: 'url'`，返回时解码 |
+
+遗留风险（不影响 P1–P3）：
+
+- 控制台沿用同源 cookie、无 CSRF token；上传/删除额外做 `Origin` / `Sec-Fetch-Site` 校验。
+- 代理上传占宿主带宽，大文件仍建议 P5 预签名直传。
+- `getObjectUrl` 的签名 URL 一旦泄露，在有效期内可被任何人下载；有效期固定 300 秒，且只对单个 key 签发。

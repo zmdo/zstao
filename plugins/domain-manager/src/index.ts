@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { checkZone, listDnsRecords } from './cloudflare.ts'
 import { normalizeDomain } from './domain-name.ts'
+import { queryAudit } from './host/audit.ts'
+import { registerDomainTools } from './host/tools.ts'
 
 const PREFIX = '/console-api/domains'
 
@@ -33,9 +35,12 @@ interface DomainRow {
   created_at: string
 }
 
-export const inject = ['database', 'secrets', 'consoleSession', 'webServer']
+export const inject = ['database', 'secrets', 'consoleSession', 'webServer', 'tools']
 
 export async function* apply(ctx: HostCtx): AsyncGenerator<() => void> {
+  ctx.inject(['tools'], (scope: Context) => {
+    registerDomainTools(scope, { pool: ctx.database.pool, secrets: ctx.secrets })
+  })
   yield ctx.webServer.register({
     kind: 'prefix',
     path: PREFIX,
@@ -56,6 +61,10 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
     }
     if (path === '/' && request.method === 'POST') {
       await createDomain(ctx, request, response)
+      return
+    }
+    if (path === '/audit' && request.method === 'GET') {
+      await readAudit(ctx, request, response)
       return
     }
     const dns = /^\/([0-9a-f-]{36})\/dns$/.exec(path)
@@ -158,10 +167,12 @@ async function readDns(ctx: HostCtx, id: string, response: ServerResponse): Prom
     return
   }
   try {
-    const records = await listDnsRecords(ctx.secrets.decrypt(row.token_ciphertext), row.zone_id)
+    const page = await listDnsRecords(ctx.secrets.decrypt(row.token_ciphertext), row.zone_id, { perPage: 100 })
     sendJson(response, 200, {
       domain: { id: row.id, name: row.name, zoneId: row.zone_id, accountId: row.account_id, accountName: row.account_name, status: row.status, createdAt: row.created_at },
-      records,
+      records: page.records,
+      total: page.total,
+      totalPages: page.totalPages,
     })
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause)
@@ -171,6 +182,24 @@ async function readDns(ctx: HostCtx, id: string, response: ServerResponse): Prom
     }
     sendJson(response, 502, { code: 'cloudflare', detail: message })
   }
+}
+
+async function readAudit(ctx: HostCtx, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const url = new URL(request.url ?? '/', 'http://localhost')
+  const page = Math.max(Number(url.searchParams.get('page') ?? 1) || 1, 1)
+  const pageSize = Math.min(Math.max(Number(url.searchParams.get('page_size') ?? 20) || 20, 1), 100)
+  const tool = (url.searchParams.get('tool') ?? '').trim()
+  const domain = (url.searchParams.get('domain') ?? '').trim()
+  const hoursRaw = (url.searchParams.get('hours') ?? '').trim()
+  const hours = hoursRaw === '' ? undefined : Number(hoursRaw)
+  const result = await queryAudit(ctx.database.pool, {
+    page,
+    pageSize,
+    tool,
+    domain,
+    hours: hours === undefined || Number.isNaN(hours) ? undefined : hours,
+  })
+  sendJson(response, 200, result)
 }
 
 function cookieHeader(request: IncomingMessage): string {

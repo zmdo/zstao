@@ -2,6 +2,9 @@ import type { LocaleFace } from './api.ts'
 
 export interface Copy {
   title: string
+  groupTitle: string
+  instancesTitle: string
+  auditTitle: string
   domains: string
   add: string
   refresh: string
@@ -31,10 +34,38 @@ export interface Copy {
   verifying: string
   errors: Record<string, string>
   account: string
+  search: string
+  previous: string
+  next: string
+  auditTool: string
+  auditAllTools: string
+  auditCreate: string
+  auditUpdate: string
+  auditDelete: string
+  auditTimeRange: string
+  auditAllTime: string
+  auditLast24h: string
+  auditLast7d: string
+  auditLast30d: string
+  auditTime: string
+  auditAction: string
+  auditDomain: string
+  auditSummary: string
+  auditStatus: string
+  auditSession: string
+  auditSucceeded: string
+  auditFailed: string
+  auditDomainFilter: string
+  auditEmpty: string
+  auditLoadFailed: string
+  auditArgs: string
 }
 
 const ZH: Copy = {
   title: '域名管理',
+  groupTitle: '域名管理',
+  instancesTitle: '域名实例',
+  auditTitle: '审计记录',
   domains: '域名',
   add: '添加域名',
   refresh: '刷新',
@@ -80,10 +111,38 @@ const ZH: Copy = {
     internal: '服务器内部错误。',
     request_failed: '请求失败。',
   },
+  search: '搜索',
+  previous: '上一页',
+  next: '下一页',
+  auditTool: '操作工具',
+  auditAllTools: '全部操作',
+  auditCreate: '新增',
+  auditUpdate: '修改',
+  auditDelete: '删除',
+  auditTimeRange: '时间范围',
+  auditAllTime: '全部时间',
+  auditLast24h: '最近 24 小时',
+  auditLast7d: '最近 7 天',
+  auditLast30d: '最近 30 天',
+  auditTime: '时间',
+  auditAction: '操作',
+  auditDomain: '域名',
+  auditSummary: '摘要',
+  auditStatus: '状态',
+  auditSession: '会话',
+  auditSucceeded: '成功',
+  auditFailed: '失败',
+  auditDomainFilter: '按域名筛选',
+  auditEmpty: '还没有 DNS 变更记录。',
+  auditLoadFailed: '审计记录加载失败。',
+  auditArgs: '参数',
 }
 
 const EN: Copy = {
   title: 'Domain manager',
+  groupTitle: 'Domain manager',
+  instancesTitle: 'Domains',
+  auditTitle: 'Audit log',
   domains: 'Domains',
   add: 'Add domain',
   refresh: 'Refresh',
@@ -129,6 +188,31 @@ const EN: Copy = {
     internal: 'Internal server error.',
     request_failed: 'The request failed.',
   },
+  search: 'Search',
+  previous: 'Previous',
+  next: 'Next',
+  auditTool: 'Tool',
+  auditAllTools: 'All actions',
+  auditCreate: 'Create',
+  auditUpdate: 'Update',
+  auditDelete: 'Delete',
+  auditTimeRange: 'Time range',
+  auditAllTime: 'All time',
+  auditLast24h: 'Last 24 hours',
+  auditLast7d: 'Last 7 days',
+  auditLast30d: 'Last 30 days',
+  auditTime: 'Time',
+  auditAction: 'Action',
+  auditDomain: 'Domain',
+  auditSummary: 'Summary',
+  auditStatus: 'Status',
+  auditSession: 'Session',
+  auditSucceeded: 'Succeeded',
+  auditFailed: 'Failed',
+  auditDomainFilter: 'Filter by domain',
+  auditEmpty: 'No DNS changes have been recorded yet.',
+  auditLoadFailed: 'Failed to load the audit log.',
+  auditArgs: 'Arguments',
 }
 
 export function copyFor(locale: string): Copy {

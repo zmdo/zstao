@@ -14,8 +14,26 @@ export interface DnsRecord {
   content: string
   ttl: number
   proxied: boolean
+  priority?: number
   modifiedOn: string
   comment: string
+}
+
+export interface DnsInput {
+  type?: string
+  name?: string
+  content?: string
+  ttl?: number
+  proxied?: boolean
+  priority?: number
+  comment?: string
+}
+
+export interface DnsPage {
+  records: DnsRecord[]
+  page: number
+  totalPages: number
+  total: number
 }
 
 export type ZoneFailure =
@@ -35,10 +53,24 @@ export interface FetchOptions {
   timeoutMs?: number
 }
 
+/** A Cloudflare resource answered with an error; the token is never part of the message. */
+export class CloudflareError extends Error {
+  readonly status: number
+  readonly code: number | undefined
+
+  constructor(status: number, code: number | undefined, message: string) {
+    super(message)
+    this.name = 'CloudflareError'
+    this.status = status
+    this.code = code
+  }
+}
+
 interface Envelope {
   success?: boolean
   errors?: { code?: number; message?: string }[]
   result?: unknown
+  result_info?: { page?: number; total_pages?: number; total_count?: number }
 }
 
 interface ZoneRow {
@@ -62,7 +94,7 @@ async function call(
       signal: AbortSignal.timeout(options.timeoutMs ?? 15_000),
     })
   } catch (cause) {
-    throw new Error(`cloudflare request failed: ${cause instanceof Error ? cause.message : String(cause)}`)
+    throw new CloudflareError(0, undefined, `cloudflare request failed: ${cause instanceof Error ? cause.message : String(cause)}`)
   }
   const body = (await response.json().catch(() => undefined)) as Envelope | undefined
   return { status: response.status, ok: response.ok, body }
@@ -71,6 +103,10 @@ async function call(
 function failureDetail(body: Envelope | undefined, fallback: string): string {
   const first = body?.errors?.[0]
   return first?.message ?? fallback
+}
+
+function failureCode(body: Envelope | undefined): number | undefined {
+  return body?.errors?.[0]?.code
 }
 
 function rows(body: Envelope | undefined): ZoneRow[] {
@@ -83,8 +119,22 @@ function rows(body: Envelope | undefined): ZoneRow[] {
  */
 function isAuthError(status: number, body: Envelope | undefined): boolean {
   if (status === 401 || status === 403) return true
-  const code = body?.errors?.[0]?.code
+  const code = failureCode(body)
   return code === 1000 || code === 10000 || code === 9109
+}
+
+function toDnsRecord(row: Record<string, unknown>): DnsRecord {
+  return {
+    id: String(row.id ?? ''),
+    type: String(row.type ?? ''),
+    name: String(row.name ?? ''),
+    content: String(row.content ?? ''),
+    ttl: Number(row.ttl ?? 0),
+    proxied: row.proxied === true,
+    priority: typeof row.priority === 'number' ? row.priority : undefined,
+    modifiedOn: String(row.modified_on ?? ''),
+    comment: String(row.comment ?? ''),
+  }
 }
 
 /**
@@ -178,19 +228,83 @@ export async function checkZone(
   }
 }
 
-export async function listDnsRecords(token: string, zoneId: string, options: FetchOptions = {}): Promise<DnsRecord[]> {
-  const page = await call(token, `/zones/${zoneId}/dns_records?per_page=100&page=1`, { method: 'GET' }, options)
-  if (page.status === 403 || page.status === 401) throw new Error('dns_read_forbidden')
-  if (!page.ok) throw new Error(failureDetail(page.body, `cloudflare status ${page.status}`))
-  const list = Array.isArray(page.body?.result) ? (page.body.result as Record<string, unknown>[]) : []
-  return list.map((row) => ({
-    id: String(row.id ?? ''),
-    type: String(row.type ?? ''),
-    name: String(row.name ?? ''),
-    content: String(row.content ?? ''),
-    ttl: Number(row.ttl ?? 0),
-    proxied: row.proxied === true,
-    modifiedOn: String(row.modified_on ?? ''),
-    comment: String(row.comment ?? ''),
-  }))
+export interface DnsListOptions extends FetchOptions {
+  page?: number
+  perPage?: number
+  type?: string
+  name?: string
+}
+
+export async function listDnsRecords(token: string, zoneId: string, options: DnsListOptions = {}): Promise<DnsPage> {
+  const perPage = Math.min(Math.max(options.perPage ?? 100, 1), 100)
+  const page = Math.max(options.page ?? 1, 1)
+  const query = new URLSearchParams({ per_page: String(perPage), page: String(page) })
+  if (options.type !== undefined && options.type !== '') query.set('type', options.type)
+  if (options.name !== undefined && options.name !== '') query.set('name', options.name)
+  const answer = await call(token, `/zones/${zoneId}/dns_records?${query.toString()}`, { method: 'GET' }, options)
+  if (answer.status === 403 || answer.status === 401) throw new CloudflareError(answer.status, failureCode(answer.body), 'dns_read_forbidden')
+  if (!answer.ok) throw new CloudflareError(answer.status, failureCode(answer.body), failureDetail(answer.body, `cloudflare status ${answer.status}`))
+  const list = Array.isArray(answer.body?.result) ? (answer.body.result as Record<string, unknown>[]) : []
+  return {
+    records: list.map(toDnsRecord),
+    page: Number(answer.body?.result_info?.page ?? page),
+    totalPages: Number(answer.body?.result_info?.total_pages ?? 1),
+    total: Number(answer.body?.result_info?.total_count ?? list.length),
+  }
+}
+
+export async function getDnsRecord(
+  token: string,
+  zoneId: string,
+  recordId: string,
+  options: FetchOptions = {},
+): Promise<DnsRecord> {
+  const answer = await call(token, `/zones/${zoneId}/dns_records/${encodeURIComponent(recordId)}`, { method: 'GET' }, options)
+  if (!answer.ok) throw new CloudflareError(answer.status, failureCode(answer.body), failureDetail(answer.body, `cloudflare status ${answer.status}`))
+  return toDnsRecord(answer.body?.result as Record<string, unknown>)
+}
+
+export async function createDnsRecord(
+  token: string,
+  zoneId: string,
+  input: DnsInput,
+  options: FetchOptions = {},
+): Promise<DnsRecord> {
+  const answer = await call(
+    token,
+    `/zones/${zoneId}/dns_records`,
+    { method: 'POST', body: JSON.stringify(input) },
+    options,
+  )
+  if (!answer.ok) throw new CloudflareError(answer.status, failureCode(answer.body), failureDetail(answer.body, `cloudflare status ${answer.status}`))
+  return toDnsRecord(answer.body?.result as Record<string, unknown>)
+}
+
+export async function updateDnsRecord(
+  token: string,
+  zoneId: string,
+  recordId: string,
+  input: DnsInput,
+  options: FetchOptions = {},
+): Promise<DnsRecord> {
+  const answer = await call(
+    token,
+    `/zones/${zoneId}/dns_records/${encodeURIComponent(recordId)}`,
+    { method: 'PATCH', body: JSON.stringify(input) },
+    options,
+  )
+  if (!answer.ok) throw new CloudflareError(answer.status, failureCode(answer.body), failureDetail(answer.body, `cloudflare status ${answer.status}`))
+  return toDnsRecord(answer.body?.result as Record<string, unknown>)
+}
+
+export async function deleteDnsRecord(
+  token: string,
+  zoneId: string,
+  recordId: string,
+  options: FetchOptions = {},
+): Promise<DnsRecord | undefined> {
+  const snapshot = await getDnsRecord(token, zoneId, recordId, options)
+  const answer = await call(token, `/zones/${zoneId}/dns_records/${encodeURIComponent(recordId)}`, { method: 'DELETE' }, options)
+  if (!answer.ok) throw new CloudflareError(answer.status, failureCode(answer.body), failureDetail(answer.body, `cloudflare status ${answer.status}`))
+  return snapshot
 }

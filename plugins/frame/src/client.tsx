@@ -337,6 +337,14 @@ function NavGlyph(props: { name: string }) {
       </svg>
     )
   }
+  if (props.name === 'audit') {
+    return (
+      <svg {...common}>
+        <rect x="2.8" y="2.4" width="10.4" height="11.2" rx="1.4" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M5.4 5.6h5.2M5.4 8h5.2M5.4 10.4h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    )
+  }
   if (props.name === 'globe') {
     return (
       <svg {...common}>

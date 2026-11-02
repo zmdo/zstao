@@ -35,7 +35,8 @@
     "test": "node --test test/**/*.test.ts"
   },
   "dependencies": {
-    "@deepseek-ai/cordis": "~4.0.5"
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-tools": "^0.2.1-rc.5"
   },
   "devDependencies": {
     "@types/react": "^18.3.18",

@@ -55,3 +55,23 @@
 .smp-domain-form { display: grid; gap: 14px; }
 .smp-console .smp-domain-form label { display: grid; gap: 6px; color: var(--dsw-alias-label-secondary); }
 .smp-console .smp-domain-form .banner { margin: 0; }
+
+.smp-domain-audit { height: 100%; }
+.smp-domain-audit-tools { margin-left: auto; flex-wrap: wrap; }
+.smp-console .smp-domain-audit-table td { font-size: 13px; }
+.smp-domain-audit-row { cursor: pointer; }
+.smp-domain-audit-row:hover td { background: var(--dsw-specific-sidebar-nav-item-hover); }
+.smp-domain-audit-row.is-open td { background: var(--primary-soft); }
+.smp-domain-audit-summary { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smp-domain-audit-session { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; color: var(--muted); }
+.smp-domain-audit .smp-audit-status {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px;
+  font-size: 12px; background: var(--green-bg); color: var(--green);
+}
+.smp-domain-audit .smp-audit-status.is-failed { background: var(--red-bg); color: var(--red); }
+.smp-domain-audit-detail { padding: 16px; border-top: 1px solid var(--line); background: var(--dsw-alias-bg-layer-2); }
+.smp-domain-audit-detail dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px 12px; margin: 0; }
+.smp-domain-audit-detail dt { color: var(--muted); font-size: 12px; }
+.smp-domain-audit-detail dd { margin: 0; min-width: 0; }
+.smp-domain-audit-detail pre.config { max-height: 240px; }
+.smp-domain-pager { display: flex; align-items: center; justify-content: space-between; }

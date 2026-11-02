@@ -117,9 +117,14 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
   const rawName = field(body, 'name')?.trim() ?? ''
   const accountId = field(body, 'accountId')?.trim() ?? ''
   const token = field(body, 'token')?.trim() ?? ''
+  const description = field(body, 'description')?.trim() ?? ''
   const name = normalizeDomain(rawName)
   if (name === undefined) {
     sendJson(response, 400, { code: 'invalid_domain', detail: '域名格式不正确' })
+    return
+  }
+  if (description.length > 200) {
+    sendJson(response, 400, { code: 'invalid_description', detail: '说明最多 200 个字符' })
     return
   }
   if (!/^[0-9a-fA-F]{32}$/.test(accountId)) {
@@ -143,10 +148,10 @@ async function createDomain(ctx: HostCtx, request: IncomingMessage, response: Se
   const id = randomUUID()
   const ciphertext = ctx.secrets.encrypt(token)
   const { rows } = await ctx.database.pool.query<DomainRow>(
-    `insert into domain_manager_domains (id, name, zone_id, account_id, account_name, status, token_ciphertext)
-     values ($1, $2, $3, $4, $5, 'active', $6)
+    `insert into domain_manager_domains (id, name, zone_id, account_id, account_name, status, token_ciphertext, description)
+     values ($1, $2, $3, $4, $5, 'active', $6, $7)
      returning id, name, zone_id, account_id, account_name, status, description, created_at`,
-    [id, name, checked.zone.id, checked.zone.accountId, checked.zone.accountName, ciphertext],
+    [id, name, checked.zone.id, checked.zone.accountId, checked.zone.accountName, ciphertext, description],
   )
   const row = rows[0]
   sendJson(response, 201, {

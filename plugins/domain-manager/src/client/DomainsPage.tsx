@@ -298,6 +298,7 @@ function AddDomainDialog(props: {
 }) {
   const { copy } = props
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [accountId, setAccountId] = useState('')
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
@@ -306,6 +307,7 @@ function AddDomainDialog(props: {
   useEffect(() => {
     if (props.open) return
     setName('')
+    setDescription('')
     setAccountId('')
     setToken('')
     setFailure(null)
@@ -318,7 +320,7 @@ function AddDomainDialog(props: {
     try {
       const data = await api<{ domain: DomainRow }>('/console-api/domains', {
         method: 'POST',
-        body: JSON.stringify({ name, accountId, token }),
+        body: JSON.stringify({ name, accountId, token, description }),
       })
       props.onAdded(data.domain)
     } catch (cause) {
@@ -331,6 +333,7 @@ function AddDomainDialog(props: {
   return (
     <Dialog
       open={props.open}
+      className="smp-domain-dialog"
       title={copy.addTitle}
       closeLabel={copy.cancel}
       onClose={() => {
@@ -364,6 +367,17 @@ function AddDomainDialog(props: {
             required
             disabled={busy}
             onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label>
+          {copy.descriptionLabel}
+          <textarea
+            value={description}
+            maxLength={200}
+            rows={3}
+            placeholder={copy.descriptionPlaceholder}
+            disabled={busy}
+            onChange={(event) => setDescription(event.target.value)}
           />
         </label>
         <label>

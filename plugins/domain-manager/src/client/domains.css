@@ -103,3 +103,5 @@
 .smp-domain-audit-detail dd { margin: 0; min-width: 0; }
 .smp-domain-audit-detail pre.config { max-height: 240px; }
 .smp-domain-pager { display: flex; align-items: center; justify-content: space-between; }
+
+.smp-dialog.smp-domain-dialog { width: min(560px, 100%); }

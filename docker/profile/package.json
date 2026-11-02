@@ -16,7 +16,9 @@
     "@smp/console-sessions": "file:/app/plugins/sessions",
     "@smp/console-settings-models": "file:/app/plugins/settings-models",
     "@smp/console-workspace-groups": "file:/app/plugins/workspace-groups",
-    "@smp/console-workspace-storage": "file:/app/plugins/workspace-storage"
+    "@smp/console-workspace-storage": "file:/app/plugins/workspace-storage",
+    "@smp/console-cos": "file:E:/Projects/zstao/plugins/cos",
+    "@smp/cos-attachments": "file:E:/Projects/zstao/plugins/cos-attachments"
   },
   "dsh": {
     "profile": {
@@ -37,7 +39,9 @@
         "@smp/console-sessions",
         "@smp/console-settings-models",
         "@smp/console-workspace-groups",
-        "@smp/console-workspace-storage"
+        "@smp/console-workspace-storage",
+        "@smp/cos-attachments",
+        "@smp/console-cos"
       ]
     }
   }

@@ -345,6 +345,14 @@ function NavGlyph(props: { name: string }) {
       </svg>
     )
   }
+  if (props.name === 'folder') {
+    return (
+      <svg {...common}>
+        <path d="M2.1 4.6a1 1 0 0 1 1-1h2.7l1.3 1.4h4.7a1 1 0 0 1 1 1v6.3a1 1 0 0 1-1 1H3.1a1 1 0 0 1-1-1Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M2.1 7h11.7" stroke="currentColor" strokeWidth="1.1" />
+      </svg>
+    )
+  }
   if (props.name === 'globe') {
     return (
       <svg {...common}>

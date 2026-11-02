@@ -1,0 +1,6 @@
+- id: attachment-local
+  disabled: true
+
+- insert:
+    - id: smp-cos-attachments
+      name: '@smp/cos-attachments'

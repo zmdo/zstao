@@ -1,0 +1,33 @@
+{
+  "name": "@smp/cos-attachments",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "COS-backed durable attachment storage for DeepSeek Harness",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "cordis.patch.yml"
+  ],
+  "engines": {
+    "dsh": "0.2.1-rc.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-attachment": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-attachment-local": "0.2.1-rc.5",
+    "cos-nodejs-sdk-v5": "^3.0.0"
+  }
+}

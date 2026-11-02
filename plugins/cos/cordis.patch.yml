@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-cos
+      name: '@smp/console-cos'

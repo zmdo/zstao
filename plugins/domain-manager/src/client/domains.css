@@ -99,11 +99,19 @@
   font-size: 12px; background: var(--green-bg); color: var(--green);
 }
 .smp-domain-audit .smp-audit-status.is-failed { background: var(--red-bg); color: var(--red); }
-.smp-domain-audit-detail { padding: 16px; border-top: 1px solid var(--line); background: var(--dsw-alias-bg-layer-2); }
-.smp-domain-audit-detail dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px 12px; margin: 0; }
-.smp-domain-audit-detail dt { color: var(--muted); font-size: 12px; }
-.smp-domain-audit-detail dd { margin: 0; min-width: 0; }
-.smp-domain-audit-detail pre.config { max-height: 240px; }
+.smp-console .smp-domain-audit .smp-record-detail { padding: 16px !important; background: var(--dsw-alias-bg-layer-2); }
+.smp-domain-audit .smp-record-section + .smp-record-section { margin-top: 14px; }
+.smp-domain-audit .smp-record-section h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.smp-domain-audit .smp-json-object { display: grid; gap: 4px; margin: 0; }
+.smp-domain-audit .smp-json-row { display: grid; grid-template-columns: minmax(110px, 180px) minmax(0, 1fr); gap: 10px; }
+.smp-domain-audit .smp-json-row > dt { color: var(--muted); overflow-wrap: anywhere; }
+.smp-domain-audit .smp-json-row > dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.smp-domain-audit pre.smp-audit-pre {
+  margin: 0; padding: 8px 10px; max-height: 240px; overflow: auto;
+  background: var(--dsw-alias-bg-layer-1); border: 1px solid var(--line); border-radius: 4px;
+  font-size: 12px;
+}
+.smp-domain-audit .empty { padding: 36px 16px; text-align: center; color: var(--muted); }
 .smp-domain-pager { display: flex; align-items: center; justify-content: space-between; }
 
 .smp-dialog.smp-domain-dialog { width: min(560px, 100%); }

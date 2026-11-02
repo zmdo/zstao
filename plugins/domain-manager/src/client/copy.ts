@@ -72,6 +72,8 @@ export interface Copy {
   auditEmpty: string
   auditLoadFailed: string
   auditArgs: string
+  auditDetail: string
+  auditError: string
 }
 
 const ZH: Copy = {
@@ -162,6 +164,8 @@ const ZH: Copy = {
   auditEmpty: '还没有 DNS 变更记录。',
   auditLoadFailed: '审计记录加载失败。',
   auditArgs: '参数',
+  auditDetail: '详情',
+  auditError: '错误',
 }
 
 const EN: Copy = {
@@ -252,6 +256,8 @@ const EN: Copy = {
   auditEmpty: 'No DNS changes have been recorded yet.',
   auditLoadFailed: 'Failed to load the audit log.',
   auditArgs: 'Arguments',
+  auditDetail: 'Details',
+  auditError: 'Error',
 }
 
 export function copyFor(locale: string): Copy {

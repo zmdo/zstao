@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { Fragment, useEffect, useState, useSyncExternalStore } from 'react'
 import { Panel } from '@smp/console-kit'
 import { api, type LocaleFace } from './api.ts'
 import { copyFor, type Copy } from './copy.ts'
@@ -143,39 +143,48 @@ export function AuditPage(props: { locale: LocaleFace }) {
           </thead>
           <tbody>
             {(data?.items ?? []).map((item) => (
-              <tr
-                key={item.id}
-                className={openId === item.id ? 'smp-domain-audit-row is-open' : 'smp-domain-audit-row'}
-                role="button"
-                aria-expanded={openId === item.id}
-                tabIndex={0}
-                onClick={() => setOpenId((current) => (current === item.id ? '' : item.id))}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return
-                  event.preventDefault()
-                  setOpenId((current) => (current === item.id ? '' : item.id))
-                }}
-              >
-                <td className="nowrap">{formatTime(item.createdAt, active)}</td>
-                <td className="nowrap">{actionLabel(copy, item.action)}</td>
-                <td>{item.domainName}</td>
-                <td className="smp-domain-audit-summary">{item.summary}</td>
-                <td className="nowrap">
-                  <span className={`smp-audit-status is-${item.ok ? 'succeeded' : 'failed'}`}>{item.ok ? copy.auditSucceeded : copy.auditFailed}</span>
-                </td>
-                <td className="smp-domain-audit-session" title={item.sessionId ?? ''}>
-                  {item.sessionId === null ? '—' : item.sessionId.slice(0, 8)}
+              <Fragment key={item.id}>
+                <tr
+                  className={openId === item.id ? 'smp-domain-audit-row is-open' : 'smp-domain-audit-row'}
+                  role="button"
+                  aria-expanded={openId === item.id}
+                  tabIndex={0}
+                  onClick={() => setOpenId((current) => (current === item.id ? '' : item.id))}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    setOpenId((current) => (current === item.id ? '' : item.id))
+                  }}
+                >
+                  <td className="nowrap">{formatTime(item.createdAt, active)}</td>
+                  <td className="nowrap">{actionLabel(copy, item.action)}</td>
+                  <td>{item.domainName}</td>
+                  <td className="smp-domain-audit-summary">{item.summary}</td>
+                  <td className="nowrap">
+                    <span className={`smp-audit-status is-${item.ok ? 'succeeded' : 'failed'}`}>{item.ok ? copy.auditSucceeded : copy.auditFailed}</span>
+                  </td>
+                  <td className="smp-domain-audit-session" title={item.sessionId ?? ''}>
+                    {item.sessionId === null ? '—' : item.sessionId.slice(0, 8)}
+                  </td>
+                </tr>
+                {openId === item.id && (
+                  <tr>
+                    <td className="smp-record-detail" colSpan={6}>
+                      <AuditDetail item={item} copy={copy} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+            {(data?.items.length ?? 0) === 0 && (
+              <tr>
+                <td colSpan={6} className="empty">
+                  {error !== '' ? copy.auditLoadFailed : copy.auditEmpty}
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
-        {(data?.items.length ?? 0) === 0 && (
-          <p className="smp-domain-empty">{error !== '' ? copy.auditLoadFailed : copy.auditEmpty}</p>
-        )}
-        {openId !== '' && (
-          <AuditDetail item={(data?.items ?? []).find((row) => row.id === openId)} copy={copy} />
-        )}
       </div>
       <footer className="smp-list-pager smp-domain-pager">
         <span>{formatRange(copy, total, page, pages)}</span>
@@ -208,24 +217,41 @@ function formatRange(copy: Copy, total: number, page: number, pages: number): st
   return `${from}-${to} / ${total}`
 }
 
-function AuditDetail(props: { item: AuditItem | undefined; copy: Copy }) {
-  if (props.item === undefined) return null
+function AuditDetail(props: { item: AuditItem; copy: Copy }) {
   const item = props.item
   return (
-    <div className="smp-domain-audit-detail">
+    <div className="smp-audit-detail">
       {item.error !== null && (
-        <p className="banner error" role="alert">
-          {item.error}
-        </p>
+        <section className="smp-record-section">
+          <h3>{props.copy.auditError}</h3>
+          <p className="banner error" role="alert">
+            {item.error}
+          </p>
+        </section>
       )}
-      <dl>
-        <dt>{props.copy.auditTool}</dt>
-        <dd className="mono">{item.tool}</dd>
-        <dt>{props.copy.auditArgs}</dt>
-        <dd>
-          <pre className="config">{JSON.stringify(item.args, null, 2)}</pre>
-        </dd>
-      </dl>
+      <section className="smp-record-section">
+        <h3>{props.copy.auditDetail}</h3>
+        <dl className="smp-json-object">
+          <div className="smp-json-row">
+            <dt>{props.copy.auditTool}</dt>
+            <dd className="mono">{item.tool}</dd>
+          </div>
+          <div className="smp-json-row">
+            <dt>{props.copy.auditSession}</dt>
+            <dd className="mono">{item.sessionId ?? '—'}</dd>
+          </div>
+          <div className="smp-json-row">
+            <dt>{props.copy.auditDomain}</dt>
+            <dd>{item.domainName}</dd>
+          </div>
+          <div className="smp-json-row">
+            <dt>{props.copy.auditArgs}</dt>
+            <dd>
+              <pre className="smp-audit-pre">{JSON.stringify(item.args, null, 2)}</pre>
+            </dd>
+          </div>
+        </dl>
+      </section>
     </div>
   )
 }

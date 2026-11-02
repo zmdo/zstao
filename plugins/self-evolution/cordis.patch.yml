@@ -1,3 +1,8 @@
+# 自演进默认关闭：分组和三种服务器类型只在用户显式启用后出现。
+# 启用方式是在 profile 的 cordis.patch.yml 里覆盖这一行：
+#   - id: smp-self-evolution
+#     disabled: false
 - insert:
     - id: smp-self-evolution
       name: '@smp/console-self-evolution'
+      disabled: true

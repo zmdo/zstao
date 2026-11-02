@@ -1,0 +1,31 @@
+# 本地私人区：不进入版本库
+/inbox/
+/.local/
+/.scratch/
+
+# 敏感信息
+.env
+.env.*
+*.key
+*.pem
+secrets.*
+
+# 编辑器与 IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# 操作系统
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# 运行产物
+*.log
+*.tmp
+bin/
+obj/
+node_modules/

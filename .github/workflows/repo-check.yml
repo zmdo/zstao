@@ -1,0 +1,15 @@
+name: repo-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repository self-check
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/Test-Repo.ps1

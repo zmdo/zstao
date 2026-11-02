@@ -31,7 +31,7 @@
     "lib/types"
   ],
   "engines": {
-    "dsh": "0.2.1-alpha.5"
+    "dsh": "0.2.1-rc.5"
   },
   "dsh": {
     "bundle": {
@@ -48,9 +48,9 @@
     "build:api": "node ../../scripts/build-public-api.mjs"
   },
   "dependencies": {
-    "@deepseek-ai/cordis": "~4.0.5-alpha.2",
-    "@deepseek-ai/dsh-tools": "^0.2.1-alpha.5",
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.2",
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-tools": "^0.2.1-rc.5",
+    "@deepseek-ai/schemastery": "~3.18.5",
     "@smp/console-kit": "file:../../packages/console-kit",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
@@ -59,7 +59,7 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-permission-presets": "0.2.1-alpha.5",
+    "@deepseek-ai/dsh-permission-presets": "0.2.1-rc.5",
     "@types/react": "^18.3.18",
     "@types/shell-quote": "^1.7.4",
     "@types/ssh2": "^1.15.5",

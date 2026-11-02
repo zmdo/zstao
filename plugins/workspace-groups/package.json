@@ -20,7 +20,7 @@
     "icon.svg"
   ],
   "engines": {
-    "dsh": "0.2.1-alpha.5"
+    "dsh": "0.2.1-rc.5"
   },
   "dsh": {
     "bundle": {
@@ -35,6 +35,6 @@
     "test": "node --test test/**/*.test.ts"
   },
   "dependencies": {
-    "@deepseek-ai/cordis": "~4.0.5-alpha.2"
+    "@deepseek-ai/cordis": "~4.0.5"
   }
 }

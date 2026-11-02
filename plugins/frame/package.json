@@ -21,7 +21,7 @@
     "icon.svg"
   ],
   "engines": {
-    "dsh": "0.2.1-alpha.5"
+    "dsh": "0.2.1-rc.5"
   },
   "dsh": {
     "bundle": {
@@ -37,8 +37,8 @@
   },
   "dependencies": {
     "@smp/console-kit": "file:../../packages/console-kit",
-    "@deepseek-ai/cordis": "~4.0.5-alpha.2",
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.2",
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/schemastery": "~3.18.5",
     "bcryptjs": "^3.0.2",
     "hash-wasm": "^4.12.0",
     "pg": "^8.16.3",

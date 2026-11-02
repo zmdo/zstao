@@ -43,3 +43,12 @@
 .smp-cos-tree-meta { color: var(--dsw-alias-label-tertiary); font-size: 12px; flex: none; margin-left: 8px; }
 .smp-cos-tree-status { margin: 0; padding: 3px 10px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
 .smp-cos-tree-footer { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-top: .5px solid var(--dsw-alias-border-l3); color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.smp-cos-tree-root { flex: 1; min-width: 0; color: var(--dsw-alias-label-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smp-cos-tree-more { display: block; width: 100%; border: 0; background: none; color: var(--dsw-alias-label-tertiary); font: inherit; font-size: 12px; text-align: left; padding: 5px 10px; cursor: pointer; border-radius: var(--dsw-radius-md); }
+.smp-cos-tree-more:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.smp-cos-file-icon { color: var(--dsw-static-neutral-bluish-300); }
+.smp-cos-file-icon.is-code, .smp-cos-file-icon.is-markdown, .smp-cos-file-icon.is-html { color: var(--dsw-static-deepseek-500); }
+.smp-cos-file-icon.is-excel { color: var(--dsw-static-green-500); }
+.smp-cos-file-icon.is-image { color: rgb(139 118 246); }
+.smp-cos-file-icon.is-pdf { color: var(--dsw-static-red-600); }
+.smp-cos-folder-icon { color: var(--dsw-static-amber-400); }

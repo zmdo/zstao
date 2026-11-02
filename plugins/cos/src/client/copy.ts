@@ -10,6 +10,7 @@ export interface Copy {
   sidebarHint: string
   sidebarNoSession: string
   sidebarTitle: string
+  loadMore: string
   searchPlaceholder: string
   empty: string
   loading: string
@@ -89,6 +90,7 @@ const ZH: Copy = {
   sidebarHint: '浏览 COS 默认桶，点击文件用内置预览打开',
   sidebarNoSession: '请先打开一个会话',
   sidebarTitle: '网络文件管理',
+  loadMore: '加载更多',
   searchPlaceholder: '在当前前缀内搜索',
   empty: '这里还没有文件。',
   loading: '加载中…',
@@ -168,6 +170,7 @@ const EN: Copy = {
   sidebarHint: 'Browse the default COS bucket and open files with the built-in preview',
   sidebarNoSession: 'Open a conversation first',
   sidebarTitle: 'Network files',
+  loadMore: 'Load more',
   searchPlaceholder: 'Search in the current prefix',
   empty: 'No files here yet.',
   loading: 'Loading…',

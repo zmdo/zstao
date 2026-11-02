@@ -67,4 +67,4 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 $relative = $path.Substring($repoRoot.Length + 1).Replace('\', '/')
 Write-Output "Created work item: $relative"
-Write-Output 'Next: fill in the delivery definition and acceptance criteria, then run powershell -File scripts/Test-Repo.ps1'
+Write-Output 'Next: fill in the delivery definition and the acceptance criteria.'

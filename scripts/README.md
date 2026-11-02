@@ -1,6 +1,6 @@
 # 脚本
 
-只放能独立运行、可重复执行的自动化。要求：Windows PowerShell 5.1+ 或 PowerShell 7+，无交互，失败返回非 0 退出码。
+只放能独立运行、可重复执行的小工具。要求：Windows PowerShell 5.1+ 或 PowerShell 7+，无交互，失败返回非 0 退出码。
 
 下面的示例用 `powershell`；装了 PowerShell 7 的话，把 `powershell` 换成 `pwsh` 即可。
 
@@ -20,16 +20,6 @@ powershell -File scripts/New-WorkItem.ps1 -Title "采用 trunk-based 分支模�
 ```
 
 输出新建文件的相对路径。同名文件已存在时自动追加序号，不会覆盖已有内容。
-
-## Test-Repo.ps1
-
-仓库自检：必需文件、Markdown 相对链接、提示词 / 角色卡 / 模板索引。
-
-```powershell
-powershell -File scripts/Test-Repo.ps1
-```
-
-通过时退出码 0；有问题时列出明细并返回 1。本地提交前与 CI 都跑它。
 
 ## 约定
 

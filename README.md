@@ -40,10 +40,7 @@ flowchart LR
 git clone https://github.com/zmdo/zstao.git
 cd zstao
 
-# 自检：必需文件、链接、索引是否完整（Windows PowerShell 5.1+ 或 PowerShell 7）
-powershell -File scripts/Test-Repo.ps1
-
-# 新建一个工作项
+# 新建一个工作项（Windows PowerShell 5.1+ 或 PowerShell 7）
 powershell -File scripts/New-WorkItem.ps1 -Title "把子代理评审接进日常流程"
 ```
 
@@ -51,28 +48,24 @@ powershell -File scripts/New-WorkItem.ps1 -Title "把子代理评审接进日常
 
 ```text
 .
-├── AGENTS.md          # 给 AI Agent 的仓库级工作约定
+├── AGENTS.md     # 给 AI Agent 的仓库级约定
 ├── README.md
-├── docs/              # 原则、流程、提示词写法
-├── prompts/           # 可直接复用的提示词
-├── agents/            # Agent 角色卡与交接协议
-├── scripts/           # 自动化脚本（PowerShell 5.1+）
-├── templates/         # 工作项 / 决策模板
-├── work/              # 工作项记录，按年归档
-└── .github/workflows/ # CI：每次推送自动跑仓库自检
+├── docs/         # 原则、流程、提示词写法
+├── prompts/      # 可直接复用的提示词
+├── agents/       # Agent 角色卡与交接协议
+├── scripts/      # 新建工作项的脚本
+└── templates/    # 工作项 / 决策模板
 ```
 
 ## 约定
 
-- **语言**：文档用中文；代码、文件名、提交信息用英文。
-- **命名**：目录与文件用 `kebab-case`；`work/` 下的工作项允许中文标题。
-- **提交**：`<type>(<scope>): <summary>`，type 取 `feat` / `fix` / `docs` / `chore` / `refactor`。
-- **分支**：`main` 常绿；改动走 `feat/<slug>`，合并前必须通过 `scripts/Test-Repo.ps1`。
+- **语言**：文档用中文；代码与文件名用英文。
+- **命名**：目录与文件用 `kebab-case`。
 - **隐私**：个人笔记、密钥、客户资料不进仓库，放本地 `inbox/`（已忽略）。
 
 ## 与 AI 协作
 
-1. 先读 [`AGENTS.md`](AGENTS.md)，它约束 AI 在本仓库里怎么工作。
+1. 先读 [`AGENTS.md`](AGENTS.md)，了解在本仓库里协作的基本约定。
 2. 再按 [`docs/workflow.md`](docs/workflow.md) 走一遍五个阶段。
 3. 提示词从 [`prompts/`](prompts/README.md) 取，不要每次从零写。
 
@@ -80,7 +73,7 @@ powershell -File scripts/New-WorkItem.ps1 -Title "把子代理评审接进日常
 
 - [x] 仓库骨架、原则与标准流程
 - [x] 提示词库与 Agent 角色卡
-- [x] 工作项脚本与仓库自检
+- [x] 工作项脚本与模板
 - [ ] 接入 MCP 工具链清单
 - [ ] 季度复盘模板与指标看板
 

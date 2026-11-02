@@ -20,4 +20,3 @@
 1. 复制 [`daily-review.md`](daily-review.md) 的结构（用途 / 变量 / 提示词 / 验收）。
 2. 文件名用 `kebab-case`，与用途一致。
 3. 在本文件索引里登记。
-4. 运行 `powershell -File scripts/Test-Repo.ps1` 确认索引完整。

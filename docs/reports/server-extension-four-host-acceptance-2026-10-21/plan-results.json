@@ -1,0 +1,241 @@
+[
+  {
+    "id": "dd7dad08-82c7-4385-bcf1-08884ebc98a1",
+    "kind": "prepare",
+    "state": "partial_failure",
+    "server": null,
+    "target_state": "failed",
+    "result": {
+      "error": "recipe_failed: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n\n",
+      "state": "failed",
+      "steps": [
+        {
+          "after": {
+            "code": "detection_failed",
+            "state": "unknown",
+            "detail": "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n"
+          },
+          "state": "failed",
+          "changes": [
+            {
+              "name": "containerd.io",
+              "source": "dists/noble/pool/stable/amd64/containerd.io_2.4.2-3~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "2.4.2-3~ubuntu.24.04~noble",
+              "checksum": "f811ab57d1f4bb0cce19df7d526da8c711d8ebea0447cc83da1999188e664122",
+              "architecture": "amd64"
+            },
+            {
+              "name": "docker-ce-cli",
+              "source": "dists/noble/pool/stable/amd64/docker-ce-cli_29.9.2-1~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "5:29.9.2-1~ubuntu.24.04~noble",
+              "checksum": "74747b5c99000279b9b2c7eb82543b4121d8436a58aa3be7e78ac6681d74794f",
+              "architecture": "amd64"
+            },
+            {
+              "name": "docker-ce",
+              "source": "dists/noble/pool/stable/amd64/docker-ce_29.9.2-1~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "5:29.9.2-1~ubuntu.24.04~noble",
+              "checksum": "95ddf7a2d8b8c0eb82d8597d4d604e294dcf741081f2e228524d5ab9bfd7c8ae",
+              "architecture": "amd64"
+            },
+            {
+              "uid": 1000,
+              "kind": "group-membership",
+              "user": "ubuntu",
+              "group": "docker"
+            }
+          ],
+          "ordinal": 1,
+          "software": "@smp/console-server-containers/docker-engine"
+        }
+      ],
+      "digest": "0ab40d9cfc0fc51c3ca3f09e9785ae3ff230f9e01e2fe829ab4bbff1f2e30339"
+    }
+  },
+  {
+    "id": "50b761ff-87ab-486a-9482-87367e659fe0",
+    "kind": "prepare",
+    "state": "completed",
+    "server": null,
+    "target_state": "succeeded",
+    "result": {
+      "state": "completed",
+      "steps": [
+        {
+          "after": {
+            "state": "installed",
+            "healthy": true,
+            "version": "29.9.2",
+            "packages": [
+              {
+                "name": "docker-ce",
+                "source": "installed",
+                "manager": "apt",
+                "version": "5:29.9.2-1~ubuntu.24.04~noble",
+                "architecture": "amd64"
+              }
+            ],
+            "targetIdentity": "docker-ce=5:29.9.2-1~ubuntu.24.04~noble"
+          },
+          "state": "succeeded",
+          "changes": [
+            {
+              "name": "containerd.io",
+              "source": "dists/noble/pool/stable/amd64/containerd.io_2.4.2-3~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "2.4.2-3~ubuntu.24.04~noble",
+              "checksum": "f811ab57d1f4bb0cce19df7d526da8c711d8ebea0447cc83da1999188e664122",
+              "architecture": "amd64"
+            },
+            {
+              "name": "docker-ce-cli",
+              "source": "dists/noble/pool/stable/amd64/docker-ce-cli_29.9.2-1~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "5:29.9.2-1~ubuntu.24.04~noble",
+              "checksum": "74747b5c99000279b9b2c7eb82543b4121d8436a58aa3be7e78ac6681d74794f",
+              "architecture": "amd64"
+            },
+            {
+              "name": "docker-ce",
+              "source": "dists/noble/pool/stable/amd64/docker-ce_29.9.2-1~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "5:29.9.2-1~ubuntu.24.04~noble",
+              "checksum": "95ddf7a2d8b8c0eb82d8597d4d604e294dcf741081f2e228524d5ab9bfd7c8ae",
+              "architecture": "amd64"
+            },
+            {
+              "uid": 1000,
+              "kind": "group-membership",
+              "user": "ubuntu",
+              "group": "docker"
+            }
+          ],
+          "ordinal": 1,
+          "software": "@smp/console-server-containers/docker-engine"
+        },
+        {
+          "after": {
+            "state": "installed",
+            "healthy": true,
+            "version": "5.6.0",
+            "packages": [
+              {
+                "name": "docker-compose-plugin",
+                "source": "installed",
+                "manager": "apt",
+                "version": "5.6.0-1~ubuntu.24.04~noble",
+                "architecture": "amd64"
+              }
+            ],
+            "targetIdentity": "docker-compose-plugin=5.6.0-1~ubuntu.24.04~noble"
+          },
+          "state": "succeeded",
+          "changes": [
+            {
+              "name": "docker-compose-plugin",
+              "source": "dists/noble/pool/stable/amd64/docker-compose-plugin_5.6.0-1~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "5.6.0-1~ubuntu.24.04~noble",
+              "checksum": "132266d499d9873aafcbe5b515997b8abd714914fa32a62ccac705c1ede7ca81",
+              "architecture": "amd64"
+            }
+          ],
+          "ordinal": 2,
+          "software": "@smp/console-server-containers/docker-compose"
+        }
+      ],
+      "digest": "2fb6b6844df3e37a4abff6027d717433abbaea34030285ee7e116e5618b5e3d5",
+      "summary": "installed"
+    }
+  },
+  {
+    "id": "002f4494-72d0-40e7-ae5f-6309c0df2221",
+    "kind": "upgrade",
+    "state": "completed",
+    "server": "验收-98-组权限修复",
+    "target_state": "succeeded",
+    "result": {
+      "state": "completed",
+      "steps": [
+        {
+          "after": {
+            "state": "installed",
+            "healthy": true,
+            "version": "29.9.2",
+            "packages": [
+              {
+                "name": "docker-ce",
+                "source": "installed",
+                "manager": "apt",
+                "version": "5:29.9.2-1~ubuntu.24.04~noble",
+                "architecture": "amd64"
+              }
+            ],
+            "targetIdentity": "docker-ce=5:29.9.2-1~ubuntu.24.04~noble"
+          },
+          "state": "succeeded",
+          "changes": [
+            {
+              "name": "docker-ce-cli",
+              "source": "dists/noble/pool/stable/amd64/docker-ce-cli_29.9.2-1~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "5:29.9.2-1~ubuntu.24.04~noble",
+              "checksum": "74747b5c99000279b9b2c7eb82543b4121d8436a58aa3be7e78ac6681d74794f",
+              "architecture": "amd64"
+            },
+            {
+              "name": "docker-ce",
+              "source": "dists/noble/pool/stable/amd64/docker-ce_29.9.2-1~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "5:29.9.2-1~ubuntu.24.04~noble",
+              "checksum": "95ddf7a2d8b8c0eb82d8597d4d604e294dcf741081f2e228524d5ab9bfd7c8ae",
+              "architecture": "amd64"
+            },
+            {
+              "name": "docker-ce-rootless-extras",
+              "source": "dists/noble/pool/stable/amd64/docker-ce-rootless-extras_29.9.2-1~ubuntu.24.04~noble_amd64.deb",
+              "manager": "apt",
+              "version": "5:29.9.2-1~ubuntu.24.04~noble",
+              "checksum": "19533f8712a28e0a16a052250a4a157eccebd2dbe710ed9c8b801c26688a100c",
+              "architecture": "amd64"
+            },
+            {
+              "uid": 1000,
+              "kind": "group-membership",
+              "user": "ubuntu",
+              "group": "docker"
+            }
+          ],
+          "ordinal": 1,
+          "software": "@smp/console-server-containers/docker-engine"
+        },
+        {
+          "after": {
+            "state": "installed",
+            "healthy": true,
+            "version": "5.6.0",
+            "packages": [
+              {
+                "name": "docker-compose-plugin",
+                "source": "installed",
+                "manager": "apt",
+                "version": "5.6.0-1~ubuntu.24.04~noble",
+                "architecture": "amd64"
+              }
+            ],
+            "targetIdentity": "docker-compose-plugin=5.6.0-1~ubuntu.24.04~noble"
+          },
+          "state": "succeeded",
+          "changes": [],
+          "ordinal": 2,
+          "software": "@smp/console-server-containers/docker-compose"
+        }
+      ],
+      "digest": "c79eb98fe71b48d58a641d8d72602486a40b50294be1aac95e8f9d581a6709e1",
+      "summary": "upgraded"
+    }
+  }
+]

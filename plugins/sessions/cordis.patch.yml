@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-sessions
+      name: '@smp/console-sessions'

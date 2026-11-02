@@ -1,0 +1,4 @@
+uid=1000(ubuntu) gid=1001(ubuntu) groups=1001(ubuntu),4(adm),20(dialout),24(cdrom),25(floppy),27(sudo),29(audio),30(dip),44(video),46(plugdev),101(lxd),1000(netdev)
+{"Client":{"Platform":{"Name":"Docker Engine - Community"},"Version":"29.9.1","ApiVersion":"1.56","DefaultAPIVersion":"1.56","GitCommit":"dfc520d","GoVersion":"go1.26.9","Os":"linux","Arch":"amd64","BuildTime":"Wed Oct 14 18:32:55 2026","Context":"default"},"Server":null}
+permission denied while trying to connect to the docker API at unix:///var/run/docker.sock
+Docker Compose version v5.6.0

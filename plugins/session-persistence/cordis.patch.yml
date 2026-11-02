@@ -1,0 +1,8 @@
+- insert:
+    - id: smp-session-persistence
+      name: '@smp/console-session-persistence'
+
+# The database backend is the only sessionPersistence. Leaving the file
+# backend mounted would register the same service and keep writing jsonl.
+- id: session-persistence-jsonl
+  disabled: true

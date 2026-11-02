@@ -1,0 +1,19 @@
+{
+  "name": "@smp/console-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "控制台面板",
+  "exports": {
+    ".": "./src/index.ts",
+    "./dialog": "./src/dialog.tsx"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "react": "^18.3.1"
+  }
+}

@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-encryption-key
+      name: '@smp/console-encryption-key'

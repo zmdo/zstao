@@ -1,0 +1,28 @@
+{
+  "title": "Container servers",
+  "description": "Container type, panel and settings.",
+  "ui": {
+    "containers": "Containers",
+    "name": "Name",
+    "image": "Image",
+    "status": "Status",
+    "ports": "Ports",
+    "noContainers": "No containers in the last successful snapshot.",
+    "noObservation": "No successful container inspection yet.",
+    "dockerUnavailable": "Docker is not installed or has not been verified.",
+    "collect": "Collect container inventory",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page",
+    "loading": "Loading…",
+    "refresh": "Refresh list",
+    "loadFailed": "Unable to load the container list.",
+    "inspectFailed": "The latest container inspection failed.",
+    "lastSuccess": "Last successful inspection",
+    "stale": "Showing the last successful snapshot.",
+    "never": "Never",
+    "range": "{count} containers, showing {from}–{to}",
+    "pageOf": "Page {page} of {pages}",
+    "perPage": "Per page"
+  }
+}

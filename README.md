@@ -1,82 +1,39 @@
-# zstao
+# CES
 
-**Zhang Shengtao 专用工作流**
+Cyber Evolving System（赛博演进系统）。
 
-把与 AI 协作的方式，沉淀成可执行的资产。
+CES 做在 Smart Management Platform（SMP）基座上。基座是 DeepSeek Harness（`dsh`）里的一组 Cordis 插件，提供登录、侧栏、平台设置、数据库、加密密钥、会话和工作区存储。CES 的业务栏目作为插件装到基座上，不另起进程，也不再经过单独的网站后台。
 
----
+这是单用户系统，只有一个平台账户；管理操作与人工审批都由该用户完成，不设置账号角色或权限组。工作区组和服务器分组用于组织业务资源。
 
-## 这是什么
+本地 CES 实例约定使用 `9090`（`http://127.0.0.1:9090/`），实际监听地址和端口由 dsh 启动参数决定。
 
-`zstao` 是 Zhang Shengtao 的个人 AI / Agent 工作流仓库，也是这套工作流的**唯一事实源**。
+`dsh` 重启不会主动删除数据库登记或远端容器。进行中的软件变更需按数据库与远端操作日志核对和恢复，见[执行与恢复](docs/framework/modules/server-management/execution-and-upgrades.md)。
 
-它不收藏资料，只沉淀能直接复用的东西：
+## 基座提供
 
-| 资产 | 解决的问题 | 位置 |
-| --- | --- | --- |
-| 工作原则 | 动手之前，用什么标准判断 | [`docs/principles.md`](docs/principles.md) |
-| 标准流程 | 一件事从想法到交付怎么走 | [`docs/workflow.md`](docs/workflow.md) |
-| 提示词 | 怎么把要求讲清楚，让 AI 一次做对 | [`prompts/`](prompts/README.md) |
-| Agent 角色 | 什么时候该拆成多个角色协作 | [`agents/`](agents/README.md) |
-| 脚本 | 重复三次以上的动作，交给机器 | [`scripts/`](scripts/README.md) |
-| 模板 | 新任务、新决策从哪里开始写 | [`templates/`](templates/README.md) |
+| 插件 | 作用 |
+| --- | --- |
+| `@smp/console-database` | 连接池、密文、迁移 |
+| `@smp/console-session-persistence` | 把会话写入 PostgreSQL |
+| `@smp/console-workspace-storage` | 把工作区登记写入数据库 |
+| `@smp/console-workspace-groups` | 工作区组、目录归属、切组与原生侧栏／工作区选择器适配 |
+| `@smp/console-install` | 第一次启动时写入数据库地址和加密密钥 |
+| `@smp/console-frame` | 侧栏、登录、网站、菜单、安全 |
+| `@smp/console-encryption-key` | 查看和更换加密密钥 |
+| `@smp/console-sessions` | 档案：查找、恢复、删除会话 |
+| `@smp/console-harness-settings` | Harness 设置 |
+| `@smp/console-settings-models` | 模型 |
+| `@smp/console-plugin-inventory` | 插件清单 |
 
-## 工作流一览
+当前架构、插件、存储、运行方式、模块状态和后续任务从 [框架与业务交接文档](docs/framework/README.md) 进入。`docs/design` 保留历史需求和方案，使用前核对实现状态；[漂移对照](docs/framework/handoff/design-drift.md)列出了主要差异。
 
-```mermaid
-flowchart LR
-    A["1 立项 Frame"] --> B["2 取证 Gather"]
-    B --> C["3 执行 Build"]
-    C --> D["4 验收 Verify"]
-    D --> E["5 沉淀 Capture"]
-    E -.-> A
-```
+[CES 自演进服务器与基础设施方案](docs/design/ces-self-evolution-infrastructure/README.md)确定采用 OneDev `16.9.7` 和三台服务器布局：正式服务器承担开发，构建测试与生产发布分别由独立服务器执行。该方案待实施。
 
-五个阶段，每一步都有明确的输入、产出和退出条件，详见 [`docs/workflow.md`](docs/workflow.md)。
+CES 当前还包含 `@smp/console-server-management`，负责服务器实例、密钥、软件计划和升级管理。独立容器插件与详情面板扩展仍处于已确认、待实施阶段，见 [服务器管理交接](docs/framework/modules/server-management/handoff.md)。
 
-## 快速开始
+## 留在外面的
 
-```powershell
-git clone https://github.com/zmdo/zstao.git
-cd zstao
-
-# 新建一个工作项（Windows PowerShell 5.1+ 或 PowerShell 7）
-powershell -File scripts/New-WorkItem.ps1 -Title "把子代理评审接进日常流程"
-```
-
-## 目录结构
-
-```text
-.
-├── AGENTS.md     # 给 AI Agent 的仓库级约定
-├── README.md
-├── docs/         # 原则、流程、提示词写法
-├── prompts/      # 可直接复用的提示词
-├── agents/       # Agent 角色卡与交接协议
-├── scripts/      # 新建工作项的脚本
-└── templates/    # 工作项 / 决策模板
-```
-
-## 约定
-
-- **语言**：文档用中文；代码与文件名用英文。
-- **命名**：目录与文件用 `kebab-case`。
-- **隐私**：个人笔记、密钥、客户资料不进仓库，放本地 `inbox/`（已忽略）。
-
-## 与 AI 协作
-
-1. 先读 [`AGENTS.md`](AGENTS.md)，了解在本仓库里协作的基本约定。
-2. 再按 [`docs/workflow.md`](docs/workflow.md) 走一遍五个阶段。
-3. 提示词从 [`prompts/`](prompts/README.md) 取，不要每次从零写。
-
-## Roadmap
-
-- [x] 仓库骨架、原则与标准流程
-- [x] 提示词库与 Agent 角色卡
-- [x] 工作项脚本与模板
-- [ ] 接入 MCP 工具链清单
-- [ ] 季度复盘模板与指标看板
-
-## License
-
-[MIT](LICENSE) © 2026 Zhang Shengtao
+- PostgreSQL。
+- 交易所和模型的 HTTP 接口。模型仍走 `dsh` 自己的接口。
+- 登记过的服务器上的容器。CES 不把 Docker 引擎写进本仓库。

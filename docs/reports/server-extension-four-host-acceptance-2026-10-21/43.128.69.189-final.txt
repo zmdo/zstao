@@ -1,0 +1,12 @@
+2026-10-21T14:23:14+08:00
+VM-0-11-ubuntu
+uid=1000(ubuntu) gid=1001(ubuntu) groups=1001(ubuntu),4(adm),20(dialout),24(cdrom),25(floppy),27(sudo),29(audio),30(dip),44(video),46(plugdev),101(lxd),988(docker),1000(netdev)
+docker:x:988:ubuntu,smp-noexec
+active
+active
+
+VERSIONS
+Client=29.9.1 Server=29.9.1
+Docker Compose version v5.6.0
+
+CONTAINERS

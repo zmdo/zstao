@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-workspace-groups
+      name: '@smp/console-workspace-groups'

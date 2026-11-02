@@ -1,0 +1,8 @@
+{
+  "host": "43.128.69.189",
+  "error": "ssh_failed",
+  "params": {
+    "detail": "Connection lost before handshake"
+  },
+  "message": "ssh_failed"
+}

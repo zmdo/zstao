@@ -1,0 +1,8 @@
+- insert:
+    - id: smp-harness-settings
+      name: '@smp/console-harness-settings'
+
+# That plugin also registers the general section and declares
+# settings.general.item. This shell declares the same slot.
+- id: ui-settings-general
+  disabled: true

@@ -1,0 +1,106 @@
+uid=1000(ubuntu) gid=1001(ubuntu) groups=1001(ubuntu),4(adm),20(dialout),24(cdrom),25(floppy),27(sudo),29(audio),30(dip),44(video),46(plugdev),101(lxd),111(docker),1000(netdev)
+× docker.service - Docker Application Container Engine
+     Loaded: loaded (/usr/lib/systemd/system/docker.service; enabled; preset: enabled)
+     Active: failed (Result: exit-code) since Wed 2026-10-21 14:01:51 CST; 25s ago
+   Duration: 17h 21min 9.085s
+TriggeredBy: × docker.socket
+       Docs: https://docs.docker.com
+    Process: 1748134 ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock (code=exited, status=1/FAILURE)
+   Main PID: 1748134 (code=exited, status=1/FAILURE)
+        CPU: 35ms
+
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: docker.service: Scheduled restart job, restart counter is at 3.
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: docker.service: Start request repeated too quickly.
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: docker.service: Failed with result 'exit-code'.
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: Failed to start docker.service - Docker Application Container Engine.
+
+× docker.socket - Docker Socket for the API
+     Loaded: loaded (/usr/lib/systemd/system/docker.socket; enabled; preset: enabled)
+     Active: failed (Result: service-start-limit-hit) since Wed 2026-10-21 14:01:51 CST; 25s ago
+   Duration: 17h 27min 52.587s
+   Triggers: ● docker.service
+     Listen: /run/docker.sock (Stream)
+        CPU: 368us
+
+Oct 20 20:33:58 VM-0-7-ubuntu systemd[1]: Starting docker.socket - Docker Socket for the API...
+Oct 20 20:33:58 VM-0-7-ubuntu systemd[1]: Listening on docker.socket - Docker Socket for the API.
+Oct 21 13:55:09 VM-0-7-ubuntu systemd[1]: docker.socket: Socket unit configuration has changed while unit has been running, no open socket file descriptor left. The socket unit is not functional until restarted.
+Oct 21 13:55:09 VM-0-7-ubuntu systemd[1]: docker.socket: Socket unit configuration has changed while unit has been running, no open socket file descriptor left. The socket unit is not functional until restarted.
+Oct 21 13:55:09 VM-0-7-ubuntu systemd[1]: docker.socket: Socket unit configuration has changed while unit has been running, no open socket file descriptor left. The socket unit is not functional until restarted.
+Oct 21 14:01:43 VM-0-7-ubuntu systemd[1]: docker.socket: Socket unit configuration has changed while unit has been running, no open socket file descriptor left. The socket unit is not functional until restarted.
+Oct 21 14:01:44 VM-0-7-ubuntu systemd[1]: docker.socket: Socket unit configuration has changed while unit has been running, no open socket file descriptor left. The socket unit is not functional until restarted.
+Oct 21 14:01:44 VM-0-7-ubuntu systemd[1]: docker.socket: Socket unit configuration has changed while unit has been running, no open socket file descriptor left. The socket unit is not functional until restarted.
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: docker.socket: Failed with result 'service-start-limit-hit'.
+
+● containerd.service - containerd container runtime
+     Loaded: loaded (/usr/lib/systemd/system/containerd.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-10-21 14:01:43 CST; 33s ago
+       Docs: https://containerd.io
+   Main PID: 1747838 (containerd)
+      Tasks: 7
+     Memory: 11.2M (peak: 11.5M)
+        CPU: 44ms
+     CGroup: /system.slice/containerd.service
+             └─1747838 /usr/bin/containerd
+
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.802248390+08:00" level=info msg="loading plugin" id=io.containerd.server.v1.grpc-tcp type=io.containerd.server.v1
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.802274839+08:00" level=info msg="skip loading plugin" error="skip plugin" id=io.containerd.server.v1.grpc-tcp type=io.containerd.server.v1
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.802283526+08:00" level=info msg="loading plugin" id=io.containerd.http.v1.pprof type=io.containerd.http.v1
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.802329302+08:00" level=info msg="loading plugin" id=io.containerd.server.v1.debug type=io.containerd.server.v1
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.802339811+08:00" level=info msg="skip loading plugin" error="skip plugin" id=io.containerd.server.v1.debug type=io.containerd.server.v1
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.803040778+08:00" level=info msg=serving... address=/run/containerd/containerd.sock.ttrpc
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.803138752+08:00" level=info msg="starting GRPC server" address=/run/containerd/containerd.sock gid=0 uid=0
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.803345079+08:00" level=info msg=serving... address=/run/containerd/containerd.sock
+Oct 21 14:01:43 VM-0-7-ubuntu systemd[1]: Started containerd.service - containerd container runtime.
+Oct 21 14:01:43 VM-0-7-ubuntu containerd[1747838]: time="2026-10-21T14:01:43.805502121+08:00" level=info msg="containerd successfully booted in 0.016278s"
+Oct 20 20:33:58 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:58.907873796+08:00" level=info msg="CDI directory does not exist, skipping: failed to monitor for changes: no such file or directory" dir=/var/run/cdi
+Oct 20 20:33:58 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:58.907966931+08:00" level=info msg="detected 127.0.0.53 nameserver, assuming systemd-resolved, so using resolv.conf: /run/systemd/resolve/resolv.conf"
+Oct 20 20:33:58 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:58.934751508+08:00" level=info msg="Creating a containerd client" address=/run/containerd/containerd.sock timeout=1m0s
+Oct 20 20:33:58 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:58.947458523+08:00" level=info msg="Loading containers: start."
+Oct 20 20:33:58 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:58.947505231+08:00" level=info msg="Starting daemon with containerd snapshotter integration enabled"
+Oct 20 20:33:58 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:58.949050704+08:00" level=info msg="Restoring containers: start."
+Oct 20 20:33:58 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:58.996878013+08:00" level=info msg="Deleting nftables IPv4 rules" error="exit status 1"
+Oct 20 20:33:59 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:59.003726915+08:00" level=info msg="Deleting nftables IPv6 rules" error="exit status 1"
+Oct 20 20:33:59 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:59.651219011+08:00" level=info msg="Loading containers: done."
+Oct 20 20:33:59 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:59.656611329+08:00" level=info msg="Docker daemon" commit="29.1.3-0ubuntu3~24.04.2" containerd-snapshotter=true storage-driver=overlayfs version=29.1.3
+Oct 20 20:33:59 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:59.656724320+08:00" level=info msg="Initializing buildkit"
+Oct 20 20:33:59 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:59.805678514+08:00" level=info msg="Completed buildkit initialization"
+Oct 20 20:33:59 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:59.810025669+08:00" level=info msg="Daemon has completed initialization"
+Oct 20 20:33:59 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-20T20:33:59.810157696+08:00" level=info msg="API listen on /run/docker.sock"
+Oct 20 20:33:59 VM-0-7-ubuntu systemd[1]: Started docker.service - Docker Application Container Engine.
+Oct 21 13:55:08 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-21T13:55:08.895757252+08:00" level=info msg="Processing signal 'terminated'"
+Oct 21 13:55:08 VM-0-7-ubuntu systemd[1]: Stopping docker.service - Docker Application Container Engine...
+Oct 21 13:55:08 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-21T13:55:08.896848202+08:00" level=info msg="stopping event stream following graceful shutdown" error="<nil>" module=libcontainerd namespace=moby
+Oct 21 13:55:08 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-21T13:55:08.897946374+08:00" level=info msg="Daemon shutdown complete"
+Oct 21 13:55:08 VM-0-7-ubuntu dockerd[1433202]: time="2026-10-21T13:55:08.897982361+08:00" level=info msg="stopping event stream following graceful shutdown" error="context canceled" module=libcontainerd namespace=plugins.moby
+Oct 21 13:55:08 VM-0-7-ubuntu systemd[1]: docker.service: Deactivated successfully.
+Oct 21 13:55:08 VM-0-7-ubuntu systemd[1]: Stopped docker.service - Docker Application Container Engine.
+Oct 21 13:55:08 VM-0-7-ubuntu systemd[1]: docker.service: Consumed 4.244s CPU time, 27.9M memory peak, 0B memory swap peak.
+Oct 21 14:01:44 VM-0-7-ubuntu systemd[1]: Starting docker.service - Docker Application Container Engine...
+Oct 21 14:01:44 VM-0-7-ubuntu dockerd[1747985]: time="2026-10-21T14:01:44.715255376+08:00" level=info msg="Starting up"
+Oct 21 14:01:44 VM-0-7-ubuntu dockerd[1747985]: time="2026-10-21T14:01:44.715903223+08:00" level=info msg="Daemon shutdown complete" error="failed to load listeners: no sockets found via socket activation: make sure the service was started by systemd"
+Oct 21 14:01:44 VM-0-7-ubuntu dockerd[1747985]: failed to load listeners: no sockets found via socket activation: make sure the service was started by systemd
+Oct 21 14:01:44 VM-0-7-ubuntu systemd[1]: docker.service: Main process exited, code=exited, status=1/FAILURE
+Oct 21 14:01:44 VM-0-7-ubuntu systemd[1]: docker.service: Failed with result 'exit-code'.
+Oct 21 14:01:44 VM-0-7-ubuntu systemd[1]: Failed to start docker.service - Docker Application Container Engine.
+Oct 21 14:01:46 VM-0-7-ubuntu systemd[1]: docker.service: Scheduled restart job, restart counter is at 1.
+Oct 21 14:01:46 VM-0-7-ubuntu systemd[1]: Starting docker.service - Docker Application Container Engine...
+Oct 21 14:01:46 VM-0-7-ubuntu dockerd[1748082]: time="2026-10-21T14:01:46.947307741+08:00" level=info msg="Starting up"
+Oct 21 14:01:46 VM-0-7-ubuntu dockerd[1748082]: time="2026-10-21T14:01:46.948542230+08:00" level=info msg="Daemon shutdown complete" error="failed to load listeners: no sockets found via socket activation: make sure the service was started by systemd"
+Oct 21 14:01:46 VM-0-7-ubuntu dockerd[1748082]: failed to load listeners: no sockets found via socket activation: make sure the service was started by systemd
+Oct 21 14:01:46 VM-0-7-ubuntu systemd[1]: docker.service: Main process exited, code=exited, status=1/FAILURE
+Oct 21 14:01:46 VM-0-7-ubuntu systemd[1]: docker.service: Failed with result 'exit-code'.
+Oct 21 14:01:46 VM-0-7-ubuntu systemd[1]: Failed to start docker.service - Docker Application Container Engine.
+Oct 21 14:01:49 VM-0-7-ubuntu systemd[1]: docker.service: Scheduled restart job, restart counter is at 2.
+Oct 21 14:01:49 VM-0-7-ubuntu systemd[1]: Starting docker.service - Docker Application Container Engine...
+Oct 21 14:01:49 VM-0-7-ubuntu dockerd[1748134]: time="2026-10-21T14:01:49.182874848+08:00" level=info msg="Starting up"
+Oct 21 14:01:49 VM-0-7-ubuntu dockerd[1748134]: time="2026-10-21T14:01:49.183568320+08:00" level=info msg="Daemon shutdown complete" error="failed to load listeners: no sockets found via socket activation: make sure the service was started by systemd"
+Oct 21 14:01:49 VM-0-7-ubuntu dockerd[1748134]: failed to load listeners: no sockets found via socket activation: make sure the service was started by systemd
+Oct 21 14:01:49 VM-0-7-ubuntu systemd[1]: docker.service: Main process exited, code=exited, status=1/FAILURE
+Oct 21 14:01:49 VM-0-7-ubuntu systemd[1]: docker.service: Failed with result 'exit-code'.
+Oct 21 14:01:49 VM-0-7-ubuntu systemd[1]: Failed to start docker.service - Docker Application Container Engine.
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: docker.service: Scheduled restart job, restart counter is at 3.
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: docker.service: Start request repeated too quickly.
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: docker.service: Failed with result 'exit-code'.
+Oct 21 14:01:51 VM-0-7-ubuntu systemd[1]: Failed to start docker.service - Docker Application Container Engine.
+total 0

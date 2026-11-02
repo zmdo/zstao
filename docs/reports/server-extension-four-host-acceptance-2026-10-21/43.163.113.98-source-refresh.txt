@@ -1,0 +1,24 @@
+Hit:1 http://mirrors.tencentyun.com/ubuntu noble InRelease
+Get:2 http://mirrors.tencentyun.com/ubuntu noble-updates InRelease [126 kB]
+Hit:3 http://mirrors.tencentyun.com/ubuntu noble-backports InRelease
+Get:4 http://mirrors.tencentyun.com/ubuntu noble-security InRelease [126 kB]
+Get:5 https://download.docker.com/linux/ubuntu noble InRelease [48.5 kB]
+Get:6 http://mirrors.tencentyun.com/ubuntu noble-updates/main amd64 Packages [1397 kB]
+Get:7 http://mirrors.tencentyun.com/ubuntu noble-updates/universe amd64 Packages [1704 kB]
+Get:8 http://mirrors.tencentyun.com/ubuntu noble-security/main amd64 Packages [1145 kB]
+Get:9 http://mirrors.tencentyun.com/ubuntu noble-security/universe amd64 Packages [1222 kB]
+Get:10 https://download.docker.com/linux/ubuntu noble/stable amd64 Packages [71.2 kB]
+Fetched 5840 kB in 2s (3888 kB/s)
+Reading package lists...
+docker-ce:
+  Installed: 5:29.9.1-1~ubuntu.24.04~noble
+  Candidate: 5:29.9.2-1~ubuntu.24.04~noble
+  Version table:
+     5:29.9.2-1~ubuntu.24.04~noble 500
+        500 https://download.docker.com/linux/ubuntu noble/stable amd64 Packages
+ *** 5:29.9.1-1~ubuntu.24.04~noble 500
+        500 https://download.docker.com/linux/ubuntu noble/stable amd64 Packages
+        100 /var/lib/dpkg/status
+     5:29.9.0-1~ubuntu.24.04~noble 500
+        500 https://download.docker.com/linux/ubuntu noble/stable amd64 Packages
+     5:29.8.2-1~ubuntu.24.04~noble 500

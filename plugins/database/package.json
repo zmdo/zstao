@@ -1,0 +1,38 @@
+{
+  "name": "@smp/console-database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "数据库连接和密文",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib/index.js",
+    "migrations",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "engines": {
+    "dsh": "0.2.1-alpha.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test": "node --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "~4.0.5-alpha.2",
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.2",
+    "pg": "^8.16.3"
+  }
+}

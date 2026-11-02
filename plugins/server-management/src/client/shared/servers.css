@@ -1,0 +1,926 @@
+.smp-console .content:has(.smp-server-shell) { display: flex; flex-direction: column; overflow: hidden; }
+.smp-console .content:has(.smp-server-shell) > .banner { flex: none; }
+.smp-server-shell {
+  flex: 1; min-height: 0; display: flex; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--dsw-alias-bg-layer-1);
+}
+.smp-server-sidebar { width: 188px; flex: none; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+.smp-server-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 10px 8px 16px; flex: none; }
+.smp-server-group-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+.smp-server-group-form { display: grid; gap: 10px; padding: 4px 12px 12px; border-bottom: 1px solid var(--line); }
+.smp-console .smp-server-group-form input { width: 100%; min-width: 0; box-sizing: border-box; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--dsw-alias-bg-layer-1); color: var(--text); }
+.smp-server-group-error { margin: 0; color: var(--red); font-size: 12px; }
+.smp-server-groups { flex: 1; min-height: 0; overflow: auto; padding: 4px 10px 16px; }
+.smp-server-group { position: relative; display: flex; align-items: center; min-width: 0; min-height: 36px; margin-bottom: 4px; border-radius: 4px; }
+.smp-server-group:hover, .smp-server-group:focus-within { background: var(--dsw-specific-sidebar-nav-item-hover); }
+.smp-server-group.is-on { background: var(--primary-soft); color: var(--primary); }
+.smp-server-group-choice { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.smp-server-group:has(.smp-server-group-delete) .smp-server-group-choice { padding-right: 34px; }
+.smp-server-group:has(.smp-server-group-rename-button) .smp-server-group-choice { padding-right: 62px; }
+.smp-server-group-choice > span:first-child { min-width: 0; padding-right: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smp-server-group.is-on .smp-server-group-choice { font-weight: 600; }
+.smp-server-group-count { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.smp-server-group:has(.smp-server-group-delete):hover .smp-server-group-count,
+.smp-server-group:has(.smp-server-group-delete):focus-within .smp-server-group-count,
+.smp-server-group:has(.smp-server-group-rename-button):hover .smp-server-group-count,
+.smp-server-group:has(.smp-server-group-rename-button):focus-within .smp-server-group-count { opacity: 0; }
+.smp-server-group-delete { position: absolute; right: 4px; display: grid; place-items: center; width: 26px; height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; }
+.smp-server-group:hover .smp-server-group-delete, .smp-server-group:focus-within .smp-server-group-delete { opacity: 1; }
+.smp-server-group-delete:hover { color: var(--red); background: var(--red-bg); }
+.smp-server-group-rename-button { position: absolute; right: 32px; display: grid; place-items: center; width: 26px; height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; }
+.smp-server-group:hover .smp-server-group-rename-button, .smp-server-group:focus-within .smp-server-group-rename-button { opacity: 1; }
+.smp-server-group-rename-button:hover { color: var(--primary); background: var(--primary-soft); }
+.smp-server-main { flex-direction:column; gap:12px; flex: 1; min-width: 0; min-height: 0; display: flex; padding: 20px 24px 24px; }
+.smp-console .smp-server-main > .panel { flex: 1; min-width: 0; min-height: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+.smp-console .smp-server-main .panel-head { flex: none; flex-wrap: wrap; min-height: 56px; padding: 12px 16px; box-sizing: border-box; }
+.smp-console .smp-server-main .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; }
+.smp-server-current-group { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; font-size: 12px; color: var(--muted); }
+.smp-server-tools { margin-left: auto; }
+.smp-console .smp-server-tools .search { width: 180px; }
+.smp-server-tools { flex-wrap: wrap; }
+.smp-console .smp-server-tools select { width: auto; max-width: 160px; }
+.smp-console .smp-server-main .banner { margin: 12px 16px 0; flex: none; }
+.smp-server-table-scroll { flex: 1; min-height: 0; }
+.smp-console .smp-server-table { min-width: 920px; font-size: 12px; }
+.smp-console .smp-server-table th { position: sticky; top: 0; z-index: 1; height: 36px; padding: 8px; box-sizing: border-box; background: var(--dsw-alias-bg-layer-2); white-space: nowrap; }
+.smp-console .smp-server-table td { height: 56px; padding: 8px; box-sizing: border-box; }
+.smp-console .smp-server-table td:last-child { max-width: 130px; font-size: 11px; white-space: normal; }
+.smp-console .smp-server-table td small { display: block; margin-top: 4px; }
+.smp-server-resources { min-width: 130px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.smp-server-resources > span { display: block; white-space: nowrap; }
+.smp-server-status-reasons { padding-left: 18px; color: var(--muted); font-size: 12px; }
+.smp-console .pill.smp-server-status.normal { color: var(--green); background: var(--green-bg); }
+.smp-console .pill.smp-server-status.disconnected, .smp-console .pill.smp-server-status.attention { color: var(--red); background: var(--red-bg); }
+.smp-console .pill.smp-server-status.installing, .smp-console .pill.smp-server-status.upgrading { color: var(--primary); background: var(--primary-soft); }
+.smp-server-group-source { display: block; font-size: 10px; font-weight: 400; color: var(--muted); }
+.smp-server-form-section { min-width: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.smp-console .smp-server-form-section > h2 { margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--dsw-alias-bg-layer-2); font-size: 14px; font-weight: 600; }
+.smp-server-form-section-body { display: grid; gap: 14px; padding: 16px; min-width: 0; }
+.smp-server-form-section-body > p { margin: 0; }
+.smp-server-form-section > footer { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.smp-console .smp-server-form-section button.smp-server-identify { border: 1px solid var(--green); background: var(--green); color: #fff; }
+.smp-console .smp-server-form-section button.smp-server-identify:disabled { opacity: .45; cursor: not-allowed; }
+.smp-required-software { min-width: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.smp-console .smp-required-software > h3 { margin: 0; padding: 10px 12px; font-size: 13px; font-weight: 500; border-bottom: 1px solid var(--line); background: var(--dsw-alias-bg-layer-2); }
+.smp-required-software > p { margin: 0; padding: 12px; font-size: 13px; }
+.smp-console .smp-required-software table { min-width: 420px; font-size: 13px; }
+.smp-console .smp-required-software th { background: var(--dsw-alias-bg-layer-2); color: var(--muted); font-size: 12px; }
+.smp-console .smp-required-software th, .smp-console .smp-required-software td { padding: 9px 12px; }
+.smp-required-software small { display: block; margin-top: 4px; overflow-wrap: anywhere; }
+.smp-software-version { font-variant-numeric: tabular-nums; }
+.smp-console form.panel-form .smp-server-address-row { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 12px; }
+.smp-console form.panel-form .smp-server-address-row > .field { min-width: 0; }
+.smp-console form.panel-form .smp-server-address-row input { width: 100%; min-width: 0; box-sizing: border-box; }
+.smp-console form.panel-form > .triple input, .smp-console form.panel-form > .triple select { box-sizing: border-box; }
+.smp-console .panel-form .smp-server-auto-install { display: flex; align-items: center; gap: 8px; }
+.smp-console .panel-form .smp-server-auto-install input { width: auto; margin: 0; }
+.smp-console .smp-server-table tbody tr:hover td { background: var(--dsw-specific-sidebar-nav-item-hover); }
+.smp-server-open { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.smp-server-open:hover { color: var(--primary); }
+.smp-server-empty { margin: 0; padding: 56px 16px; text-align: center; color: var(--muted); }
+.smp-server-pager { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 56px; padding: 10px 16px; box-sizing: border-box; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.smp-server-pager label { display: flex; align-items: center; gap: 6px; }
+.smp-console .smp-server-pager select { width: auto; }
+.smp-console .smp-server-pager button { padding: 0 10px; }
+.smp-task-history { margin-top: 24px; min-width: 0; }
+.smp-task-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.smp-task-filters label { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+.smp-console .smp-task-filters input, .smp-console .smp-task-filters select { box-sizing: border-box; width: auto; min-width: 140px; height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--dsw-alias-bg-layer-1); color: var(--text); }
+.smp-console .smp-task-table { min-width: 720px; }
+.smp-task-table small { display: block; margin-top: 4px; }
+.smp-task-table ul { margin: 6px 0; padding-left: 18px; }
+@media (max-width: 900px) {
+  .smp-server-sidebar { width: 176px; }
+  .smp-server-group-head { flex-wrap: wrap; }
+  .smp-server-main { padding: 12px; }
+}
+
+.smp-console .smp-upgrade-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); align-items: end; gap: 16px; margin: 16px 0; }
+.smp-console .smp-upgrade-fields > .field, .smp-console .smp-plan-confirm > .field, .smp-console .smp-upgrade-dialog > .field { display: grid; gap: 6px; min-width: 0; font-size: 12px; color: var(--muted); }
+.smp-console .smp-upgrade-fields .field > input, .smp-console .smp-upgrade-fields .field > select,
+.smp-console .smp-plan-confirm > .field > select, .smp-console .smp-upgrade-dialog > .field > input { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; height: 34px; font-size: 13px; }
+.smp-console .smp-upgrade-scroll { overflow:auto; margin:12px 0; }
+.smp-console .smp-upgrade-scroll table { min-width:680px; width:100%; }
+.smp-console .smp-upgrade-scroll small { display:block; color:var(--muted); overflow-wrap:anywhere; }
+.smp-console .smp-upgrade-modal { position:fixed; inset:0; z-index:1000; background:#0007; display:flex; align-items:center; justify-content:center; padding:24px; }
+.smp-console .smp-upgrade-dialog { background:var(--dsw-alias-bg-layer-1); color:var(--text); border:1px solid var(--line); border-radius:12px; width:min(1100px,100%); max-height:90vh; overflow:auto; padding:24px; box-shadow:0 12px 48px #0004; }
+.smp-console .smp-plan-target,.smp-console .smp-plan-confirm,.smp-console .smp-version-policies { margin:16px 0; padding:16px; border:1px solid var(--line); border-radius:8px; }
+.smp-console .smp-plan-target h3,.smp-console .smp-version-policies h3 { font-size:14px; margin:0 0 8px; }
+.smp-console .smp-rule-editor { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.smp-console .smp-rule-editor input { width:110px; min-width:0; }
+.smp-console .smp-upgrade-ack { display:block; margin:12px 0; }
+.smp-console .smp-change-plan pre,.smp-console .smp-upgrade-dialog pre { max-height:260px; overflow:auto; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+
+.smp-console .smp-upgrade-page { min-width: 0; }
+.smp-console .smp-upgrade-filter-region { container-type: inline-size; }
+.smp-console .smp-upgrade-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.smp-console .smp-upgrade-toolbar > p { margin: 0; font-size: 13px; }
+.smp-console .smp-upgrade-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 16px; border: 1px solid var(--line); border-radius: 4px; background: var(--dsw-alias-bg-layer-2); }
+.smp-console .smp-upgrade-selection { margin: 16px 0 12px; }
+.smp-console .smp-upgrade-selection > span { margin-left: auto; font-size: 12px; color: var(--muted); }
+.smp-console .smp-upgrade-suggestions { margin: 0; }
+.smp-console .smp-upgrade-suggestions th:first-child { width: 32px; }
+.smp-console .smp-upgrade-suggestions th:last-child { width: 150px; }
+.smp-console .smp-upgrade-empty { height: 96px; padding: 24px 16px; box-sizing: border-box; text-align: center; color: var(--muted); font-size: 13px; }
+.smp-console .smp-detection-results { margin-top: 24px; min-width: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.smp-console .smp-detection-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.smp-console .smp-detection-head h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.smp-console .smp-detection-head > span { color: var(--muted); font-size: 12px; }
+.smp-console .smp-detection-scroll { overflow-x: auto; }
+.smp-console .smp-detection-table { min-width: 720px; font-size: 13px; }
+.smp-console .smp-detection-table td > b { font-weight: 500; }
+.smp-console .smp-detection-table small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.smp-console .smp-detection-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.smp-console .smp-detection-reasons { margin: 0; padding-left: 16px; }
+.smp-console .smp-detection-reasons li + li { margin-top: 4px; }
+.smp-console .smp-detection-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.smp-console .smp-detection-status::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.smp-console .smp-detection-status.failed { color: var(--red); }
+.smp-console .smp-detection-status.blocked { color: var(--warn); }
+.smp-console .smp-detection-status.available { color: var(--primary); }
+.smp-console .smp-detection-status.current { color: var(--green); }
+.smp-console .smp-detection-status.unknown { color: var(--muted); }
+@container (max-width: 900px) {
+  .smp-console .smp-upgrade-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 440px) {
+  .smp-console .smp-upgrade-filters { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  .smp-console .smp-upgrade-selection > span { margin-left: 0; width: 100%; }
+}
+
+.smp-console .content:has(.smp-server-workspace) { display: flex; flex-direction: column; overflow: hidden; }
+.smp-server-workspace {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--dsw-alias-bg-layer-1);
+}
+.smp-server-workspace-head {
+  flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  min-height: 56px; padding: 10px 16px; box-sizing: border-box; border-bottom: 1px solid var(--line);
+}
+.smp-server-workspace-identity { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.smp-server-workspace-identity h2 {
+  margin: 0; max-width: 48ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 16px; font-weight: 600;
+}
+.smp-server-workspace-identity .mono { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.smp-server-workspace-head > .pill { margin-left: auto; }
+.smp-server-workspace-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.smp-server-workspace-nav {
+  width: 188px; flex: none; min-height: 0; padding: 8px 10px 16px;
+  border-right: 1px solid var(--line); overflow: auto;
+}
+.smp-server-workspace-nav nav { display: grid; gap: 4px; }
+.smp-console .smp-server-workspace-choice {
+  min-height: 36px; padding: 0 10px; border: 0; border-radius: 4px;
+  background: transparent; color: var(--text); text-align: left; cursor: pointer;
+}
+.smp-console .smp-server-workspace-choice:hover { background: var(--dsw-specific-sidebar-nav-item-hover); }
+.smp-console .smp-server-workspace-choice.is-on { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.smp-server-workspace-select-wrap { display: none; }
+.smp-server-workspace-panel {
+  flex: 1; min-width: 0; min-height: 0; display: flex; padding: 20px 24px 24px; overflow: auto;
+}
+.smp-console .smp-server-workspace-panel > .panel {
+  flex: 1; min-width: 0; min-height: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden;
+  border: 0; border-radius: 0; background: transparent;
+}
+.smp-console .smp-server-workspace-panel > .panel > .panel-head {
+  flex: none; min-height: 0; padding: 0 0 12px; border-bottom: 1px solid var(--line);
+}
+.smp-console .smp-server-workspace-panel > .panel > .panel-body {
+  flex: 1; min-height: 0; padding: 0; overflow: auto;
+}
+/* The workspace already draws one frame; inner cards use separators instead of nested borders. */
+.smp-console .smp-server-workspace .node-card {
+  border: 0; border-radius: 0; background: transparent; padding: 0;
+}
+.smp-console .smp-server-workspace .smp-required-software { border: 0; border-radius: 0; }
+.smp-console .smp-server-workspace .smp-version-policies { border: 0; border-radius: 0; padding: 0; margin: 0; }
+.smp-console .smp-server-workspace .smp-required-software > h3 { padding-left: 0; background: transparent; }
+.smp-console .smp-server-workspace .smp-server-form-section { border: 0; border-radius: 0; }
+.smp-console .smp-server-workspace .smp-server-form-section > h2 { padding-left: 0; background: transparent; }
+.smp-console .smp-server-workspace .smp-server-form-section-body { padding-left: 0; padding-right: 0; }
+.smp-console .smp-server-workspace .smp-server-form-section > footer { padding-left: 0; padding-right: 0; }
+.smp-server-workspace .smp-task-history { margin-top: 0; }
+
+/* The task list scrolls inside its table, keeping filters and pagination fixed. */
+.smp-console .smp-server-workspace-panel > .panel.smp-task-panel > .panel-body {
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.smp-console .smp-task-panel .smp-task-history {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 0; min-width: 0;
+}
+.smp-console .smp-task-panel .smp-task-history > .muted,
+.smp-console .smp-task-panel .smp-task-filters,
+.smp-console .smp-task-panel .smp-task-history > .banner,
+.smp-console .smp-task-panel .smp-server-pager { flex: none; }
+.smp-console .smp-task-panel .smp-task-history .table-scroll {
+  flex: 1; min-height: 0; overflow: auto;
+}
+.smp-console .smp-task-panel .smp-task-table thead th {
+  position: sticky; top: 0; z-index: 1; background: #fafafa;
+}
+
+.smp-server-terminal-layer { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.smp-server-terminal-layer[hidden] { display: none; }
+.smp-console .smp-server-terminal-layer > .panel {
+  flex: 1; min-width: 0; min-height: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden;
+  border: 0; border-radius: 0; background: transparent;
+}
+.smp-console .smp-server-terminal-layer > .panel > .panel-head {
+  flex: none; min-height: 0; padding: 0 0 12px; border-bottom: 1px solid var(--line);
+}
+.smp-console .smp-server-terminal-layer > .panel > .panel-body {
+  flex: 1; min-height: 0; padding: 0; overflow: auto;
+}
+.smp-server-settings-layer { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.smp-server-extension-layer { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
+.smp-server-settings-layer[hidden] { display: none; }
+.smp-console .smp-server-settings-layer > .panel {
+  flex: 1; min-width: 0; min-height: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden;
+  border: 0; border-radius: 0; background: transparent;
+}
+.smp-console .smp-server-settings-layer > .panel > .panel-head {
+  flex: none; min-height: 0; padding: 0 0 12px; border-bottom: 1px solid var(--line);
+}
+.smp-console .smp-server-settings-layer > .panel > .panel-body {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: hidden;
+}
+.smp-console .smp-settings-tabs {
+  flex: none; display: flex; gap: 4px; height: 48px; margin: 0; padding: 0; border-bottom: 1px solid var(--line);
+  overflow-x: auto; flex-wrap: nowrap;
+}
+.smp-console .smp-settings-tab { flex: none; display: flex; align-items: center; height: 100%; padding: 0 14px; border: 0; border-radius: 0; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.smp-console .smp-settings-tab:hover { color: var(--dsw-alias-label-primary); background: transparent; }
+.smp-console .smp-settings-tab.is-on { color: var(--dsw-alias-state-business-primary); box-shadow: inset 0 -2px 0 var(--dsw-alias-state-business-primary); font-weight: inherit; }
+.smp-console .smp-settings-content { flex: 1; min-height: 0; overflow: auto; padding-top: 16px; }
+.smp-console .smp-settings-form { display: grid; gap: 14px; }
+.smp-console .smp-settings-actions { flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
+.smp-console .smp-terminal-toolbar {
+  flex: none; display: flex; align-items: center; gap: 8px; padding: 0 0 8px;
+  font-size: 12px; color: var(--muted);
+}
+.smp-console .smp-terminal-toolbar button { margin-left: auto; }
+.smp-console .smp-terminal-status.connected { color: var(--green); }
+.smp-console .smp-terminal-status.connecting { color: var(--primary); }
+.smp-console .smp-terminal-status.failed { color: var(--red); }
+
+/* The embedded terminal fills the remaining panel height instead of using a page-height minimum. */
+.smp-console .smp-server-workspace-panel > .panel.smp-server-terminal-panel { min-height: 0; }
+.smp-console :is(.smp-server-workspace-panel, .smp-server-terminal-layer) > .panel.smp-server-terminal-panel > .panel-body {
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.smp-console .smp-server-terminal-panel .terminal-page {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+}
+.smp-console .smp-server-terminal-panel .terminal-host {
+  flex: 1; min-height: 0; height: auto; overflow: hidden;
+  overscroll-behavior: contain; box-sizing: border-box;
+}
+.smp-console .smp-server-terminal-panel .xterm-viewport {
+  scrollbar-width: none;
+}
+.smp-console .smp-server-terminal-panel .xterm-viewport::-webkit-scrollbar {
+  display: none;
+}
+@media (max-width: 900px) {
+  .smp-server-workspace-body { flex-direction: column; }
+  .smp-server-workspace-nav { display: none; }
+  .smp-server-workspace-select-wrap {
+    display: grid; gap: 4px; padding: 10px 12px 0; font-size: 12px; color: var(--muted);
+  }
+  .smp-console .smp-server-workspace-select {
+    box-sizing: border-box; width: 100%; height: 34px; padding: 0 10px;
+    border: 1px solid var(--border); border-radius: 4px; background: var(--dsw-alias-bg-layer-1); color: var(--text);
+  }
+  .smp-server-workspace-head { padding: 10px 12px; }
+  .smp-server-workspace-identity h2 { max-width: 24ch; }
+  .smp-server-workspace-panel { padding: 12px; }
+}
+
+.smp-server-actions { white-space: nowrap; }
+.smp-server-action-icon { display: inline-grid; place-items: center; box-sizing: border-box; width: 26px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+.smp-server-action-icon + .smp-server-action-icon { margin-left: 2px; }
+.smp-server-action-icon:hover { background: var(--dsw-specific-sidebar-nav-item-hover); color: var(--primary); }
+.smp-server-action-icon.danger:hover { color: var(--red); background: var(--red-bg); }
+.smp-console .danger-button { background: var(--red); border-color: var(--red); color: #fff; }
+.smp-console .danger-button:hover:not(:disabled) { filter: brightness(0.92); }
+.smp-server-group-rename { position: relative; display: flex; align-items: center; padding: 4px 66px 4px 6px; }
+.smp-server-group-rename input { min-width: 0; flex: 1; height: 28px; box-sizing: border-box; }
+.smp-server-group-rename .smp-server-group-icon-button { position: absolute; top: 4px; }
+.smp-server-group-rename .smp-server-group-icon-button:first-of-type { right: 32px; }
+.smp-server-group-rename .smp-server-group-icon-button:last-of-type { right: 4px; }
+
+.smp-console .smp-server-group-icon-button {
+  flex: none; display: grid; place-items: center; box-sizing: border-box;
+  width: 26px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 4px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.smp-console .smp-server-group-icon-button:hover:not(:disabled) {
+  background: var(--dsw-specific-sidebar-nav-item-hover); color: var(--primary);
+}
+.smp-console .smp-server-group-icon-button:disabled { opacity: 0.45; cursor: default; }
+
+.smp-upgrade-footer { justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line); }
+
+.smp-console .smp-upgrade-dialog.smp-confirm-dialog { width: min(420px, 100%); }
+
+.smp-plan-dialog > .row:first-child { display: none; }
+.smp-plan-dialog .smp-change-plan { min-width: 0; }
+
+.smp-plan-dialog > .row:last-child { display: none; }
+.smp-plan-dialog .smp-plan-confirm > button { display: none; }
+
+.smp-plan-dialog > .row:last-child { display: none; }
+.smp-plan-dialog .smp-plan-confirm > button { display: none; }
+
+.smp-server-address-cell { min-width: 150px; }
+.smp-address-row { display: flex; align-items: center; gap: 6px; min-width: 0; line-height: 20px; }
+.smp-address-row > small { flex: none; width: 28px; color: var(--muted); font-size: 11px; }
+.smp-address-row > .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smp-copy-address { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
+.smp-copy-address:hover { background: var(--dsw-specific-sidebar-nav-item-hover); color: var(--primary); }
+
+/* The configuration tab strip is full-bleed to the workspace frame; only its content is inset. */
+.smp-console .smp-server-workspace-panel:has(> .smp-server-settings-layer:not([hidden])) { padding: 0; }
+.smp-console .smp-settings-content { padding: 16px 24px 24px; }
+
+/* Configuration sections are separate cards, including the required-software table. */
+.smp-console .smp-server-settings-layer .smp-server-form-section {
+  border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+}
+.smp-console .smp-server-settings-layer .smp-server-form-section > h2 {
+  margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);
+  background: var(--dsw-alias-bg-layer-2); font-size: 14px; font-weight: 600;
+}
+.smp-console .smp-server-settings-layer .smp-server-form-section-body { padding: 16px; }
+.smp-console .smp-server-settings-layer .smp-server-form-section > footer { padding: 12px 16px; }
+.smp-console .smp-server-settings-layer .smp-required-software {
+  border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+}
+.smp-console .smp-server-settings-layer .smp-required-software > h3 {
+  margin: 0; padding: 12px 16px; background: var(--dsw-alias-bg-layer-2);
+  border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 500;
+}
+
+/* Policy and extension settings use the same card framing as the basic sections. */
+.smp-console .smp-server-settings-layer .smp-version-policies {
+  margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+}
+.smp-console .smp-server-settings-layer .smp-version-policies > h3 {
+  margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);
+  background: var(--dsw-alias-bg-layer-2); font-size: 14px; font-weight: 600;
+}
+.smp-console .smp-server-settings-layer .smp-version-policies > p.muted {
+  margin: 0; padding: 12px 16px 0;
+}
+.smp-console .smp-server-settings-layer .smp-version-policies .smp-upgrade-scroll {
+  margin: 12px 16px 16px;
+}
+.smp-console .smp-server-settings-layer .smp-extension-settings {
+  border: 1px solid var(--line); border-radius: 4px; overflow: hidden; padding: 0 0 16px;
+}
+.smp-console .smp-server-settings-layer .smp-extension-settings > .smp-extension-settings-head {
+  margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);
+  background: var(--dsw-alias-bg-layer-2);
+}
+.smp-console .smp-server-settings-layer .smp-extension-settings .smp-extension-settings-head h3 {
+  margin: 0; font-size: 14px; font-weight: 600;
+}
+.smp-console .smp-server-settings-layer .smp-extension-settings > :not(.smp-extension-settings-head):not(.smp-settings-actions) {
+  margin-left: 16px; margin-right: 16px;
+}
+.smp-console .smp-server-settings-layer .smp-extension-settings > .smp-settings-actions {
+  margin: 12px 16px 0; padding-top: 12px; border-top: 1px solid var(--line);
+}
+
+.smp-console .smp-server-workspace .node-card.smp-card {
+  border: 1px solid var(--line); border-radius: 4px; padding: 16px;
+}
+.smp-console .smp-server-workspace .smp-required-software.smp-card {
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.smp-console .smp-server-workspace .smp-required-software.smp-card > h3 {
+  padding: 12px 16px; background: var(--dsw-alias-bg-layer-2); border-bottom: 1px solid var(--line);
+}
+
+/* Required-software is a dense embedded table; keep its compact card styling. */
+.smp-console .smp-required-software table.smp-table th,
+.smp-console .smp-required-software table.smp-table td {
+  padding: 9px 12px;
+}
+.smp-console .smp-required-software table.smp-table th {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Configuration tables share the compact card table rhythm. */
+.smp-console .smp-version-policies table.smp-table th,
+.smp-console .smp-version-policies table.smp-table td { padding: 9px 12px; }
+.smp-console .smp-version-policies table.smp-table th {
+  background: var(--dsw-alias-bg-layer-2); color: var(--muted); font-size: 12px;
+}
+.smp-section-hint { margin: 8px 2px 0; color: var(--muted); font-size: 12px; line-height: 18px; }
+
+/* Policy table uses the same full-bleed, scrollable list frame as required software. */
+.smp-console .smp-server-settings-layer .smp-version-policies .smp-upgrade-scroll {
+  margin: 0;
+}
+.smp-console .smp-server-settings-layer .smp-version-policies table.smp-table {
+  min-width: 420px; width: 100%;
+}
+
+/* The move dialog embeds the same compact policy table as the settings card. */
+.smp-console .smp-dialog .smp-version-policies {
+  flex: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+}
+.smp-console .smp-dialog .smp-version-policies > h3 {
+  margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);
+  background: var(--dsw-alias-bg-layer-2); font-size: 14px; font-weight: 600;
+}
+.smp-console .smp-dialog .smp-version-policies .smp-upgrade-scroll { margin: 0; }
+.smp-console .smp-dialog .smp-version-policies table.smp-table {
+  min-width: 420px; width: 100%;
+}
+.smp-console .smp-dialog .smp-version-policies table.smp-table th,
+.smp-console .smp-dialog .smp-version-policies table.smp-table td { padding: 9px 12px; }
+.smp-console .smp-dialog .smp-version-policies table.smp-table th {
+  background: var(--dsw-alias-bg-layer-2); color: var(--muted); font-size: 12px;
+}
+
+/* Preflight target rows use the same section-card frame as configuration cards. */
+.smp-console .smp-dialog .smp-plan-target {
+  margin: 12px 0; padding: 0; border-radius: 4px; overflow: hidden;
+}
+.smp-console .smp-dialog .smp-plan-target > h3 {
+  margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);
+  background: var(--dsw-alias-bg-layer-2); font-size: 14px; font-weight: 600;
+}
+.smp-console .smp-dialog .smp-plan-target > p {
+  margin: 0; padding: 8px 16px;
+}
+.smp-console .smp-dialog .smp-plan-target > .smp-upgrade-scroll {
+  margin: 0;
+}
+.smp-console .smp-dialog .smp-plan-target table.smp-table th,
+.smp-console .smp-dialog .smp-plan-target table.smp-table td { padding: 9px 12px; }
+.smp-console .smp-dialog .smp-plan-target table.smp-table th {
+  background: var(--dsw-alias-bg-layer-2); color: var(--muted); font-size: 12px;
+}
+
+.smp-console .smp-dialog .smp-plan-target > h3 {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.smp-plan-target-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smp-plan-state {
+  flex: none; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 500; line-height: 18px;
+  white-space: nowrap; background: var(--dsw-alias-bg-layer-2); color: var(--muted);
+}
+.smp-plan-state.is-pending { background: var(--warn-bg); color: var(--warn); }
+.smp-plan-state.is-running { background: var(--primary-soft); color: var(--primary); }
+.smp-plan-state.is-success { background: var(--green-bg); color: var(--green); }
+.smp-plan-state.is-failed { background: var(--red-bg); color: var(--red); }
+
+/* Removing the batch hint must also remove its surrounding paragraph spacing. */
+.smp-console .smp-dialog .smp-change-plan > p {
+  margin-top: 0; margin-bottom: 8px;
+}
+.smp-console .smp-dialog .smp-change-plan > .smp-plan-target {
+  margin-top: 8px;
+}
+
+.smp-console .smp-dialog.smp-dialog-move { flex: none; width: min(900px, calc(100vw - 16px)); max-width: calc(100vw - 16px); }
+
+/* Target tables use the same row rhythm as every other table module. */
+.smp-console .smp-dialog .smp-plan-target.smp-table-card table.smp-table th,
+.smp-console .smp-dialog .smp-plan-target.smp-table-card table.smp-table td { padding: 11px 16px; }
+.smp-console .smp-dialog .smp-plan-target.smp-table-card table.smp-table th {
+  background: #fafafa; color: #909399; font-size: 13px; font-weight: 500;
+}
+
+/* Task report: locked filter/pager toolbar above a full-bleed scrolling table. */
+.smp-console .smp-server-workspace-panel:has(> .panel.smp-task-panel) { padding: 0; }
+.smp-console .smp-task-top {
+  flex: none; padding: 12px 16px; background: var(--dsw-alias-bg-layer-1);
+  border-bottom: 1px solid var(--line); z-index: 2;
+}
+.smp-console .smp-task-top .smp-task-filters { margin: 0 0 8px; justify-content: flex-end; }
+.smp-console .smp-task-top .banner { margin: 0 0 12px; }
+.smp-console .smp-task-pager {
+  flex: none; min-height: 0; padding: 12px 24px; border-top: 1px solid var(--line);
+}
+.smp-console .smp-task-panel .smp-task-history .table-scroll {
+  flex: 1; min-height: 0; overflow: auto; border-top: 0;
+}
+.smp-console .smp-task-table { min-width: 100%; }
+
+/* Compact task filters: no visible labels, joined date-range control. */
+.smp-console .smp-task-filters > input,
+.smp-console .smp-task-filters > select { box-sizing: border-box; height: 34px; }
+.smp-console .smp-task-date-range {
+  display: flex; align-items: center; box-sizing: border-box; height: 34px; min-width: 0;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--dsw-alias-bg-layer-1);
+}
+.smp-console .smp-task-date-range:focus-within { border-color: var(--primary); }
+.smp-console .smp-task-date-range > input {
+  flex: 1 1 0; min-width: 0; height: 100%; box-sizing: border-box; padding: 0 8px;
+  border: 0; background: transparent; color: var(--text); font: inherit;
+}
+.smp-console .smp-task-date-range > input:focus { outline: none; }
+.smp-console .smp-task-date-range > span { flex: none; color: var(--muted); }
+
+.smp-console .smp-task-filters { gap: 8px; }
+.smp-console .smp-task-filters input,
+.smp-console .smp-task-filters select { min-width: 120px; }
+.smp-console .smp-task-date-range { min-width: 260px; flex: 0 1 320px; }
+
+.smp-console .smp-task-filters > input[type="search"] {
+  flex: 0 1 300px; min-width: 220px; width: 300px;
+}
+
+/* Configuration action bar stays pinned to the bottom of the scrolling settings area. */
+.smp-console .smp-settings-content .smp-settings-actions {
+  position: sticky; bottom: -24px; z-index: 3;
+  margin: 0 -24px -24px; padding: 12px 24px;
+  background: var(--dsw-alias-bg-layer-1);
+  border-top: 1px solid var(--line);
+}
+
+/* One fixed action-bar height across all configuration tabs. */
+.smp-console .smp-settings-content .smp-settings-actions {
+  box-sizing: border-box; height: 56px; min-height: 56px; max-height: 56px;
+  align-items: center; padding: 0 24px; overflow-x: auto; overflow-y: hidden;
+}
+
+/* Flatten the retained extension wrapper so its action bar can stick to the settings viewport. */
+.smp-console .smp-settings-content > div:not([hidden]):has(> .smp-extension-settings) {
+  display: contents;
+}
+.smp-console .smp-settings-content [data-extension-actions] { display: contents; }
+
+/* Settings use a structural footer: content scrolls above, actions are a fixed-height sibling. */
+.smp-console .smp-settings-content {
+  display: flex; flex-direction: column; overflow: hidden; padding: 0;
+}
+.smp-console .smp-settings-content .smp-settings-form {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; max-width: none;
+}
+.smp-console .smp-settings-form-body {
+  flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.smp-console .smp-settings-form-body > * { flex: none; }
+.smp-console .smp-settings-content .smp-settings-actions {
+  position: static; bottom: auto; flex: none;
+  box-sizing: border-box; height: 56px; min-height: 56px; max-height: 56px;
+  margin: 0; padding: 0 24px; align-items: center;
+  background: var(--dsw-alias-bg-layer-1); border-top: 1px solid var(--line);
+  overflow-x: auto; overflow-y: hidden;
+}
+.smp-console .smp-settings-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.smp-console .smp-settings-pane[hidden] { display: none; }
+.smp-console .smp-extension-settings-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.smp-console .smp-extension-settings-body {
+  flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 24px;
+}
+.smp-console .smp-settings-content [data-extension-actions] { display: block; flex: none; }
+
+/* The scrolling panel owns the viewport; its cards keep their natural height. */
+.smp-console .smp-settings-scroll { overscroll-behavior: contain; }
+
+/* Basic information uses a wider name and narrower group/region controls. */
+.smp-console form.panel-form .triple.smp-basic-info-grid {
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 0.8fr);
+  max-width: 900px;
+}
+
+.smp-console form.panel-form .smp-basic-info-grid > .field { min-width: 0; }
+.smp-console form.panel-form .smp-basic-info-grid input,
+.smp-console form.panel-form .smp-basic-info-grid select {
+  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%;
+}
+
+/* Keys table is full-bleed; its pagination sits below the table like the task report. */
+.smp-console .smp-keys-panel > .panel-body { padding-left: 0; padding-right: 0; }
+.smp-console .smp-keys-table-wrap { margin: 0; }
+.smp-console .smp-keys-table-wrap table { width: 100%; }
+.smp-console .smp-keys-pager { padding: 12px 16px; border-top: 1px solid var(--line); }
+
+/* Keep the keys table header flush with the panel title bar. */
+.smp-console .smp-keys-panel > .panel-body { padding-top: 0; }
+
+.smp-console .smp-keys-table-wrap th { white-space: nowrap; }
+
+/* Keys page fills the viewport; the table scrolls and the pager remains at the bottom. */
+.smp-console .content:has(.smp-keys-panel) { display: flex; flex-direction: column; overflow: hidden; }
+.smp-console .smp-keys-panel {
+  flex: 1; min-height: 0; margin-bottom: 0; display: flex; flex-direction: column;
+}
+.smp-console .smp-keys-panel > .panel-body {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+}
+.smp-console .smp-keys-table-wrap { flex: 1; min-height: 0; overflow: auto; }
+.smp-console .smp-keys-pager { flex: none; }
+
+/* Host fingerprint gets its own row below the detail grid. */
+.smp-console .smp-server-fingerprint {
+  display: flex; align-items: baseline; gap: 12px; margin-top: 12px;
+  padding-top: 10px; border-top: 1px solid var(--line);
+}
+.smp-console .smp-server-fingerprint > span { flex: none; color: var(--muted); font-size: 12px; }
+.smp-console .smp-server-fingerprint > b { min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
+
+/* Detail resource rows share the list wording and add a threshold-colored bar. */
+.smp-server-usage { display: grid; gap: 5px; min-width: 0; }
+.smp-server-usage > span { color: var(--muted); font-size: 12px; }
+.smp-server-usage > b { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.smp-server-usage-bar { height: 6px; border-radius: 99px; background: var(--dsw-alias-bg-layer-2); overflow: hidden; }
+.smp-server-usage-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+.smp-server-usage-bar > i.warn { background: var(--warn); }
+.smp-server-usage-bar > i.hot { background: var(--red); }
+.smp-server-usage-bar > i.unknown { background: var(--muted); }
+
+.smp-resource-history { margin-top: 16px; padding: 0; }
+.smp-resource-history > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.smp-resource-history > header h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.smp-resource-ranges { display: flex; gap: 2px; }
+.smp-resource-ranges button { height: 26px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.smp-resource-ranges button:hover { color: var(--text); }
+.smp-resource-ranges button.is-on { background: var(--primary-soft); color: var(--primary); }
+.smp-resource-readout { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 16px 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.smp-resource-readout .is-cpu { color: var(--primary); }
+.smp-resource-readout .is-memory { color: var(--green); }
+.smp-resource-readout .is-disk { color: var(--warn); }
+.smp-resource-readout time { margin-left: auto; color: var(--muted); }
+.smp-resource-chart { padding: 4px 8px 0; }
+.smp-resource-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.smp-chart-grid { stroke: var(--line); stroke-width: 1; }
+.smp-chart-label { fill: var(--muted); font-size: 10px; }
+.smp-chart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.smp-chart-line.is-cpu { stroke: var(--primary); }
+.smp-chart-line.is-memory { stroke: var(--green); }
+.smp-chart-line.is-disk { stroke: var(--warn); }
+.smp-chart-cursor { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.smp-chart-dot.is-cpu { fill: var(--primary); }
+.smp-chart-dot.is-memory { fill: var(--green); }
+.smp-chart-dot.is-disk { fill: var(--warn); }
+.smp-resource-legend { display: flex; gap: 16px; padding: 0 16px 12px; color: var(--muted); font-size: 12px; }
+.smp-resource-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }
+.smp-resource-history > p { margin: 0; padding: 16px; }
+
+/* Custom range controls and one chart per resource. */
+.smp-resource-custom {
+  display: flex; flex-wrap: wrap; align-items: end; gap: 10px;
+  padding: 12px 16px 0;
+}
+.smp-resource-custom label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+.smp-resource-custom input {
+  height: 30px; box-sizing: border-box; padding: 0 8px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-1); color: var(--text); font: inherit;
+}
+.smp-resource-custom button { height: 30px; }
+.smp-resource-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px; padding: 12px 16px 16px;
+}
+.smp-resource-panel { min-width: 0; border: 1px solid var(--line); border-radius: 4px; padding: 10px; }
+.smp-resource-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.smp-resource-panel-head b { font-variant-numeric: tabular-nums; }
+.smp-resource-panel-head .is-cpu { color: var(--primary); }
+.smp-resource-panel-head .is-memory { color: var(--green); }
+.smp-resource-panel-head .is-disk { color: var(--warn); }
+.smp-resource-panel .smp-resource-chart { padding: 0; }
+
+.smp-resource-chart-wrap { position: relative; }
+.smp-chart-grid-vertical { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.6; }
+.smp-chart-tooltip {
+  position: absolute; top: 2px; z-index: 2; transform: translateX(-50%);
+  display: grid; gap: 2px; padding: 5px 7px; border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-3); border: 1px solid var(--line);
+  box-shadow: var(--dsw-elevation-prominent); color: var(--text); font-size: 11px;
+  pointer-events: none; white-space: nowrap;
+}
+.smp-chart-tooltip time { color: var(--muted); }
+.smp-chart-tooltip span { font-weight: 600; }
+
+/* Breathing room between the history charts and the required-software module. */
+.smp-resource-history { margin-bottom: 16px; }
+
+/* Plan target cards match the policy table-card header padding. */
+.smp-console .smp-dialog .smp-plan-target.smp-table-card > h3 {
+  padding: 14px 16px;
+}
+.smp-console .smp-dialog .smp-plan-target {
+  margin-bottom: 18px;
+}
+
+/* Plan list is framed like the other table modules. */
+.smp-console .smp-plan-list-card { border-radius: 4px; overflow: hidden; }
+.smp-console .smp-plan-list-card .smp-upgrade-scroll { margin: 0; }
+
+/* The inline "view plan" page uses the same target-card metrics as the dialog. */
+.smp-console .smp-change-plan .smp-plan-target {
+  padding: 0; margin-bottom: 18px; border-radius: 4px; overflow: hidden;
+}
+.smp-console .smp-change-plan .smp-plan-target > h3 {
+  padding: 14px 16px;
+}
+.smp-console .smp-change-plan .smp-plan-target table.smp-table th,
+.smp-console .smp-change-plan .smp-plan-target table.smp-table td {
+  padding: 11px 16px;
+}
+.smp-console .smp-change-plan .smp-plan-target table.smp-table th {
+  background: #fafafa; color: #909399; font-size: 13px; font-weight: 500;
+}
+
+/* Plan targets are TableCard instances; remove the legacy section padding. */
+.smp-console .smp-plan-target.smp-table-card {
+  margin: 12px 0 18px; padding: 0; border-radius: 4px; overflow: hidden;
+}
+.smp-console .smp-plan-target > header > span { color: inherit; }
+
+.smp-plan-head-extra { gap: 8px; align-items: center; }
+.smp-console select.smp-plan-status-filter { width: auto; }
+.smp-console .smp-plans-table .smp-select-col { width: 36px; padding-right: 0; }
+.smp-console .smp-plans-table .smp-select-col input { width: auto; margin: 0; }
+
+.smp-console .smp-plans-table tbody tr.smp-plan-row { cursor: pointer; }
+.smp-console .smp-plans-table tbody tr.smp-plan-row:hover td { background: #f7f9fc; }
+
+.smp-console .smp-server-header-icon {
+  flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.smp-console .smp-server-header-icon:hover:not(:disabled) { color: var(--primary); background: var(--dsw-specific-sidebar-nav-item-hover); }
+.smp-console .smp-server-header-icon:disabled { opacity: 0.45; cursor: not-allowed; }
+.smp-console .smp-server-header-icon.is-busy svg { animation: smp-spin 0.8s linear infinite; }
+@keyframes smp-spin { to { transform: rotate(360deg); } }
+
+/* Suggestion results use the shared table-card frame. */
+.smp-console .smp-upgrade-results { margin: 0; }
+.smp-console .smp-upgrade-results .smp-upgrade-scroll { margin: 0; }
+
+/* Detection results live in a right-side drawer. */
+.smp-checks-layer { position: fixed; inset: var(--dsh-frame-chrome-top, 0px) 0 0; z-index: 900; display: flex; justify-content: flex-end; }
+.smp-checks-mask { position: absolute; inset: 0; background: var(--dsw-alias-bg-mask-1); backdrop-filter: var(--dsw-mask-blur); }
+.smp-checks-drawer {
+  position: relative; z-index: 1; width: min(520px, 100%); height: 100%;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--dsw-alias-bg-layer-2); border-left: 1px solid var(--line);
+  box-shadow: var(--dsw-elevation-prominent);
+}
+.smp-checks-head {
+  flex: none; display: flex; align-items: center; gap: 10px; min-height: 48px;
+  padding: 8px 16px; border-bottom: 1px solid var(--line);
+}
+.smp-checks-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.smp-checks-head > span { color: var(--muted); font-size: 12px; }
+.smp-checks-head > button { margin-left: auto; }
+.smp-checks-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px; overflow: hidden; }
+.smp-console .smp-checks-body .smp-detection-results {
+  flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; margin: 0; border: 0; border-radius: 0;
+}
+.smp-console .smp-checks-body .smp-detection-results > header { display: none; }
+.smp-checks-body .smp-detection-scroll { flex: 1; min-height: 0; overflow: auto; }
+.smp-checks-body .smp-detection-pager { flex: none; }
+.smp-checks-body .smp-detection-table { min-width: 680px; }
+
+/* Drawer table is flush to the drawer edges; its pager owns the bottom edge. */
+.smp-console .smp-checks-body { padding: 0; }
+.smp-console .smp-checks-body .smp-detection-results { border: 0; border-radius: 0; }
+.smp-console .smp-checks-body .smp-detection-pager {
+  flex: none; padding: 12px 16px; border-top: 1px solid var(--line);
+}
+
+/* Wider drawer and a table that fits it without a bottom horizontal scrollbar. */
+.smp-console .smp-checks-drawer { width: min(720px, 100%); }
+.smp-console .smp-checks-body .smp-detection-table {
+  min-width: 0; width: 100%; font-size: 12px;
+}
+.smp-console .smp-checks-body .smp-detection-table th,
+.smp-console .smp-checks-body .smp-detection-table td { padding: 10px 12px; }
+.smp-console .smp-checks-body .smp-detection-table td { overflow-wrap: anywhere; }
+.smp-console .smp-checks-body .smp-detection-reasons { padding-left: 14px; }
+
+.smp-console .smp-checks-retract {
+  flex: none; display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.smp-console .smp-checks-retract:hover { color: var(--primary); background: var(--dsw-specific-sidebar-nav-item-hover); }
+
+.smp-console .smp-records-table tbody tr.smp-record-row { cursor: pointer; }
+.smp-console .smp-records-table tbody tr.smp-record-row:hover td,
+.smp-console .smp-records-table tbody tr.smp-record-row.is-open td { background: #f7f9fc; }
+.smp-record-detail { padding: 16px !important; background: var(--dsw-alias-bg-layer-2); }
+.smp-record-section + .smp-record-section { margin-top: 14px; }
+.smp-record-section h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.smp-record-actions { margin-top: 14px; }
+.smp-json-object { display: grid; gap: 4px; margin: 0; }
+.smp-json-row { display: grid; grid-template-columns: minmax(110px, 180px) minmax(0, 1fr); gap: 10px; }
+.smp-json-row > dt { color: var(--muted); overflow-wrap: anywhere; }
+.smp-json-row > dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.smp-json-list { margin: 0; padding-left: 18px; }
+.smp-json-scalar { white-space: pre-wrap; }
+
+.smp-records-tools { gap: 8px; align-items: center; }
+.smp-console .smp-records-tools .search { width: 220px; }
+.smp-console .smp-records-tools select { width: auto; }
+
+/* Resource rows: text sits on a colored bar, with a clipped white copy inside the fill. */
+.smp-console .smp-server-resources { min-width: 220px; }
+.smp-console .smp-server-resources > .smp-resource-line {
+  position: relative; display: block; min-height: 21px; line-height: 21px;
+  border-radius: 3px; overflow: hidden; white-space: nowrap; margin: 1px 0;
+  background: var(--dsw-alias-bg-layer-2);
+}
+.smp-resource-track { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }
+.smp-resource-track > i { display: block; height: 100%; border-radius: inherit; }
+.smp-resource-track > i.cpu { background: var(--primary); }
+.smp-resource-track > i.memory { background: var(--green); }
+.smp-resource-track > i.disk { background: var(--warn); }
+.smp-resource-track > i.hot { background: #b91c1c; }
+.smp-resource-text {
+  position: relative; z-index: 1; display: block; padding: 0 6px;
+  color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.smp-resource-text.is-filled { position: absolute; inset: 0; color: #fff; }
+body[data-ds-dark-theme] .smp-console .smp-resource-text,
+body[data-ds-dark-theme] .smp-console .smp-resource-text.is-filled { color: #fff; }
+
+/* FitAddon must measure the same box that contains the terminal screen. */
+.smp-console .smp-server-terminal-panel .terminal-host { padding: 0; }
+
+.smp-audit-table .smp-audit-command {
+  max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+}
+.smp-audit-status { font-size: 12px; color: var(--muted); }
+.smp-audit-status.is-succeeded { color: #15803d; }
+.smp-audit-status.is-failed,
+.smp-audit-status.is-timeout,
+.smp-audit-status.is-denied { color: #b91c1c; }
+
+.smp-server-exec-settings { display: grid; gap: 16px; }
+.smp-server-exec-settings header h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.smp-server-exec-settings header p { margin: 0; }
+.smp-server-exec-rows { display: flex; flex-direction: column; }
+.smp-server-exec-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 16px 0; border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+.smp-server-exec-row:last-child { border-bottom: 0; }
+.smp-server-exec-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding-right: 48px; }
+.smp-server-exec-row-title { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-primary); }
+.smp-server-exec-row-desc { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
+.smp-server-exec-control { display: inline-flex; align-items: center; gap: 8px; }
+.smp-server-exec-value {
+  width: 96px; height: 36px; box-sizing: border-box; padding: 0 10px;
+  border: 0.5px solid transparent; border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary);
+  font-size: 14px; line-height: 22px; font-variant-numeric: tabular-nums; text-align: center;
+}
+.smp-server-exec-value:focus { border-color: var(--dsw-alias-border-l1); outline: none; }
+.smp-server-exec-unit { font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-secondary); }
+.smp-server-exec-expander {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+  padding: 0; border: 0; border-radius: var(--dsw-radius-xs); background: transparent;
+  color: var(--dsw-alias-label-tertiary); cursor: pointer;
+}
+.smp-server-exec-expander:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.smp-server-exec-expander svg { transition: transform var(--ds-transition-duration-fast) var(--ds-ease-in-out); }
+.smp-server-exec-expander[aria-expanded='true'] svg { transform: rotate(180deg); }
+.smp-server-exec-max {
+  flex-basis: 100%; display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  padding: 8px 0 0; color: var(--dsw-alias-label-tertiary); font-size: 12px;
+}
+.smp-server-exec-max label { display: inline-flex; align-items: center; gap: 8px; }
+@media (max-width: 720px) {
+  .smp-server-exec-row-text { padding-right: 0; flex-basis: 100%; }
+  .smp-server-exec-control { width: 100%; justify-content: flex-end; }
+}
+
+.smp-audit-table .smp-audit-session {
+  max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+}
+
+.smp-audit-detail { display: grid; gap: 14px; }
+.smp-audit-detail .smp-audit-pre {
+  margin: 0; max-height: 160px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+}
+
+.smp-audit-session-link { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0; border: 0; background: transparent; color: var(--primary); cursor: pointer; font: inherit; }
+.smp-audit-session-link:hover { text-decoration: underline; }
+
+.smp-audit-deleted { color: var(--muted); font-size: 12px; }
+
+.smp-audit-server-link { padding: 0; border: 0; background: transparent; color: var(--primary); cursor: pointer; font: inherit; text-align: left; }
+.smp-audit-server-link:hover { text-decoration: underline; }
+.smp-audit-server-deleted { color: var(--muted); }
+
+.smp-server-rsync-policy { display: grid; gap: 6px; padding-top: 16px; border-top: 0.5px solid var(--dsw-alias-border-l2); }
+.smp-server-rsync-policy-input { width: 100%; min-height: 150px; box-sizing: border-box; padding: 10px; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-primary); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Container runtime",
+    "description": "Provides shared Docker Engine and Docker Compose definitions and installation recipes."
+  }
+}

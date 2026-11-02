@@ -1,0 +1,51 @@
+{
+  "name": "@smp/console-frame",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "侧栏、登录和 Harness",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./site-mark": "./src/site-mark.ts",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "engines": {
+    "dsh": "0.2.1-alpha.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test": "node --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@smp/console-kit": "file:../../packages/console-kit",
+    "@deepseek-ai/cordis": "~4.0.5-alpha.2",
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.2",
+    "bcryptjs": "^3.0.2",
+    "hash-wasm": "^4.12.0",
+    "pg": "^8.16.3",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "react": "^18.3.1"
+  }
+}

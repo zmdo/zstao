@@ -1,0 +1,25 @@
+2026-10-21T14:23:24+08:00
+VM-0-9-ubuntu
+uid=1000(ubuntu) gid=1001(ubuntu) groups=1001(ubuntu),4(adm),20(dialout),24(cdrom),25(floppy),27(sudo),29(audio),30(dip),44(video),46(plugdev),101(lxd),988(docker),1000(netdev)
+docker:x:988:ubuntu,smp-noexec
+active
+active
+
+VERSIONS
+Client=29.9.1 Server=29.9.1
+Docker Compose version v5.6.0
+
+CONTAINERS
+smp-acceptance-00-live smp-acceptance:empty Created
+smp-acceptance-12 smp-acceptance:empty Created
+smp-acceptance-11 smp-acceptance:empty Created
+smp-acceptance-10 smp-acceptance:empty Created
+smp-acceptance-09 smp-acceptance:empty Created
+smp-acceptance-08 smp-acceptance:empty Created
+smp-acceptance-07 smp-acceptance:empty Created
+smp-acceptance-06 smp-acceptance:empty Created
+smp-acceptance-05 smp-acceptance:empty Created
+smp-acceptance-04 smp-acceptance:empty Created
+smp-acceptance-03 smp-acceptance:empty Created
+smp-acceptance-02 smp-acceptance:empty Created
+smp-acceptance-01 smp-acceptance:empty Created

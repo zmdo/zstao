@@ -1,0 +1,48 @@
+.smp-container-panel { height: 100%; min-height: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+.smp-container-panel > .panel-head { flex: none; display: flex; align-items: center; justify-content: space-between; }
+.smp-container-panel > .smp-container-top { flex: none; display: grid; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.smp-container-panel > .smp-container-top p { margin: 0; }
+.smp-container-panel > .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.smp-container-panel .table-scroll { flex: 1; min-height: 0; overflow: auto; }
+.smp-container-panel .table-scroll thead th { position: sticky; top: 0; z-index: 2; background: #fafafa; }
+.smp-container-panel .container-empty { margin: 0; padding: 16px; color: var(--muted); }
+body[data-ds-dark-theme] .smp-container-panel .table-scroll thead th,
+html[data-ds-theme-source='dark'] .smp-container-panel .table-scroll thead th {
+  background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary);
+}
+
+/* The container extension lives inside the workspace frame; don't draw a second card. */
+.smp-container-panel {
+  border: 0; border-radius: 0; background: transparent;
+}
+
+.smp-console .panel.smp-container-panel {
+  margin: 0; border: 0; border-radius: 0; background: transparent;
+}
+.smp-console .smp-server-workspace-panel:has(.smp-container-panel) { padding: 0; }
+
+.smp-container-panel > .smp-container-toolbar {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);
+}
+.smp-container-panel > .smp-container-toolbar .muted { margin: 0; font-size: 12px; }
+.smp-container-panel > .smp-container-status {
+  flex: none; display: grid; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--line);
+}
+.smp-container-panel > .smp-container-status p { margin: 0; }
+.smp-container-panel > .panel-head { display: none; }
+.smp-container-panel > .smp-container-pager { flex: none; }
+
+/* The extension layer must not scroll; only the container table does. */
+.smp-console .smp-server-extension-layer:has(.smp-container-panel) {
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.smp-console .smp-server-extension-layer:has(.smp-container-panel) > div {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+}
+.smp-container-panel > .smp-container-toolbar {
+  position: sticky; top: 0; z-index: 3; background: var(--dsw-alias-bg-layer-1);
+}
+.smp-container-panel > .smp-container-pager {
+  position: sticky; bottom: 0; z-index: 3; background: var(--dsw-alias-bg-layer-1);
+}

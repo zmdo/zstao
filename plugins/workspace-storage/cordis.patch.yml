@@ -1,0 +1,14 @@
+- insert:
+    - id: smp-workspace-storage
+      name: '@smp/console-workspace-storage'
+      config:
+        importRoot: !!js dshHomePath('storages')
+
+# config replaces the whole block. backend stays json for every domain
+# except workspace, which this plugin serves from PostgreSQL.
+- id: storage-domain
+  name: '@deepseek-ai/dsh-storage-domain'
+  config:
+    backend: json
+    routes:
+      workspace: postgres

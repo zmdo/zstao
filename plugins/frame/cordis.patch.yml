@@ -1,0 +1,8 @@
+- insert:
+    - id: smp-frame
+      name: '@smp/console-frame'
+
+# The console draws its own sidebar. Leaving this on would also let the
+# harness settings dialog declare settings.section.
+- id: ui-sidebar
+  disabled: true

@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-plugin-inventory
+      name: '@smp/console-plugin-inventory'

@@ -1,0 +1,51 @@
+.smp-sidebar-flyout {
+  position: fixed;
+  z-index: 100;
+  width: 228px;
+  max-width: calc(100vw - 16px);
+  padding-left: 8px;
+  box-sizing: border-box;
+}
+.smp-sidebar-flyout-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 6px;
+  background: var(--dsw-alias-bg-layer-1);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
+}
+.smp-sidebar-flyout-title {
+  padding: 4px 10px 6px;
+  color: var(--smp-muted);
+  font-size: 12px;
+}
+.smp-sidebar-flyout-item {
+  flex: none;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--smp-text);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.smp-sidebar-flyout-item.is-on {
+  background: var(--smp-primary-soft);
+  color: var(--smp-primary);
+  font-weight: 600;
+}
+.smp-sidebar-flyout-item:hover {
+  color: var(--smp-primary);
+}
+.smp-sidebar-flyout-item:focus-visible {
+  outline: 2px solid var(--smp-primary);
+  outline-offset: -2px;
+}

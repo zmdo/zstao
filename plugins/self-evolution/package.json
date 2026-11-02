@@ -1,0 +1,39 @@
+{
+  "name": "@smp/console-self-evolution",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "\u81ea\u6f14\u8fdb\u57fa\u7840\u8bbe\u65bd\u5206\u7ec4\u548c\u4e13\u7528\u670d\u52a1\u5668\u7c7b\u578b",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib/index.js",
+    "scripts/stack.sh",
+    "scripts/test.sh",
+    "scripts/host.sh",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "engines": {
+    "dsh": "0.2.1-alpha.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test": "node --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@smp/console-server-management": "file:../server-management",
+    "@smp/console-container-runtime": "file:../container-runtime"
+  }
+}

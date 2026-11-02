@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-server-extension-fixture
+      name: '@smp/console-server-extension-fixture'

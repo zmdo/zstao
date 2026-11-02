@@ -1,0 +1,40 @@
+{
+  "name": "@smp/console-server-extension-fixture",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Test fixture plugin for server extension contracts",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "scripts/*.sh"
+  ],
+  "engines": {
+    "dsh": "0.2.1-alpha.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "node ../../../../../scripts/build-plugin.mjs"
+  },
+  "peerDependencies": {
+    "@smp/console-server-management": "^0.1.0"
+  }
+}

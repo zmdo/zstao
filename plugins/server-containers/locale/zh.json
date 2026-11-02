@@ -1,0 +1,28 @@
+{
+  "title": "容器服务器",
+  "description": "提供容器类型、容器面板和容器设置。",
+  "ui": {
+    "containers": "容器",
+    "name": "名称",
+    "image": "镜像",
+    "status": "状态",
+    "ports": "端口",
+    "noContainers": "上次成功采集的清单中没有容器。",
+    "noObservation": "尚无成功的容器采集记录。",
+    "dockerUnavailable": "Docker 未安装或未验证。",
+    "collect": "采集容器清单",
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "页",
+    "loading": "加载中…",
+    "refresh": "刷新列表",
+    "loadFailed": "无法加载容器清单。",
+    "inspectFailed": "最近一次容器采集失败。",
+    "lastSuccess": "上次成功采集",
+    "stale": "当前显示上次成功的快照。",
+    "never": "暂无",
+    "range": "共 {count} 个容器，第 {from}–{to} 个",
+    "pageOf": "第 {page} / {pages} 页",
+    "perPage": "每页"
+  }
+}

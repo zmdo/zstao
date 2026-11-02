@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-install
+      name: '@smp/console-install'

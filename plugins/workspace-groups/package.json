@@ -1,0 +1,40 @@
+{
+  "name": "@smp/console-workspace-groups",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "按工作区组切换会话，并让插件声明自己可用的组",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "engines": {
+    "dsh": "0.2.1-alpha.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test": "node --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "~4.0.5-alpha.2"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "host": "43.153.204.197",
+  "error": "ssh_auth_timeout",
+  "params": {
+    "seconds": 30
+  },
+  "message": "ssh_auth_timeout"
+}

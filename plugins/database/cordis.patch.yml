@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-database
+      name: '@smp/console-database'

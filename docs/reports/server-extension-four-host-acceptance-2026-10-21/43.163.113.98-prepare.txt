@@ -1,0 +1,2 @@
+Removing user ubuntu from group docker
+docker:x:988:smp-noexec,smp-retry

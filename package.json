@@ -1,0 +1,19 @@
+{
+  "name": "smp-dsh",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "plugins/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "prebuild": "npm run build:api --workspace=@smp/console-server-management"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "react-test-renderer": "^18.3.1",
+    "typescript": "^5.9.3"
+  }
+}

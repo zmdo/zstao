@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "workspace-storage",
+    "description": "Write workspace records to the database"
+  }
+}

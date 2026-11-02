@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "session-persistence",
+    "description": "Write sessions to the database"
+  }
+}

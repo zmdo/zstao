@@ -1,0 +1,69 @@
+{
+  "name": "@smp/console-server-management",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "登记服务器和密钥，并执行连接测试、巡检、采指标和终端",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./contracts": {
+      "types": "./lib/types/contracts.d.ts",
+      "default": "./lib/contracts.js"
+    },
+    "./client-api": {
+      "types": "./lib/types/client-api.d.ts",
+      "default": "./lib/client-api.js"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "lib/contracts.js",
+    "lib/client-api.js",
+    "lib/types"
+  ],
+  "engines": {
+    "dsh": "0.2.1-alpha.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test": "node --test test/**/*.test.ts",
+    "pretest": "node ../../scripts/build-public-api.mjs",
+    "build:api": "node ../../scripts/build-public-api.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "~4.0.5-alpha.2",
+    "@deepseek-ai/dsh-tools": "^0.2.1-alpha.5",
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.2",
+    "@smp/console-kit": "file:../../packages/console-kit",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "shell-quote": "^1.8.2",
+    "ssh2": "^1.16.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-permission-presets": "0.2.1-alpha.5",
+    "@types/react": "^18.3.18",
+    "@types/shell-quote": "^1.7.4",
+    "@types/ssh2": "^1.15.5",
+    "@types/ws": "^8.18.1",
+    "react": "^18.3.1"
+  }
+}

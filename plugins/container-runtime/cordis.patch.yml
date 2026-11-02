@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-container-runtime
+      name: '@smp/console-container-runtime'

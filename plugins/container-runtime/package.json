@@ -1,0 +1,37 @@
+{
+  "name": "@smp/console-container-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "共享 Docker Engine 和 Compose 定义与安装配方",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib/index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "scripts/*.sh"
+  ],
+  "engines": {
+    "dsh": "0.2.1-alpha.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@smp/console-server-management": "file:../server-management",
+    "@deepseek-ai/cordis": "~4.0.5-alpha.2"
+  }
+}

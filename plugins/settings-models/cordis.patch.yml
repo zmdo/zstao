@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-settings-models
+      name: '@smp/console-settings-models'

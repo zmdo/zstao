@@ -1,0 +1,232 @@
+{
+  "at": "2026-10-21T06:23:59.526Z",
+  "servers": [
+    {
+      "id": "0670b4ac-b02f-44da-ab6e-ae7e7143041c",
+      "name": "验收-189-扩展配置",
+      "host": "43.128.69.189",
+      "type_key": "@smp/console-server-extension-fixture/database",
+      "config_revision": "3",
+      "declared_os": {
+        "kind": "catalog",
+        "name": "Ubuntu 24.04 LTS",
+        "family": "builtin/ubuntu",
+        "version": "24.04",
+        "precision": "release",
+        "releaseKey": "24.04"
+      },
+      "connection_state": "online",
+      "os_probe_state": "detected",
+      "detected_os": {
+        "family": "builtin/ubuntu",
+        "version": "24.04",
+        "architecture": "x86_64"
+      }
+    },
+    {
+      "id": "2e046bf2-9a58-4fa9-8cfe-a07da72908af",
+      "name": "验收-83-容器列表",
+      "host": "43.128.72.83",
+      "type_key": "@smp/console-server-containers/container",
+      "config_revision": "1",
+      "declared_os": {
+        "kind": "catalog",
+        "name": "Ubuntu 24.04 LTS",
+        "family": "builtin/ubuntu",
+        "version": "24.04",
+        "precision": "release",
+        "releaseKey": "24.04"
+      },
+      "connection_state": "offline",
+      "os_probe_state": "detected",
+      "detected_os": {
+        "family": "builtin/ubuntu",
+        "version": "24.04",
+        "architecture": "x86_64"
+      }
+    },
+    {
+      "id": "5d0d2bd3-1a6a-4617-a763-a029ef4a20a3",
+      "name": "验收-197-首次安装",
+      "host": "43.153.204.197",
+      "type_key": "@smp/console-server-containers/container",
+      "config_revision": "1",
+      "declared_os": {
+        "kind": "catalog",
+        "name": "Ubuntu 24.04 LTS",
+        "family": "builtin/ubuntu",
+        "version": "24.04",
+        "precision": "release",
+        "releaseKey": "24.04"
+      },
+      "connection_state": "online",
+      "os_probe_state": "detected",
+      "detected_os": {
+        "family": "builtin/ubuntu",
+        "version": "24.04",
+        "architecture": "x86_64"
+      }
+    },
+    {
+      "id": "3cc53465-889a-4631-8e8c-0bae75b363bd",
+      "name": "验收-98-组权限修复",
+      "host": "43.163.113.98",
+      "type_key": "@smp/console-server-containers/container",
+      "config_revision": "1",
+      "declared_os": {
+        "kind": "catalog",
+        "name": "Ubuntu 24.04 LTS",
+        "family": "builtin/ubuntu",
+        "version": "24.04",
+        "precision": "release",
+        "releaseKey": "24.04"
+      },
+      "connection_state": "offline",
+      "os_probe_state": "detected",
+      "detected_os": {
+        "family": "builtin/ubuntu",
+        "version": "24.04",
+        "architecture": "x86_64"
+      }
+    }
+  ],
+  "software": [
+    {
+      "host": "43.128.72.83",
+      "software_key": "@smp/console-server-containers/docker-compose",
+      "probe_state": "installed",
+      "product_version": "5.6.0",
+      "healthy": true,
+      "checked_at": "2026-10-21T06:11:42.721Z"
+    },
+    {
+      "host": "43.128.72.83",
+      "software_key": "@smp/console-server-containers/docker-engine",
+      "probe_state": "installed",
+      "product_version": "29.9.1",
+      "healthy": true,
+      "checked_at": "2026-10-21T06:11:42.721Z"
+    },
+    {
+      "host": "43.153.204.197",
+      "software_key": "@smp/console-server-containers/docker-compose",
+      "probe_state": "installed",
+      "product_version": "5.6.0",
+      "healthy": true,
+      "checked_at": "2026-10-21T06:23:29.776Z"
+    },
+    {
+      "host": "43.153.204.197",
+      "software_key": "@smp/console-server-containers/docker-engine",
+      "probe_state": "installed",
+      "product_version": "29.9.2",
+      "healthy": true,
+      "checked_at": "2026-10-21T06:23:29.776Z"
+    },
+    {
+      "host": "43.163.113.98",
+      "software_key": "@smp/console-server-containers/docker-compose",
+      "probe_state": "installed",
+      "product_version": "5.6.0",
+      "healthy": true,
+      "checked_at": "2026-10-21T06:16:18.089Z"
+    },
+    {
+      "host": "43.163.113.98",
+      "software_key": "@smp/console-server-containers/docker-engine",
+      "probe_state": "installed",
+      "product_version": "29.9.2",
+      "healthy": true,
+      "checked_at": "2026-10-21T06:16:18.089Z"
+    }
+  ],
+  "settings": [
+    {
+      "host": "43.128.69.189",
+      "owner": "@smp/console-server-extension-fixture",
+      "section_key": "database-execution",
+      "value": {
+        "mode": "observe"
+      },
+      "revision": "2"
+    },
+    {
+      "host": "43.128.69.189",
+      "owner": "@smp/console-server-extension-fixture",
+      "section_key": "database-settings",
+      "value": {
+        "collect": false
+      },
+      "revision": "1"
+    },
+    {
+      "host": "43.128.72.83",
+      "owner": "@smp/console-server-containers",
+      "section_key": "container-settings",
+      "value": {
+        "collect": true
+      },
+      "revision": "2"
+    }
+  ],
+  "observations": [
+    {
+      "host": "43.128.69.189",
+      "owner": "@smp/console-server-extension-fixture",
+      "status": "succeeded",
+      "last_success_at": "2026-10-21T05:55:22.513Z",
+      "error": null,
+      "containers": "0"
+    },
+    {
+      "host": "43.128.72.83",
+      "owner": "@smp/console-server-containers",
+      "status": "succeeded",
+      "last_success_at": "2026-10-21T06:11:42.697Z",
+      "error": null,
+      "containers": "13"
+    },
+    {
+      "host": "43.153.204.197",
+      "owner": "@smp/console-server-containers",
+      "status": "succeeded",
+      "last_success_at": "2026-10-21T06:23:29.763Z",
+      "error": null,
+      "containers": "0"
+    },
+    {
+      "host": "43.163.113.98",
+      "owner": "@smp/console-server-containers",
+      "status": "succeeded",
+      "last_success_at": "2026-10-21T06:16:18.079Z",
+      "error": null,
+      "containers": "0"
+    }
+  ],
+  "settingPlans": [
+    {
+      "host": "43.128.69.189",
+      "section_key": "database-execution",
+      "state": "applied",
+      "expected_revision": "0",
+      "created_at": "2026-10-21T05:54:28.055Z",
+      "expires_at": "2026-10-21T06:04:28.057Z"
+    },
+    {
+      "host": "43.128.69.189",
+      "section_key": "database-execution",
+      "state": "applied",
+      "expected_revision": "1",
+      "created_at": "2026-10-21T06:14:54.665Z",
+      "expires_at": "2026-10-21T06:24:54.668Z"
+    },
+    {
+      "host": "43.128.69.189",
+      "section_key": "database-execution",
+      "state": "pending",
+      "expected_revision": "2",
+      "created_at": "2026-10-21T06:16:41.925Z",
+      "expires_at": "2026-10-21T06:26:41.918Z"
+    }
+  ]
+}

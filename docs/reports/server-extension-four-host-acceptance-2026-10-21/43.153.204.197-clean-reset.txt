@@ -1,0 +1,40 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following packages were automatically installed and are no longer required:
+  bridge-utils dns-root-data dnsmasq-base pigz ubuntu-fan
+Use 'sudo apt autoremove' to remove them.
+The following packages will be REMOVED:
+  containerd.io docker-ce docker-ce-cli
+0 upgraded, 0 newly installed, 3 to remove and 201 not upgraded.
+After this operation, 253 MB disk space will be freed.
+(Reading database ...
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 89908 files and directories currently installed.)
+Removing docker-ce (5:29.9.2-1~ubuntu.24.04~noble) ...
+Removing containerd.io (2.4.2-3~ubuntu.24.04~noble) ...
+Removing docker-ce-cli (5:29.9.2-1~ubuntu.24.04~noble) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+Removing user ubuntu from group docker
+DOCKER_ABSENT
+inactive
+2026-10-21T14:03:24+08:00

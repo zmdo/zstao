@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-self-evolution
+      name: '@smp/console-self-evolution'

@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-evolution-workspace-group
+      name: '@smp/console-workspace-group-evolution-dev'

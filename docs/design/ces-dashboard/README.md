@@ -10,9 +10,11 @@
 
 - 盈利金额 = 收入 - 支出，即净收益。
 - 默认时间范围 = 近 30 天。
-- 默认显示币种 = CNY，可切换 USD；使用配置汇率折算，不在 P1 接实时汇率 API。
-- 首批接入 = 模型调用：余额、调用花费、单据推送。
+- 默认显示币种 = CNY，可切换 USD；通过行情 API 获取 USD/CNY，定时刷新并缓存。
+- 首批接入 = 只接 DeepSeek 模型调用：余额、调用花费、单据推送；模型目录跟随后台模型配置自动同步。
 - 侧边栏位置 = 最上方。
+- 需要独立的“全部单据”页面。
+- 需要 CSV 账单导入。
 
 ## 1. 背景
 
@@ -40,9 +42,9 @@ CES 目前有服务器管理、COS、工作区组等栏目，但没有一个统�
 ### 非目标
 
 - 不做支付、转账、充值、扣款等资金操作。
-- 不做发票 OCR、文件上传、账单 PDF 解析。
+- 不做发票 OCR 或 PDF 解析；文件导入只支持 UTF-8 CSV。
 - 不做多用户权限体系；CES 仍是单用户控制台。
-- 不做实时汇率行情；P1 使用部署配置的 USD/CNY 汇率，支持 CNY/USD 显示切换。
+- 不做实时逐笔汇率行情；P1 使用行情 API 的每日/定时参考汇率，支持 CNY/USD 显示切换。
 - 不替代服务器管理、模型设置等原有页面。
 - 不把账户密钥、API Key、发票原文存进仪表盘。
 
@@ -149,14 +151,15 @@ CES 目前有服务器管理、COS、工作区组等栏目，但没有一个统�
 
 - 页面顶部提供 `CNY | USD` 切换，默认 CNY。
 - 切换只改变**展示币种**；数据库保留每条账户/余额/单据的原始币种。
-- 后端按配置汇率折算到展示币种，返回 `fx` 信息：
+- 后端从行情 API 获取并缓存汇率，再折算到展示币种，返回 `fx` 信息：
   - 汇率值
-  - 汇率时间
-  - 汇率来源（P1 为 `config`）
+  - 行情时间
+  - 汇率来源（P1 为 `frankfurter` 或配置的自定义源）
 - 汇率缺失时：
   - 同币种数据仍可显示；
   - 需要折算的数据排除，并在页面显示“缺少 USD/CNY 汇率”的提示；
-  - 不静默把 USD 当 CNY 相加。
+  - 不静默把 USD 当 CNY 相加；
+  - 使用最近一次成功的缓存汇率，并明确显示“汇率已过期 / 上次更新时间”。
 - 选择结果只保存在当前浏览器偏好，下次打开沿用。
 - 账户明细同时显示原币金额和折算金额。
 
@@ -207,11 +210,11 @@ profit = Σ income(amount_minor) - Σ expense(amount_minor)
 converted = amount_minor × rate(original → display) / 10^(originalScale - displayScale)
 ```
 
-- P1 只支持 CNY、USD；`usdCnyRate` 在部署配置中提供（1 USD = N CNY）。
-- USD → CNY 使用 `usdCnyRate`；CNY → USD 使用其倒数。
+- P1 只支持 CNY、USD；USD/CNY 汇率由行情 API 提供并缓存（默认 Frankfurter，1 USD = N CNY）。
+- USD → CNY 使用最新缓存汇率；CNY → USD 使用其倒数。
 - 折算结果四舍五入到展示币种最小单位，**先折算再汇总**，避免先汇总后换算的误差。
 - 响应中返回 `displayCurrency` 和 `fx`；前端在金额下方显示汇率与时间。
-- P2 接入汇率表/行情 API；P3 支持更多币种。
+- 行情刷新失败时保留最近成功汇率，并在 UI 标注时间；P3 支持更多币种。
 
 ## 6. 数据模型
 
@@ -297,7 +300,34 @@ create index dashboard_transactions_kind_time_idx
 - `metadata` 只放展示所需的少量字段，禁止放密钥、发票原文、完整请求体。
 - `metadata` 应用层限制 8 KiB。
 
-### 6.4 保留与归档
+### 6.4 汇率缓存
+
+```sql
+create table dashboard_fx_rates (
+  base char(3) not null,
+  quote char(3) not null,
+  rate numeric(18, 8) not null check (rate > 0),
+  as_of timestamptz not null,
+  fetched_at timestamptz not null default now(),
+  source text not null,
+  primary key (base, quote)
+);
+```
+
+- 只缓存 USD/CNY 及反向；P1 默认使用 Frankfurter 行情接口，定时刷新。
+- 行情失败时保留上一行，页面显示 `as_of` 与“已过期”状态。
+- 不把行情 API 的原始响应、密钥写入该表。
+
+`FxRateService`：
+
+- host 启动时异步刷新一次，之后按 `fx.refreshSeconds`（默认 1800 秒）刷新。
+- 默认请求 `https://api.frankfurter.app/latest?from=USD&to=CNY`，解析 `rates.CNY` 和 `date`。
+- 自定义源通过配置 `fx.url` 接入，适配器只接受约定的 JSON：`{ base, quote, rate, asOf }`；不允许在代码里硬编码第三方密钥。
+- 请求使用超时和 AbortController；失败只更新 `fetched_at`/日志，不覆盖最近成功汇率。
+- 数据库写入 upsert；summary 从缓存读取，不因行情 API 慢而阻塞页面。
+- 没有缓存时 summary 返回 `fx=null` 和 warning；页面显示汇率缺失提示。
+
+### 6.5 保留与归档
 
 - 账户使用 `status='archived'` 软删除，历史单据保留。
 - P1 不做自动清理；后续可按保留策略归档。
@@ -459,6 +489,21 @@ P2 可以增加 `dashboard.widget` 客户端 slot：
 - 注入 `llm`，通过 `llm/stream` waterfall 包装 `next()`，只读收集 `usage` chunk，原样透传所有 chunk。
 - 必须调用 `next()`，不能截断模型流。
 - 从 `GenerateOptions`/会话上下文中拿 provider、model、session/attempt 标识；取不到时使用请求指纹。
+- 模型目录和价格都跟随后台模型配置自动同步：监听 `llm/adapters-updated` 与 `settings/document-updated`，从 `llm.listModels()`/`listConfigurableProviders()` 刷新 provider/model，并读取同一份模型配置里的 `pricing`。
+- 扩展 `@smp/console-settings-models` 的模型 profile，增加可选价格字段：
+
+```ts
+interface ModelPricing {
+  currency: 'CNY' | 'USD'
+  inputPerMillion: string
+  outputPerMillion: string
+  cacheReadPerMillion?: string
+  cacheWritePerMillion?: string
+}
+```
+
+- 后台模型配置是价格的唯一真源；DeepSeek 首次部署可预置官方价格，之后以配置页保存的值为准。
+- 模型配置没有 `pricing` 时不写入金额为 0 的单据，按“未计价”告警；不在仪表盘里维护第二份价格表。
 - 计价参数按模型配置：
 
 ```ts
@@ -479,22 +524,23 @@ interface ModelPrice {
   - `externalId = model-call:<provider>:<attemptId>`（无 attemptId 时使用稳定指纹）
   - `title = 模型调用 · <model>`
   - `metadata` 只保留 provider、model、token 计数，不保存 prompt/回复正文。
-- 价格表缺失时不写入金额为 0 的单据；记录告警，P2 再补“未计价调用”列表。
+- 价格字段缺失时不写入金额为 0 的单据；记录告警并标记“未计价”，P2 再补“未计价调用”列表。
+- 后台模型配置新增/删除模型或修改价格时，后续调用立即使用新价格；已发生的历史单据不重新计价。
 - 同一 attempt 重放时由 dashboard 幂等去重。
 
 #### 余额
 
-- 每个模型厂商一个账户，例如 `DeepSeek`、`OpenAI`。
-- 有余额 API 的厂商（P1 先做 DeepSeek）定时拉取，推送 `account` + `balance`：
+- 首批只接 DeepSeek，一个 DeepSeek 账户。
+- 使用 DeepSeek 余额 API 定时拉取，推送 `account` + `balance`：
   - 账户 `externalId = provider id`
   - 余额快照 `externalId = balance:<provider>:<capturedAt>`
 - 拉取失败只记日志，不清空旧余额；页面继续显示最后一次成功快照及其时间。
-- 没有余额 API 的厂商可通过脚本/HTTP ingest 手工推送。
+- 其他厂商暂不在 P1 接入；后续可通过脚本/HTTP ingest 手工推送。
 
 #### 单据推送
 
 - 厂商账单/发票同步走 `dashboard.ingest` 或 HTTP 接入点，不放进模型调用路径。
-- 第一版支持“账单导入脚本/适配器”；不在仪表盘内做 PDF OCR。
+- 第一版支持“账单导入脚本/适配器”和仪表盘 CSV 导入；不在仪表盘内做 PDF OCR。
 - 账单的 `externalId` 使用厂商账单号，重复同步幂等。
 - 账单币种保留原币，由仪表盘按显示币种折算。
 
@@ -502,7 +548,7 @@ interface ModelPrice {
 
 - 模型计费适配器可以依赖 `llm`、`credentials`、`settings`、`dashboard`；仪表盘不反向依赖模型插件。
 - 模型适配器未加载时，仪表盘仍可展示手工推送或其他来源的数据。
-- 模型价格和厂商余额配置属于适配器，不写死进仪表盘。
+- 模型价格属于后台模型配置；DeepSeek 余额配置属于适配器；仪表盘只接收标准账户/余额/单据事件。
 
 ## 8. 后端接口
 
@@ -523,7 +569,7 @@ interface DashboardSummary {
     quote: 'CNY' | 'USD'
     rate: string
     asOf: string
-    source: 'config'
+    source: 'frankfurter' | 'custom'
   } | null
   range: { from: string; to: string; label: string }
   balance: {
@@ -574,9 +620,36 @@ interface DashboardSummary {
 GET /console-api/dashboard/transactions?range=30d&currency=CNY&limit=50&cursor=...
 ```
 
-P1 可以只返回最近若干条；P2 增加 cursor 分页和完整列表抽屉。
+P1 就实现 cursor 分页和完整列表页；支持按类型、来源、账户筛选，默认按发生时间倒序。
 
-### 8.3 刷新与实时
+### 8.3 CSV 导入
+
+```http
+POST /console-api/dashboard/import/csv
+Content-Type: text/csv; charset=utf-8
+```
+
+- 最大 1 MiB，UTF-8；第一行是表头。
+- 必需列：`external_id,type,title,amount,currency,occurred_at`。
+- 可选列：`account_external_id,status,metadata`。
+- `type` 只接受 `income`/`expense`；`occurred_at` 接受 ISO 8601。
+- 服务端逐行校验，错误行返回行号和原因，不中断其他行。
+- 导入仍走 `DashboardService.ingestMany`，按 `(source, externalId)` 幂等。
+- `source` 使用固定值 `@smp/console-dashboard:csv`，CSV 内容不能指定任意 source。
+- 响应：
+
+```json
+{
+  "imported": 12,
+  "duplicates": 2,
+  "failed": 1,
+  "errors": [
+    { "line": 7, "code": "invalid_amount", "detail": "金额必须是正数" }
+  ]
+}
+```
+
+### 8.4 刷新与实时
 
 P1：
 
@@ -617,6 +690,8 @@ plugins/dashboard/
 │     ├─ AccountBreakdown.tsx
 │     ├─ TrendChart.tsx
 │     ├─ RecentReceipts.tsx
+│     ├─ TransactionsPage.tsx
+│     ├─ ImportCsvDialog.tsx
 │     ├─ dashboard.css
 │     └─ api.ts
 └─ test/
@@ -629,7 +704,7 @@ plugins/model-billing/           # 首批模型调用适配器，独立于仪表
 └─ src/
    ├─ index.ts                   # 注入 llm/credentials/settings/dashboard
    ├─ usage.ts                   # llm/stream usage 收集
-   ├─ pricing.ts                 # 模型价格表
+   ├─ pricing.ts                 # 读取后台模型配置的价格
    ├─ balance.ts                 # 厂商余额同步
    └─ receipts.ts                # 账单/单据推送
 ```
@@ -671,6 +746,26 @@ export const inject = ['slots', 'locale']
 - 点击行打开详情抽屉（P2）；P1 至少显示完整标题和来源。
 - 空状态、加载态、错误态。
 
+### 11.1 全部单据页
+
+点击“查看全部”在同一个仪表盘页面内切换到完整单据视图，不新增侧边栏入口：
+
+- 顶部：返回仪表盘、标题、范围/币种、筛选、导入 CSV、导出（P2）。
+- 筛选：类型（全部/收入/支出）、来源、账户、状态、时间范围。
+- 列表：时间、标题、来源/账户、类型、原币金额、展示币种金额、状态。
+- cursor 分页，每页 50 条；切换筛选时重置分页。
+- 行点击打开单据详情。
+- 空状态、加载态、错误态。
+- “推进来的数据”和“CSV 导入”都出现在这个列表。
+
+### 11.2 CSV 导入交互
+
+- 在全部单据页点击“导入 CSV”，打开对话框。
+- 选择文件后本地预览前 20 行，确认表头映射。
+- 提交后显示导入结果：成功、重复、失败行号和原因。
+- 失败行不阻塞其他行；用户可以修正后重新导入，重复行会被幂等识别。
+- 第一版只支持 UTF-8 CSV，不支持 XLSX/PDF。
+
 ## 12. 安全与一致性
 
 - 写入只接受已认证控制台会话或配置的 Bearer token。
@@ -691,18 +786,25 @@ export const inject = ['slots', 'locale']
 interface Config {
   defaultCurrency: 'CNY' | 'USD' // 默认 CNY
   supportedCurrencies: ('CNY' | 'USD')[] // 默认 ['CNY', 'USD']
-  usdCnyRate: number          // 1 USD = N CNY；缺少时 USD 折算不可用
-  fxAsOf: string              // 汇率配置时间
   timeZone: string            // 默认 Asia/Shanghai
   refreshSeconds: number      // 默认 60
   ingestToken?: string        // 可选；空表示仅允许同源 cookie
+  fx: {
+    provider: 'frankfurter' | 'custom' // 默认 frankfurter
+    url: string               // 默认 https://api.frankfurter.app/latest?from=USD&to=CNY
+    apiKey?: string           // 自定义行情源需要时使用；从环境变量读取
+    refreshSeconds: number    // 默认 1800
+    timeoutMs: number         // 默认 5000
+  }
 }
 ```
 
 - 配置通过 `Schema` 校验；`defaultCurrency`/`supportedCurrencies` 只接受 `CNY`/`USD`。
-- `usdCnyRate` 必须是正数；缺失时界面显示汇率提示，USD 数据不参与 CNY 汇总。
+- `fx.url` 必须是 HTTPS；`fx.provider='custom'` 时必须提供解析器约定的响应格式。
+- 行情 API 失败时使用数据库最近一次成功汇率；没有缓存时界面显示汇率提示，USD 数据不参与 CNY 汇总。
 - 部署时在 `docker/render-profile.mjs` 生成 `smp-dashboard` 配置；token 从环境变量读取，不写死。
 - `docker/profile/package.json` 增加 `@smp/console-dashboard` 与首批适配器 `@smp/console-model-billing` 的依赖和 bundle。
+- `@smp/console-settings-models` 增加模型价格字段和编辑入口；数据库迁移新增价格列或复用其 profile 配置 JSON。
 - `cordis.patch.yml`：
 
 ```yaml
@@ -713,7 +815,8 @@ interface Config {
 
 - 新增 `plugins/database/migrations/0046_dashboard.sql`；由 database 插件启动时执行。
 - 侧边栏图标 `chart` 需要在 `plugins/frame/src/client.tsx` 的 `NavGlyph` 中增加一个分支；这是唯一的 shell 侧小改动。
-- `docker/render-profile.mjs` 增加 `smp-dashboard` 配置：默认币种、USD/CNY 汇率、时区、刷新间隔。
+- `docker/render-profile.mjs` 增加 `smp-dashboard` 配置：默认币种、行情 API、时区、刷新间隔。
+- 行情 API 密钥从环境变量读取（如 `DASHBOARD_FX_API_KEY`），不写入配置文件或数据库。
 
 ## 14. 测试与验收
 
@@ -729,10 +832,13 @@ interface Config {
 
 - 迁移能在现有 PostgreSQL 上执行。
 - `POST /console-api/dashboard/ingest` 的认证、校验、重复请求。
+- `POST /console-api/dashboard/import/csv` 的逐行校验、重复导入和错误行。
 - `GET /console-api/dashboard/summary` 的认证和金额字符串。
 - 页面入口（侧边栏直接打开）加载正常。
-- CNY/USD 切换和汇率缺失提示。
+- CNY/USD 切换、行情刷新失败时的缓存降级和汇率过期提示。
 - 模型调用适配器产生的单据可幂等重放。
+- 后台模型配置改价后，新调用使用新价格，旧单据不变。
+- 全部单据页分页和 CSV 导入。
 
 ### 验收标准
 
@@ -743,10 +849,11 @@ interface Config {
 5. 下半部分左侧趋势图、右侧最近单据。
 6. 其他插件可通过 `ctx.dashboard.ingest` 推送账户、余额、单据。
 7. HTTP 接入点可幂等重放，重复数据不重复计数。
-8. CNY/USD 切换后金额按配置汇率折算，缺少汇率时明确提示。
+8. CNY/USD 切换后金额按行情汇率折算，缺少汇率时明确提示。
 9. 模型调用适配器能推送余额、调用花费和单据。
-10. 空数据、加载、错误、窄屏均有正确状态。
-11. 不引入外部图表依赖，不修改 DSH 核心插件生命周期约定。
+10. 全部单据页可分页、筛选，CSV 导入有预览和错误行提示。
+11. 空数据、加载、错误、窄屏均有正确状态。
+12. 不引入外部图表依赖，不修改 DSH 核心插件生命周期约定。
 
 ## 15. 实施顺序
 
@@ -755,8 +862,11 @@ interface Config {
 - 迁移、repository、DashboardService
 - summary 路由与认证
 - 页面注册（侧边栏最上方）、三张卡片、趋势图、最近单据
-- CNY/USD 切换与配置汇率折算
+- CNY/USD 切换、行情 API 汇率、缓存与降级
+- 全部单据页、筛选、cursor 分页
+- CSV 导入（预览/校验/幂等/错误行）
 - `@smp/console-model-billing` 适配器：DeepSeek 余额、调用花费、账单推送
+- `@smp/console-settings-models` 模型价格字段及自动同步
 - 手动/定时刷新
 - 基础单元/集成测试
 
@@ -764,7 +874,7 @@ interface Config {
 
 - HTTP ingest + Bearer token
 - 账户明细弹层
-- 单据详情抽屉、完整列表
+- 单据详情抽屉
 - SSE 实时刷新
 - 隐藏/聚合小账户等交互
 
@@ -782,15 +892,14 @@ interface Config {
 | 各插件对“收入/支出”口径不一致 | 接入契约强制 `type`，UI 不猜；文档写明 |
 | 同一账户重复推送导致余额翻倍 | 按账户取最新快照，不累加快照历史 |
 | 重复单据 | `(source, external_id)` 唯一 + duplicate 返回 |
-| 多币种直接相加 | 按展示币种配置汇率折算；缺失时排除并提示 |
+| 多币种直接相加 | 按展示币种行情汇率折算；缺失时排除并提示 |
 | 推送量过大 | 批量上限、索引、分页；P2 流式/队列 |
 | 浏览器时区与业务时区不一致 | 服务端按配置时区聚合，接口返回绝对时间 |
 | 仪表盘成为插件硬依赖 | 推荐 host service；外部集成走 HTTP；文档说明加载顺序 |
 
-待确认：
+待确认/实现前需敲定：
 
-1. USD/CNY 汇率由部署配置手工维护，还是后续接入行情 API？P1 先手工配置。
-2. 首批仅 DeepSeek 模型调用，还是同时支持 OpenAI 等厂商的余额接口？
-3. 模型价格表由适配器配置维护，还是跟随后台模型配置自动同步？
-4. 是否需要“全部单据”独立页面，还是只在仪表盘内抽屉展示？
-5. 账单导入第一版是否需要文件上传（CSV）？当前设计只做 API/脚本推送。
+1. 默认使用 Frankfurter 作为 USD/CNY 行情源是否可接受？如果要换供应商，需确认响应格式和是否要 API Key。
+2. DeepSeek 余额 API 的具体环境和凭据引用方式，是否复用模型配置中的 credential。
+3. CSV 模板是否要与现有账单导出格式对齐；当前设计是一组固定列。
+4. DeepSeek 首次内置价格版本，以及后台配置页是否需要“恢复默认价格”。

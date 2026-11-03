@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { homedir } from 'node:os'
+import { isAbsolute } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import Schema from '@deepseek-ai/schemastery'
 import { GroupRegistry, generalGroup, type Queryable, type Registry } from './service.ts'
 import { GroupFailure } from './contract.ts'
 import { UNASSIGNED_GROUP_ID } from './rules.ts'
@@ -23,11 +25,22 @@ export { GroupRegistry as WorkspaceGroups } from './service.ts'
 export type { GroupInput } from './rules.ts'
 export type { GroupLabelI18n } from './contract.ts'
 export const inject = ['database', 'workspaceRegistry', 'webServer', 'consoleSession', 'sessionQuery']
+
+export interface Config {
+  /** Absolute directory under which registered groups keep their workspaces. */
+  root: string
+}
+
+export const Config: Schema<Config> = Schema.object({
+  root: Schema.string().default(homedir()),
+})
 const ROOT = '/console-api/workspace-groups'
 const ACTIONS = ['', '/workspaces', '/rename', '/remove', '/focus', '/claim', '/search']
 
-export async function apply(ctx: HostCtx): Promise<void> {
-  const groups = new GroupRegistry(ctx.database.pool, ctx.workspaceRegistry, homedir())
+export async function apply(ctx: HostCtx, config: Config): Promise<void> {
+  const root = config.root.trim()
+  if (!isAbsolute(root)) throw new Error('工作区组根目录必须是绝对路径')
+  const groups = new GroupRegistry(ctx.database.pool, ctx.workspaceRegistry, root)
   await groups.register(generalGroup)
   ctx.effect(function* () {
     yield () => groups.close()

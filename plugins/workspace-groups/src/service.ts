@@ -231,7 +231,13 @@ export class GroupRegistry {
   }
   private async ensureDefault(groupId: string): Promise<void> {
     const group = this.normal(groupId)
-    if ((await this.members()).some(m => m.groupId === groupId && m.isDefault && this.registry.get(m.workspaceId) !== undefined)) return
+    const current = (await this.members()).find(m => m.groupId === groupId && m.isDefault && this.registry.get(m.workspaceId) !== undefined)
+    if (current !== undefined) {
+      // The membership can outlive the directory after a move to a new root;
+      // recreate it so the stored workspace remains usable.
+      await ensureDirectory(current.directory)
+      return
+    }
     const path = defaultWorkspacePath(group.path)
     await ensureDirectory(path)
     const canonical = await realpath(path)

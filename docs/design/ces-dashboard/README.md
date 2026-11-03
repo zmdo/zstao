@@ -1,6 +1,6 @@
 # CES 仪表盘插件设计
 
-- 状态：方案设计（核心决策已确认）
+- 状态：P1 已实现（核心仪表盘 + DeepSeek 适配器）
 - 日期：2026-11-04
 - 分支：`feat/dashboard`
 - 插件包名：`@smp/console-dashboard`

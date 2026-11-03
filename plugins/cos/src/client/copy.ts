@@ -58,6 +58,9 @@ export interface Copy {
   archiveSkipped: string
   archiveFailed: string
   archiveIgnored: string
+  archiveFiltered: string
+  archiveExclude: string
+  archiveExcludeHint: string
   test: string
   testOk: string
   save: string
@@ -150,6 +153,9 @@ const ZH: Copy = {
   archiveSkipped: '跳过',
   archiveFailed: '失败',
   archiveIgnored: '忽略',
+  archiveFiltered: '过滤',
+  archiveExclude: 'ZIP 过滤规则',
+  archiveExcludeHint: '一行一条正则，匹配的文件不上传；默认过滤 macOS 的 __MACOSX、.DS_Store 和 ._ 元数据。',
   test: '测试连接',
   testOk: '连接正常',
   save: '保存',
@@ -242,6 +248,9 @@ const EN: Copy = {
   archiveSkipped: 'Skipped',
   archiveFailed: 'Failed',
   archiveIgnored: 'Ignored',
+  archiveFiltered: 'Filtered',
+  archiveExclude: 'ZIP exclude rules',
+  archiveExcludeHint: 'One regular expression per line; matching files are skipped. Defaults filter macOS __MACOSX, .DS_Store and ._ metadata.',
   test: 'Test connection',
   testOk: 'Connection OK',
   save: 'Save',

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import test from 'node:test'
+import { DEFAULT_ARCHIVE_EXCLUDE } from '../src/host/config.ts'
 import {
   archiveFolderName,
   importArchive,
@@ -24,6 +25,7 @@ const settings = {
   maxUploadBytes: 10,
   maxPreviewBytes: 1024,
   maxArchiveBytes: 100,
+  archiveExclude: DEFAULT_ARCHIVE_EXCLUDE,
   enabled: true,
 }
 
@@ -36,14 +38,48 @@ function rawEntry(name: string, size: number, options: { flag?: number; mode?: n
   }
 }
 
-test('inspect keeps files and ignores directories and macOS metadata', () => {
+test('inspect keeps files and filters directories and macOS metadata', () => {
   const result = inspectArchive(
     [rawEntry('a.txt', 5), rawEntry('sub/', 0, { mode: 0o040755 }), rawEntry('sub/b.txt', 6), rawEntry('__MACOSX/junk', 3)],
     settings,
   )
   assert.deepEqual(result.errors, [])
   assert.deepEqual(result.files.map((file) => [file.name, file.size]), [['a.txt', 5], ['sub/b.txt', 6]])
-  assert.equal(result.ignored, 2)
+  assert.equal(result.filtered, 1)
+  assert.equal(result.ignored, 1)
+})
+
+test('inspect filters configured patterns and supports clearing them', () => {
+  const entries = [
+    rawEntry('.DS_Store', 2),
+    rawEntry('sub/.DS_Store', 2),
+    rawEntry('._resource', 2),
+    rawEntry('keep.txt', 4),
+  ]
+  const defaults = inspectArchive(entries, settings)
+  assert.deepEqual(defaults.files.map((file) => file.name), ['keep.txt'])
+  assert.equal(defaults.filtered, 3)
+
+  const custom = inspectArchive(entries, { ...settings, archiveExclude: 'DS_Store$' })
+  assert.deepEqual(custom.files.map((file) => file.name), ['._resource', 'keep.txt'])
+  assert.equal(custom.filtered, 2)
+  assert.deepEqual(custom.errors, [])
+
+  const disabled = inspectArchive(entries, { ...settings, archiveExclude: '' })
+  assert.deepEqual(disabled.files.map((file) => file.name), ['.DS_Store', 'sub/.DS_Store', '._resource', 'keep.txt'])
+  assert.equal(disabled.filtered, 0)
+})
+
+test('inspect rejects an invalid exclude expression', () => {
+  const result = inspectArchive([rawEntry('a.txt', 1)], { ...settings, archiveExclude: '(' })
+  assert.match(result.errors.join('\n'), /排除规则第 1 行不是合法正则/)
+})
+
+test('a zip containing only filtered entries is accepted with zero files', () => {
+  const result = inspectArchive([rawEntry('__MACOSX/junk', 2), rawEntry('.DS_Store', 2)], settings)
+  assert.deepEqual(result.errors, [])
+  assert.deepEqual(result.files, [])
+  assert.equal(result.filtered, 2)
 })
 
 test('inspect rejects traversal, absolute paths and symlinks', () => {

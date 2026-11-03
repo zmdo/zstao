@@ -1,5 +1,12 @@
 export type Role = 'attachments' | 'default'
 
+/** Default macOS archive metadata filters, one regular expression per line. */
+export const DEFAULT_ARCHIVE_EXCLUDE = [
+  '(^|/)__MACOSX/',
+  '(^|/)\\.DS_Store$',
+  '(^|/)\\._[^/]*$',
+].join('\n')
+
 export interface Queryable {
   query<T = unknown>(text: string, values?: unknown[]): Promise<{ rows: T[] }>
 }
@@ -19,6 +26,7 @@ export interface BucketSettings {
   maxUploadBytes: number
   maxPreviewBytes: number
   maxArchiveBytes: number
+  archiveExclude: string
   enabled: boolean
 }
 
@@ -31,6 +39,7 @@ export interface BucketInput {
   maxUploadBytes?: number
   maxPreviewBytes?: number
   maxArchiveBytes?: number
+  archiveExclude?: string
   enabled?: boolean
 }
 
@@ -44,6 +53,7 @@ interface BucketRow {
   max_upload_bytes: string | number
   max_preview_bytes: string | number
   max_archive_bytes: string | number
+  archive_exclude: string | null
   enabled: boolean
 }
 
@@ -59,6 +69,31 @@ export function normalizePrefix(value: string | undefined): string {
   return text === '' ? '' : `${text}/`
 }
 
+/** One expression per line; blank lines are ignored. */
+export function normalizeArchiveExclude(value: string): string {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .join('\n')
+}
+
+export function validateArchiveExclude(value: string): string | undefined {
+  if (value.length > 4096) return '排除规则不能超过 4096 个字符'
+  const normalized = normalizeArchiveExclude(value)
+  const lines = normalized === '' ? [] : normalized.split('\n')
+  if (lines.length > 50) return '排除规则最多 50 行'
+  for (const [index, line] of lines.entries()) {
+    if (line.length > 512) return `排除规则第 ${index + 1} 行过长`
+    try {
+      new RegExp(line)
+    } catch {
+      return `排除规则第 ${index + 1} 行不是合法正则`
+    }
+  }
+  return undefined
+}
+
 export function bucketRowToSettings(row: BucketRow, secrets: Secrets): BucketSettings {
   return {
     role: row.role,
@@ -70,6 +105,7 @@ export function bucketRowToSettings(row: BucketRow, secrets: Secrets): BucketSet
     maxUploadBytes: Number(row.max_upload_bytes),
     maxPreviewBytes: Number(row.max_preview_bytes),
     maxArchiveBytes: Number(row.max_archive_bytes ?? 1_073_741_824),
+    archiveExclude: row.archive_exclude ?? DEFAULT_ARCHIVE_EXCLUDE,
     enabled: row.enabled,
   }
 }
@@ -103,6 +139,10 @@ export function validateInput(role: Role, input: BucketInput): string | undefine
     const archive = Number(input.maxArchiveBytes)
     if (!Number.isFinite(archive) || archive < 1_048_576 || archive > 10_737_418_240) return '压缩包上限需在 1MB 到 10240MB 之间'
   }
+  if (role === 'default' && input.archiveExclude !== undefined) {
+    const problem = validateArchiveExclude(input.archiveExclude)
+    if (problem !== undefined) return problem
+  }
   const prefix = normalizePrefix(input.basePrefix)
   if (prefix.length > 512) return 'basePrefix 过长'
   return undefined
@@ -121,10 +161,11 @@ export async function saveBucket(pool: Queryable, secrets: Secrets, role: Role, 
   const maxUploadBytes = role === 'default' ? Math.floor(Number(input.maxUploadBytes ?? 104_857_600)) : 104_857_600
   const maxPreviewBytes = role === 'default' ? Math.floor(Number(input.maxPreviewBytes ?? 20_971_520)) : 20_971_520
   const maxArchiveBytes = role === 'default' ? Math.floor(Number(input.maxArchiveBytes ?? existing?.maxArchiveBytes ?? 1_073_741_824)) : 1_073_741_824
+  const archiveExclude = role === 'default' ? normalizeArchiveExclude(input.archiveExclude ?? existing?.archiveExclude ?? DEFAULT_ARCHIVE_EXCLUDE) : DEFAULT_ARCHIVE_EXCLUDE
   const enabled = input.enabled !== false
   await pool.query(
-    `insert into cos_buckets (role, bucket, region, secret_id, secret_key_ciphertext, base_prefix, max_upload_bytes, max_preview_bytes, max_archive_bytes, enabled, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+    `insert into cos_buckets (role, bucket, region, secret_id, secret_key_ciphertext, base_prefix, max_upload_bytes, max_preview_bytes, max_archive_bytes, archive_exclude, enabled, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
      on conflict (role) do update set
        bucket = excluded.bucket,
        region = excluded.region,
@@ -134,11 +175,12 @@ export async function saveBucket(pool: Queryable, secrets: Secrets, role: Role, 
        max_upload_bytes = excluded.max_upload_bytes,
        max_preview_bytes = excluded.max_preview_bytes,
        max_archive_bytes = excluded.max_archive_bytes,
+       archive_exclude = excluded.archive_exclude,
        enabled = excluded.enabled,
        updated_at = now()`,
-    [role, bucket, region, secretId, ciphertext, prefix, maxUploadBytes, maxPreviewBytes, maxArchiveBytes, enabled],
+    [role, bucket, region, secretId, ciphertext, prefix, maxUploadBytes, maxPreviewBytes, maxArchiveBytes, archiveExclude, enabled],
   )
-  return { role, bucket, region, secretId, secretKey, basePrefix: prefix, maxUploadBytes, maxPreviewBytes, maxArchiveBytes, enabled }
+  return { role, bucket, region, secretId, secretKey, basePrefix: prefix, maxUploadBytes, maxPreviewBytes, maxArchiveBytes, archiveExclude, enabled }
 }
 
 export async function clearBuckets(pool: Queryable): Promise<void> {

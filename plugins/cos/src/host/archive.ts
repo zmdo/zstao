@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import type { IncomingMessage } from 'node:http'
 import yauzl from 'yauzl'
 import { recordAudit } from './audit.ts'
-import type { BucketSettings, Queryable } from './config.ts'
+import { DEFAULT_ARCHIVE_EXCLUDE, type BucketSettings, type Queryable } from './config.ts'
 import { mapError, sanitizeKey, type CosClient } from './cos.ts'
 import { contentTypeOf, putObject, statObject } from './objects.ts'
 
@@ -41,6 +41,7 @@ export interface ArchiveFile {
 export interface ArchiveInspection {
   files: ArchiveFile[]
   ignored: number
+  filtered: number
   errors: string[]
 }
 
@@ -55,6 +56,7 @@ export interface ArchiveItem {
 
 export interface ArchiveOutcome {
   total: number
+  filtered: number
   uploaded: number
   skipped: number
   failed: number
@@ -165,7 +167,7 @@ function decodeName(entry: any): string {
   }
 }
 
-function normalizeEntryName(name: string): { name?: string; ignored?: boolean; error?: string } {
+function normalizeEntryName(name: string): { name?: string; error?: string } {
   let normalized = name.replace(/\\/g, '/')
   while (normalized.startsWith('./')) normalized = normalized.slice(2)
   if (normalized === '') return { error: '空文件名' }
@@ -173,11 +175,28 @@ function normalizeEntryName(name: string): { name?: string; ignored?: boolean; e
   if (normalized.includes('\u0000')) return { error: '文件名包含空字符' }
   const parts = normalized.split('/')
   if (parts.some((part) => part === '' || part === '.' || part === '..')) return { error: '路径包含 . 或 ..' }
-  if (parts[0] === '__MACOSX') return { ignored: true }
-  const base = parts[parts.length - 1]
-  if (base === '.DS_Store' || base.startsWith('._')) return { ignored: true }
   if (normalized.length > 1024) return { error: '路径过长' }
   return { name: normalized }
+}
+
+function compileArchiveFilters(value: string | undefined, errors: string[]): RegExp[] {
+  const source = value === undefined ? DEFAULT_ARCHIVE_EXCLUDE : value
+  const filters: RegExp[] = []
+  for (const [index, line] of source.split(/\r?\n/).entries()) {
+    const pattern = line.trim()
+    if (pattern === '') continue
+    try {
+      filters.push(new RegExp(pattern))
+    } catch {
+      errors.push(`排除规则第 ${index + 1} 行不是合法正则`)
+    }
+  }
+  return filters
+}
+
+/** Match a zip entry path against the user-configured exclude expressions. */
+function isFiltered(filters: RegExp[], path: string): boolean {
+  return filters.some((filter) => filter.test(path))
 }
 
 /** Validate every entry before the first upload so a bad archive is rejected atomically. */
@@ -186,11 +205,14 @@ export function inspectArchive(raw: any[], settings: BucketSettings): ArchiveIns
   const files: ArchiveFile[] = []
   const seen = new Set<string>()
   let ignored = 0
+  let filtered = 0
   let total = 0
   if (raw.length > ARCHIVE_MAX_ENTRIES) {
     errors.push(`压缩包内条目超过 ${ARCHIVE_MAX_ENTRIES} 个`)
-    return { files, ignored, errors }
+    return { files, ignored, filtered, errors }
   }
+  const filters = compileArchiveFilters(settings.archiveExclude, errors)
+  if (errors.length > 0) return { files, ignored, filtered, errors }
   for (const entry of raw) {
     if ((entry.generalPurposeBitFlag & 0x1) !== 0) {
       errors.push('不支持加密 zip')
@@ -202,20 +224,25 @@ export function inspectArchive(raw: any[], settings: BucketSettings): ArchiveIns
       continue
     }
     const decoded = decodeName(entry)
+    const candidate = decoded.replace(/\\/g, '/')
+    if (isFiltered(filters, candidate)) {
+      filtered += 1
+      continue
+    }
     if (decoded.endsWith('/') || kind === 0o040000) {
       ignored += 1
       continue
     }
     const normalized = normalizeEntryName(decoded)
-    if (normalized.ignored) {
-      ignored += 1
-      continue
-    }
     if (normalized.error !== undefined) {
       errors.push(`${decoded}: ${normalized.error}`)
       continue
     }
     const name = normalized.name as string
+    if (isFiltered(filters, name)) {
+      filtered += 1
+      continue
+    }
     if (seen.has(name)) {
       errors.push(`${name}: 压缩包内有重名文件`)
       continue
@@ -237,8 +264,8 @@ export function inspectArchive(raw: any[], settings: BucketSettings): ArchiveIns
     }
     files.push({ entry, name, size })
   }
-  if (files.length === 0 && errors.length === 0) errors.push('压缩包内没有可上传的文件')
-  return { files, ignored, errors }
+  if (files.length === 0 && errors.length === 0 && filtered === 0) errors.push('压缩包内没有可上传的文件')
+  return { files, ignored, filtered, errors }
 }
 
 export function normalizeArchivePrefix(value: string): string {
@@ -295,11 +322,13 @@ export interface ImportArchiveOptions {
   files: ArchiveFile[]
   prefix: string
   overwrite: boolean
+  filtered?: number
 }
 
 /** Upload each zip entry straight from its decompression stream; no extracted files on disk. */
 export async function importArchive(options: ImportArchiveOptions): Promise<ArchiveOutcome> {
   const { settings, client, zip, files, prefix, overwrite } = options
+  const filtered = options.filtered ?? 0
   const items: ArchiveItem[] = []
   let uploaded = 0
   let skipped = 0
@@ -348,6 +377,7 @@ export async function importArchive(options: ImportArchiveOptions): Promise<Arch
 
   return {
     total: files.length,
+    filtered,
     uploaded,
     skipped,
     failed,
@@ -391,6 +421,7 @@ export async function recordArchiveAudit(input: ArchiveAuditInput): Promise<void
       kind: 'zip',
       prefix: input.prefix,
       total: input.outcome.total,
+      filtered: input.outcome.filtered,
       uploaded: input.outcome.uploaded,
       skipped: input.outcome.skipped,
       failed: input.outcome.failed,

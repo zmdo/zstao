@@ -22,6 +22,7 @@ interface ConfigEntry {
   maxUploadBytes: number
   maxPreviewBytes?: number
   maxArchiveBytes?: number
+  archiveExclude?: string
   enabled: boolean
 }
 
@@ -313,6 +314,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
           skipped?: number
           failed?: number
           ignored?: number
+          filtered?: number
           total?: number
         }
         if (xhr.status < 200 || xhr.status > 299) {
@@ -324,6 +326,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
           `${copy.archiveSkipped} ${payload.skipped ?? 0}`,
           `${copy.archiveFailed} ${payload.failed ?? 0}`,
         ]
+        if ((payload.filtered ?? 0) > 0) parts.push(`${copy.archiveFiltered} ${payload.filtered}`)
         if ((payload.ignored ?? 0) > 0) parts.push(`${copy.archiveIgnored} ${payload.ignored}`)
         setArchiveMessage(parts.join(' · '))
         if ((payload.failed ?? 0) > 0 && (payload.errors?.length ?? 0) > 0) setError((payload.errors ?? []).join('；'))
@@ -700,10 +703,17 @@ interface Draft {
   maxUpload: string
   maxPreview: string
   maxArchive: string
+  archiveExclude: string
   enabled: boolean
 }
 
-const EMPTY: Draft = { bucket: '', region: '', secretId: '', secretKey: '', basePrefix: '', maxUpload: '100', maxPreview: '20', maxArchive: '1024', enabled: true }
+const DEFAULT_ARCHIVE_EXCLUDE = [
+  '(^|/)__MACOSX/',
+  '(^|/)\\.DS_Store$',
+  '(^|/)\\._[^/]*$',
+].join('\n')
+
+const EMPTY: Draft = { bucket: '', region: '', secretId: '', secretKey: '', basePrefix: '', maxUpload: '100', maxPreview: '20', maxArchive: '1024', archiveExclude: DEFAULT_ARCHIVE_EXCLUDE, enabled: true }
 
 function toDraft(entry: ConfigEntry | null): Draft {
   if (entry === null) return { ...EMPTY }
@@ -716,6 +726,7 @@ function toDraft(entry: ConfigEntry | null): Draft {
     maxUpload: String(Math.round(entry.maxUploadBytes / 1048576)),
     maxPreview: String(Math.round((entry.maxPreviewBytes ?? 20_971_520) / 1048576)),
     maxArchive: String(Math.round((entry.maxArchiveBytes ?? 1_073_741_824) / 1048576)),
+    archiveExclude: entry.archiveExclude ?? DEFAULT_ARCHIVE_EXCLUDE,
     enabled: entry.enabled,
   }
 }
@@ -761,6 +772,7 @@ export function SettingsPage(props: { locale: LocaleFace }) {
     maxUploadBytes: Math.round(Number(draft.maxUpload || '100') * 1048576),
     maxPreviewBytes: Math.round(Number(draft.maxPreview || '20') * 1048576),
     maxArchiveBytes: Math.round(Number(draft.maxArchive || '1024') * 1048576),
+    archiveExclude: draft.archiveExclude,
     enabled: draft.enabled,
   })
 
@@ -862,6 +874,11 @@ export function SettingsPage(props: { locale: LocaleFace }) {
             <label className="smp-cos-field">
               <span>{copy.maxArchive}</span>
               <input type="number" min={1} max={10240} value={draft.maxArchive} onChange={(event) => update({ ...draft, maxArchive: event.target.value })} />
+            </label>
+            <label className="smp-cos-field smp-cos-field-stack">
+              <span>{copy.archiveExclude}</span>
+              <textarea rows={4} spellCheck={false} value={draft.archiveExclude} onChange={(event) => update({ ...draft, archiveExclude: event.target.value })} />
+              <small className="smp-cos-help">{copy.archiveExcludeHint}</small>
             </label>
           </>
         )}

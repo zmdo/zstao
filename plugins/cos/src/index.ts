@@ -6,7 +6,7 @@ import { ArchiveError, archiveFolderName, createArchivePath, importArchive, norm
 import { queryAudit, recordAudit } from './host/audit.ts'
 import { compileBatch, executeBatch, type BatchOpInput, type ConflictPolicy, type ErrorPolicy } from './host/batch.ts'
 import { recordBatchAudit } from './host/batch-audit.ts'
-import { clearBuckets, isRole, loadBucket, loadBuckets, saveBucket, validateInput, type BucketInput, type Queryable, type Role, type Secrets } from './host/config.ts'
+import { clearBuckets, DEFAULT_ARCHIVE_EXCLUDE, isRole, loadBucket, loadBuckets, saveBucket, validateInput, type BucketInput, type Queryable, type Role, type Secrets } from './host/config.ts'
 import { createClient, invoke, mapError, sanitizeKey } from './host/cos.ts'
 import { deleteObject, listObjects, putObject, readObjectText, signedDownloadUrl, signedInlineUrl, statObject } from './host/objects.ts'
 import { materialize, PreviewError, startPreviewCleanup } from './host/preview.ts'
@@ -175,6 +175,7 @@ async function archive(ctx: HostCtx, request: IncomingMessage, url: URL, respons
           detail: '压缩包校验失败',
           errors: opened.inspection.errors.slice(0, 20),
           ignored: opened.inspection.ignored,
+          filtered: opened.inspection.filtered,
         })
       }
       const outcome = await importArchive({
@@ -184,6 +185,7 @@ async function archive(ctx: HostCtx, request: IncomingMessage, url: URL, respons
         files: stripMatchingRoot(opened.inspection.files, folder),
         prefix: targetPrefix,
         overwrite,
+        filtered: opened.inspection.filtered,
       })
       await recordArchiveAudit({ archiveId, prefix: targetPrefix, outcome, pool: ctx.database.pool })
       sendJson(response, 200, { archiveId, prefix: targetPrefix, folder, ignored: opened.inspection.ignored, ...outcome })
@@ -201,7 +203,7 @@ async function archive(ctx: HostCtx, request: IncomingMessage, url: URL, respons
 
 async function readConfig(ctx: HostCtx, response: ServerResponse): Promise<void> {
   const both = await loadBuckets(ctx.database.pool, ctx.secrets)
-  const mask = (settings: { role: Role; bucket: string; region: string; secretId: string; basePrefix: string; maxUploadBytes: number; maxPreviewBytes: number; maxArchiveBytes: number; enabled: boolean; secretKey: string } | undefined) =>
+  const mask = (settings: { role: Role; bucket: string; region: string; secretId: string; basePrefix: string; maxUploadBytes: number; maxPreviewBytes: number; maxArchiveBytes: number; archiveExclude: string; enabled: boolean; secretKey: string } | undefined) =>
     settings === undefined
       ? null
       : {
@@ -214,6 +216,7 @@ async function readConfig(ctx: HostCtx, response: ServerResponse): Promise<void>
           maxUploadBytes: settings.maxUploadBytes,
           maxPreviewBytes: settings.maxPreviewBytes,
           maxArchiveBytes: settings.maxArchiveBytes,
+          archiveExclude: settings.archiveExclude,
           enabled: settings.enabled,
         }
   sendJson(response, 200, { attachments: mask(both.attachments), default: mask(both.default) })
@@ -249,6 +252,7 @@ async function writeConfig(ctx: HostCtx, request: IncomingMessage, response: Ser
       maxUploadBytes: input.maxUploadBytes ?? 104_857_600,
       maxPreviewBytes: input.maxPreviewBytes ?? 20_971_520,
       maxArchiveBytes: input.maxArchiveBytes ?? 1_073_741_824,
+      archiveExclude: input.archiveExclude ?? DEFAULT_ARCHIVE_EXCLUDE,
       enabled: input.enabled !== false,
     }
     try {
@@ -314,6 +318,7 @@ async function testConfig(ctx: HostCtx, request: IncomingMessage, response: Serv
     maxUploadBytes: input.maxUploadBytes ?? 104_857_600,
     maxPreviewBytes: input.maxPreviewBytes ?? 20_971_520,
     maxArchiveBytes: 1_073_741_824,
+    archiveExclude: input.archiveExclude ?? DEFAULT_ARCHIVE_EXCLUDE,
     enabled: true,
   }
   const started = Date.now()

@@ -1,4 +1,4 @@
-﻿.smp-cos-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; color: var(--muted); }
+.smp-cos-crumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; color: var(--muted); }
 .smp-cos-crumb { padding: 2px 4px; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; }
 .smp-cos-crumb:hover { text-decoration: underline; }
 .smp-cos-folder { padding: 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: inherit; }
@@ -9,6 +9,10 @@
 .smp-cos-card { margin: 0; }
 .smp-cos-field { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 10px; margin-bottom: 8px; }
 .smp-cos-field > span { color: var(--muted); font-size: 12px; }
+.smp-cos-field-stack { align-items: start; }
+.smp-cos-field-stack > span { padding-top: 6px; }
+.smp-cos-field textarea { box-sizing: border-box; width: 100%; min-height: 84px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--dsw-alias-bg-layer-1); color: inherit; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; }
+.smp-cos-help { grid-column: 2; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .smp-cos-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
 
 .smp-cos-drawer {

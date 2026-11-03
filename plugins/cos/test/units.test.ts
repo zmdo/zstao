@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { normalizePrefix, validateInput } from '../src/host/config.ts'
+import { DEFAULT_ARCHIVE_EXCLUDE, normalizePrefix, validateInput } from '../src/host/config.ts'
 import { mapError, sanitizeKey, attachmentKey, CosRequestError } from '../src/host/cos.ts'
 import { listObjects, signedDownloadUrl } from '../src/host/objects.ts'
 import { isPreviewable } from '../src/host/preview.ts'
@@ -41,6 +41,9 @@ test('config validation checks bucket format and upload range', () => {
   assert.match(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxPreviewBytes: 1000 }) ?? '', /预览/)
   assert.match(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxArchiveBytes: 10 }) ?? '', /压缩包上限/)
   assert.equal(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxArchiveBytes: 1_073_741_824 }), undefined)
+  assert.equal(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', archiveExclude: DEFAULT_ARCHIVE_EXCLUDE }), undefined)
+  assert.equal(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', archiveExclude: '' }), undefined)
+  assert.match(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', archiveExclude: '(' }) ?? '', /第 1 行不是合法正则/)
 })
 
 test('only previewable media types are materialised', () => {

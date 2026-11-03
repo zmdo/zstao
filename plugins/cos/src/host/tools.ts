@@ -5,9 +5,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { authorizeOperation, sessionPermission } from './approval.ts'
 import { recordAudit } from './audit.ts'
+import { compileBatch, executeBatch, type BatchOpInput } from './batch.ts'
+import { recordBatchAudit } from './batch-audit.ts'
 import { createClient, invoke, mapError, sanitizeKey, type CosClient } from './cos.ts'
 import { loadBucket, type BucketSettings, type Queryable, type Secrets } from './config.ts'
-import { deleteObject, listObjects, signedDownloadUrl, statObject } from './objects.ts'
+import { contentTypeOf, deleteObject, listObjects, signedDownloadUrl, statObject } from './objects.ts'
 import { materialize, PreviewError } from './preview.ts'
 
 const TEXT_OUTPUT = {
@@ -45,14 +47,12 @@ const defaultBucket = async (deps: ToolDeps): Promise<{ settings: BucketSettings
   return { settings }
 }
 
-const contentTypeOf = (path: string): string => {
-  const ext = path.toLowerCase().slice(path.lastIndexOf('.'))
-  const table: Record<string, string> = {
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
-    '.pdf': 'application/pdf', '.json': 'application/json', '.txt': 'text/plain', '.md': 'text/markdown',
-    '.csv': 'text/csv', '.zip': 'application/zip', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  }
-  return table[ext] ?? 'application/octet-stream'
+const textOf = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
+
+const formatBytes = (bytes: number): string => {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`
+  return `${Math.round(bytes / 1024)} KB`
 }
 
 export function registerCosTools(scope: Context, deps: ToolDeps): void {
@@ -315,7 +315,7 @@ export function registerCosTools(scope: Context, deps: ToolDeps): void {
       description: 'List recent COS operations with their result and failure reasons.',
       parameters: {
         key: { type: 'string', description: 'Optional object key substring.' },
-        action: { type: 'string', enum: ['config', 'upload', 'download', 'delete'], description: 'Optional action filter.' },
+        action: { type: 'string', enum: ['config', 'upload', 'download', 'delete', 'move', 'copy', 'batch'], description: 'Optional action filter.' },
         hours: { type: 'integer', description: 'Only records newer than this many hours.' },
         limit: { type: 'integer', description: 'Maximum records, 1-100. Defaults to 20.' },
       },
@@ -341,6 +341,93 @@ export function registerCosTools(scope: Context, deps: ToolDeps): void {
             error: item.error,
           })),
         })
+      },
+    }),
+  )
+
+  scope.tools.register(
+    defineTool({
+      name: 'platform_cos_batch',
+      description:
+        'Run a batch of COS operations against the default bucket: move, copy, delete and upload. A folder move/copy needs recursive=true and a from ending with /. A move is copy + verify + delete, so the source is kept when deleting it fails. The default on_conflict is fail; pass overwrite per operation to override. Writes need one user approval unless the session has full access; dry_run previews counts, conflicts and a sample without changing anything. Capped at 200 objects, 100 uploads and 2GB of uploads per call.',
+      parameters: {
+        ops: {
+          type: 'array',
+          required: true,
+          description:
+            'Operations. move/copy use from and to (to is the new key or prefix); delete uses key; upload uses path (a file inside the session workspace) and key. Set recursive=true to expand a from prefix ending with /.',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              op: { type: 'string', enum: ['move', 'copy', 'delete', 'upload'], required: true, description: 'Operation name.' },
+              from: { type: 'string', description: 'Source key or prefix for move/copy.' },
+              to: { type: 'string', description: 'Destination key or prefix for move/copy.' },
+              key: { type: 'string', description: 'Object key for delete/upload.' },
+              path: { type: 'string', description: 'Workspace-relative or absolute file path for upload.' },
+              recursive: { type: 'boolean', description: 'Expand from as a prefix; from must end with /.' },
+              overwrite: { type: 'boolean', description: 'true overwrites, false fails on conflict; omitted follows on_conflict.' },
+            },
+          },
+        },
+        dry_run: { type: 'boolean', description: 'Preview the plan without asking for approval or changing anything.' },
+        on_conflict: { type: 'string', enum: ['fail', 'skip', 'overwrite'], description: 'Default destination conflict policy. Defaults to fail.' },
+        on_error: { type: 'string', enum: ['continue', 'stop'], description: 'Continue after a failed item or stop scheduling. Defaults to continue.' },
+      },
+      output: TEXT_OUTPUT,
+      timeoutMs: 300_000,
+      isConcurrencySafe: () => false,
+      async execute(args: Record<string, unknown>, exec: ExecLike) {
+        const target = await defaultBucket(deps)
+        if ('error' in target) return target.error
+        const inputs = Array.isArray(args.ops) ? (args.ops as BatchOpInput[]) : []
+        const uploads = inputs.filter((input) => input !== null && typeof input === 'object' && textOf(input.op) === 'upload')
+        if (uploads.length > 0) {
+          const workingDirectory = scope.get('workingDirectory') as WorkingDirectoryLike | undefined
+          if (workingDirectory === undefined) return fail('workspace_unavailable', '当前会话没有工作区')
+          let root: string
+          try {
+            root = await workingDirectory.ensure(exec.agent, exec.signal)
+          } catch (cause) {
+            return fail('workspace_unavailable', cause instanceof Error ? cause.message : String(cause))
+          }
+          for (const input of uploads) {
+            const candidate = resolve(root, String(input.path ?? ''))
+            if (candidate !== root && !candidate.startsWith(root + sep)) return fail('path_outside_workspace', '只能上传工作区内的文件')
+            input.absolutePath = candidate
+          }
+        }
+
+        const onConflict = args.on_conflict === 'skip' || args.on_conflict === 'overwrite' ? args.on_conflict : 'fail'
+        const onError = args.on_error === 'stop' ? 'stop' : 'continue'
+        const client = createClient(target.settings)
+        const compiled = await compileBatch(target.settings, client, inputs, { onConflict, onError })
+        if (!compiled.ok) return fail(compiled.code, compiled.detail, { problems: compiled.problems })
+        if (args.dry_run === true) {
+          return JSON.stringify({
+            dryRun: true,
+            planId: compiled.plan.planId,
+            summary: compiled.plan.summary,
+            sample: compiled.plan.sample,
+            warnings: compiled.plan.warnings,
+          })
+        }
+
+        const plan = compiled.plan
+        const summary = plan.summary
+        const reason = `COS batch: move ${summary.move}, copy ${summary.copy}, delete ${summary.delete}, upload ${summary.upload} (${formatBytes(summary.bytes)}), ${summary.conflicts} conflicts`
+        const displayReason = `COS 批量操作：移动 ${summary.move}，复制 ${summary.copy}，删除 ${summary.delete}，上传 ${summary.upload}，共 ${formatBytes(summary.bytes)}`
+        const decision = await approve(exec, 'platform_cos_batch', reason, displayReason)
+        if (!decision.allowed) return fail('approval_denied', `未获批准（${decision.outcome}）`, { outcome: decision.outcome })
+
+        const outcome = await executeBatch(target.settings, client, plan)
+        await recordBatchAudit(deps.pool, {
+          actor: 'tool',
+          sessionId: exec.agent?.id ?? null,
+          plan,
+          outcome,
+        })
+        return JSON.stringify(outcome)
       },
     }),
   )

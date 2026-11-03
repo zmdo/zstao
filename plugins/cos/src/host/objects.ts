@@ -125,6 +125,68 @@ export async function deleteObject(settings: BucketSettings, client: CosClient, 
   await invoke(client, 'deleteObject', { Bucket: settings.bucket, Region: settings.region, Key: key })
 }
 
+/** COS has no server-side move/rename: a move is copy + delete. */
+export async function copyObject(settings: BucketSettings, client: CosClient, sourceKey: string, destKey: string): Promise<void> {
+  const source = sanitizeKey(sourceKey, settings.basePrefix)
+  const dest = sanitizeKey(destKey, settings.basePrefix)
+  const copySource = `${settings.bucket}.cos.${settings.region}.myqcloud.com/${source.split('/').map(encodeURIComponent).join('/')}`
+  await invoke(client, 'putObjectCopy', {
+    Bucket: settings.bucket,
+    Region: settings.region,
+    Key: dest,
+    CopySource: copySource,
+  })
+}
+
+export interface PrefixEntry {
+  key: string
+  size: number
+}
+
+/** List objects under a prefix without folder grouping, capped at `limit`. */
+export async function listPrefixEntries(
+  settings: BucketSettings,
+  client: CosClient,
+  prefix: string,
+  limit: number,
+): Promise<{ items: PrefixEntry[]; truncated: boolean }> {
+  const actual = `${settings.basePrefix}${prefix}`
+  const items: PrefixEntry[] = []
+  let marker = ''
+  for (let page = 0; page < 1000; page += 1) {
+    const data = await invoke(client, 'getBucket', {
+      Bucket: settings.bucket,
+      Region: settings.region,
+      Prefix: actual,
+      Marker: marker,
+      MaxKeys: 1000,
+      EncodingType: 'url',
+    })
+    for (const entry of data.Contents ?? []) {
+      const key = decode(entry.Key)
+      if (key.endsWith('/')) continue
+      if (!key.startsWith(actual)) continue
+      if (items.length >= limit) return { items, truncated: true }
+      items.push({ key: key.slice(settings.basePrefix.length), size: Number(entry.Size ?? 0) })
+    }
+    if (String(data.IsTruncated) !== 'true') return { items, truncated: false }
+    const next = String(data.NextMarker ?? '')
+    if (next === '' || next === marker) return { items, truncated: false }
+    marker = next
+  }
+  return { items, truncated: true }
+}
+
+const CONTENT_TYPES: Record<string, string> = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
+  '.pdf': 'application/pdf', '.json': 'application/json', '.txt': 'text/plain', '.md': 'text/markdown',
+  '.csv': 'text/csv', '.zip': 'application/zip', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+}
+
+export function contentTypeOf(path: string): string {
+  return CONTENT_TYPES[path.toLowerCase().slice(path.lastIndexOf('.'))] ?? 'application/octet-stream'
+}
+
 export function signedDownloadUrl(settings: BucketSettings, client: CosClient, relativeKey: string, name: string): Promise<string> {
   const key = sanitizeKey(relativeKey, settings.basePrefix)
   return new Promise((resolve, reject) => {

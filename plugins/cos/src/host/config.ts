@@ -18,6 +18,7 @@ export interface BucketSettings {
   basePrefix: string
   maxUploadBytes: number
   maxPreviewBytes: number
+  maxArchiveBytes: number
   enabled: boolean
 }
 
@@ -29,6 +30,7 @@ export interface BucketInput {
   basePrefix?: string
   maxUploadBytes?: number
   maxPreviewBytes?: number
+  maxArchiveBytes?: number
   enabled?: boolean
 }
 
@@ -41,6 +43,7 @@ interface BucketRow {
   base_prefix: string
   max_upload_bytes: string | number
   max_preview_bytes: string | number
+  max_archive_bytes: string | number
   enabled: boolean
 }
 
@@ -66,6 +69,7 @@ export function bucketRowToSettings(row: BucketRow, secrets: Secrets): BucketSet
     basePrefix: row.base_prefix,
     maxUploadBytes: Number(row.max_upload_bytes),
     maxPreviewBytes: Number(row.max_preview_bytes),
+    maxArchiveBytes: Number(row.max_archive_bytes ?? 1_073_741_824),
     enabled: row.enabled,
   }
 }
@@ -95,6 +99,10 @@ export function validateInput(role: Role, input: BucketInput): string | undefine
     const preview = Number(input.maxPreviewBytes)
     if (!Number.isFinite(preview) || preview < 1_048_576 || preview > 209_715_200) return '预览上限需在 1MB 到 200MB 之间'
   }
+  if (role === 'default' && input.maxArchiveBytes !== undefined) {
+    const archive = Number(input.maxArchiveBytes)
+    if (!Number.isFinite(archive) || archive < 1_048_576 || archive > 10_737_418_240) return '压缩包上限需在 1MB 到 10240MB 之间'
+  }
   const prefix = normalizePrefix(input.basePrefix)
   if (prefix.length > 512) return 'basePrefix 过长'
   return undefined
@@ -112,10 +120,11 @@ export async function saveBucket(pool: Queryable, secrets: Secrets, role: Role, 
   const prefix = normalizePrefix(input.basePrefix)
   const maxUploadBytes = role === 'default' ? Math.floor(Number(input.maxUploadBytes ?? 104_857_600)) : 104_857_600
   const maxPreviewBytes = role === 'default' ? Math.floor(Number(input.maxPreviewBytes ?? 20_971_520)) : 20_971_520
+  const maxArchiveBytes = role === 'default' ? Math.floor(Number(input.maxArchiveBytes ?? existing?.maxArchiveBytes ?? 1_073_741_824)) : 1_073_741_824
   const enabled = input.enabled !== false
   await pool.query(
-    `insert into cos_buckets (role, bucket, region, secret_id, secret_key_ciphertext, base_prefix, max_upload_bytes, max_preview_bytes, enabled, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+    `insert into cos_buckets (role, bucket, region, secret_id, secret_key_ciphertext, base_prefix, max_upload_bytes, max_preview_bytes, max_archive_bytes, enabled, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
      on conflict (role) do update set
        bucket = excluded.bucket,
        region = excluded.region,
@@ -124,11 +133,12 @@ export async function saveBucket(pool: Queryable, secrets: Secrets, role: Role, 
        base_prefix = excluded.base_prefix,
        max_upload_bytes = excluded.max_upload_bytes,
        max_preview_bytes = excluded.max_preview_bytes,
+       max_archive_bytes = excluded.max_archive_bytes,
        enabled = excluded.enabled,
        updated_at = now()`,
-    [role, bucket, region, secretId, ciphertext, prefix, maxUploadBytes, maxPreviewBytes, enabled],
+    [role, bucket, region, secretId, ciphertext, prefix, maxUploadBytes, maxPreviewBytes, maxArchiveBytes, enabled],
   )
-  return { role, bucket, region, secretId, secretKey, basePrefix: prefix, maxUploadBytes, maxPreviewBytes, enabled }
+  return { role, bucket, region, secretId, secretKey, basePrefix: prefix, maxUploadBytes, maxPreviewBytes, maxArchiveBytes, enabled }
 }
 
 export async function clearBuckets(pool: Queryable): Promise<void> {

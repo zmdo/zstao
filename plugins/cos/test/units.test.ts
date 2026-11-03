@@ -39,6 +39,8 @@ test('config validation checks bucket format and upload range', () => {
   assert.match(validateInput('default', { bucket: 'demo', region: 'ap-beijing' }) ?? '', /name-appid/)
   assert.match(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxUploadBytes: 10 }) ?? '', /上限/)
   assert.match(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxPreviewBytes: 1000 }) ?? '', /预览/)
+  assert.match(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxArchiveBytes: 10 }) ?? '', /压缩包上限/)
+  assert.equal(validateInput('default', { bucket: 'demo-1250000000', region: 'ap-beijing', maxArchiveBytes: 1_073_741_824 }), undefined)
 })
 
 test('only previewable media types are materialised', () => {

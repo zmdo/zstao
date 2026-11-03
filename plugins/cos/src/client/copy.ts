@@ -50,6 +50,14 @@ export interface Copy {
   basePrefix: string
   maxUpload: string
   maxPreview: string
+  maxArchive: string
+  uploadArchive: string
+  archiveOverwrite: string
+  archiveProcessing: string
+  archiveDone: string
+  archiveSkipped: string
+  archiveFailed: string
+  archiveIgnored: string
   test: string
   testOk: string
   save: string
@@ -72,6 +80,9 @@ export interface Copy {
   actionUpload: string
   actionDownload: string
   actionDelete: string
+  actionMove: string
+  actionCopy: string
+  actionBatch: string
   succeeded: string
   failed: string
   error: string
@@ -131,6 +142,14 @@ const ZH: Copy = {
   basePrefix: '根前缀',
   maxUpload: '上传上限（MB）',
   maxPreview: '预览上限（MB）',
+  maxArchive: '压缩包上限（MB）',
+  uploadArchive: '批量上传',
+  archiveOverwrite: '覆盖同名',
+  archiveProcessing: '解压并上传中…',
+  archiveDone: '批量上传完成',
+  archiveSkipped: '跳过',
+  archiveFailed: '失败',
+  archiveIgnored: '忽略',
   test: '测试连接',
   testOk: '连接正常',
   save: '保存',
@@ -153,6 +172,9 @@ const ZH: Copy = {
   actionUpload: '上传',
   actionDownload: '下载',
   actionDelete: '删除',
+  actionMove: '移动',
+  actionCopy: '复制',
+  actionBatch: '批量',
   succeeded: '成功',
   failed: '失败',
   error: '错误',
@@ -212,6 +234,14 @@ const EN: Copy = {
   basePrefix: 'Base prefix',
   maxUpload: 'Upload limit (MB)',
   maxPreview: 'Preview limit (MB)',
+  maxArchive: 'Archive limit (MB)',
+  uploadArchive: 'Batch upload',
+  archiveOverwrite: 'Overwrite existing',
+  archiveProcessing: 'Extracting and uploading…',
+  archiveDone: 'Batch upload finished',
+  archiveSkipped: 'Skipped',
+  archiveFailed: 'Failed',
+  archiveIgnored: 'Ignored',
   test: 'Test connection',
   testOk: 'Connection OK',
   save: 'Save',
@@ -234,6 +264,9 @@ const EN: Copy = {
   actionUpload: 'Upload',
   actionDownload: 'Download',
   actionDelete: 'Delete',
+  actionMove: 'Move',
+  actionCopy: 'Copy',
+  actionBatch: 'Batch',
   succeeded: 'OK',
   failed: 'Failed',
   error: 'Error',

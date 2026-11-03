@@ -3,7 +3,7 @@ import type { Queryable } from './config.ts'
 export interface AuditEntry {
   sessionId: string | null
   actor: 'console' | 'tool'
-  action: 'config' | 'upload' | 'download' | 'delete'
+  action: 'config' | 'upload' | 'download' | 'delete' | 'move' | 'copy' | 'batch'
   objectKey: string
   sizeBytes: number | null
   ok: boolean

@@ -21,6 +21,7 @@ interface ConfigEntry {
   basePrefix: string
   maxUploadBytes: number
   maxPreviewBytes?: number
+  maxArchiveBytes?: number
   enabled: boolean
 }
 
@@ -200,6 +201,10 @@ export function FilesPage(props: { locale: LocaleFace }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [progress, setProgress] = useState<Record<string, number>>({})
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const [archiveProgress, setArchiveProgress] = useState(0)
+  const [archiveMessage, setArchiveMessage] = useState('')
+  const [archiveOverwrite, setArchiveOverwrite] = useState(false)
   const [preview, setPreview] = useState<{ key: string; name: string; kind: 'text' | 'image' | 'pdf' } | null>(null)
   const [previewText, setPreviewText] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -208,6 +213,7 @@ export function FilesPage(props: { locale: LocaleFace }) {
   const [query, setQuery] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
   const input = useRef<HTMLInputElement>(null)
+  const archiveInput = useRef<HTMLInputElement>(null)
 
   const load = async (nextPrefix: string, marker: string, query: string, size = pageSize) => {
     setLoading(true)
@@ -285,6 +291,55 @@ export function FilesPage(props: { locale: LocaleFace }) {
     if (input.current !== null) input.current.value = ''
   }
 
+  const uploadArchive = (file: File | undefined) => {
+    if (file === undefined) return
+    setArchiveBusy(true)
+    setArchiveProgress(0)
+    setArchiveMessage('')
+    setError('')
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API}/archive?prefix=${encodeURIComponent(prefix)}&name=${encodeURIComponent(file.name)}&overwrite=${archiveOverwrite ? 'true' : 'false'}`)
+    xhr.setRequestHeader('content-type', 'application/zip')
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) setArchiveProgress(Math.round((event.loaded / event.total) * 100))
+    }
+    xhr.onload = () => {
+      setArchiveBusy(false)
+      try {
+        const payload = JSON.parse(xhr.responseText) as {
+          detail?: string
+          errors?: string[]
+          uploaded?: number
+          skipped?: number
+          failed?: number
+          ignored?: number
+          total?: number
+        }
+        if (xhr.status < 200 || xhr.status > 299) {
+          setError([payload.detail ?? `HTTP ${xhr.status}`, ...(payload.errors ?? [])].join('；'))
+          return
+        }
+        const parts = [
+          `${copy.archiveDone}：${payload.uploaded ?? 0}/${payload.total ?? 0}`,
+          `${copy.archiveSkipped} ${payload.skipped ?? 0}`,
+          `${copy.archiveFailed} ${payload.failed ?? 0}`,
+        ]
+        if ((payload.ignored ?? 0) > 0) parts.push(`${copy.archiveIgnored} ${payload.ignored}`)
+        setArchiveMessage(parts.join(' · '))
+        if ((payload.failed ?? 0) > 0 && (payload.errors?.length ?? 0) > 0) setError((payload.errors ?? []).join('；'))
+        setRefreshKey((value) => value + 1)
+      } catch {
+        setError(`HTTP ${xhr.status}`)
+      }
+    }
+    xhr.onerror = () => {
+      setArchiveBusy(false)
+      setError(copy.uploadFailed)
+    }
+    xhr.send(file)
+    if (archiveInput.current !== null) archiveInput.current.value = ''
+  }
+
   const remove = async (key: string) => {
     if (!window.confirm(copy.confirmDelete)) return
     try {
@@ -328,7 +383,14 @@ export function FilesPage(props: { locale: LocaleFace }) {
           <button type="button" className="primary" onClick={() => input.current?.click()}>
             {copy.upload}
           </button>
+          <button type="button" className="secondary" disabled={archiveBusy} onClick={() => archiveInput.current?.click()}>
+            {copy.uploadArchive}
+          </button>
+          <label className="muted" title={copy.archiveOverwrite}>
+            <input type="checkbox" checked={archiveOverwrite} onChange={(event) => setArchiveOverwrite(event.target.checked)} /> {copy.archiveOverwrite}
+          </label>
           <input ref={input} type="file" multiple hidden onChange={(event) => upload(event.target.files)} />
+          <input ref={archiveInput} type="file" accept=".zip,application/zip" hidden onChange={(event) => uploadArchive(event.target.files?.[0])} />
         </div>
       }
     >
@@ -341,9 +403,15 @@ export function FilesPage(props: { locale: LocaleFace }) {
         <p className="smp-cos-note">
           {Object.entries(progress)
             .map(([name, value]) => `${name} ${value}%`)
-            .join(' 路 ')}
+            .join(' · ')}
         </p>
       )}
+      {archiveBusy && (
+        <p className="smp-cos-note">
+          {archiveProgress < 100 ? `${copy.uploadArchive} ${archiveProgress}%` : copy.archiveProcessing}
+        </p>
+      )}
+      {archiveMessage !== '' && <p className="smp-cos-note">{archiveMessage}</p>}
       <div className="smp-cos-page-tree">
         <CosList
           locale={props.locale}
@@ -437,13 +505,16 @@ function parseError(text: string): string | undefined {
   }
 }
 
-const ACTIONS = ['config', 'upload', 'download', 'delete'] as const
+const ACTIONS = ['config', 'upload', 'download', 'delete', 'move', 'copy', 'batch'] as const
 
 function actionLabel(copy: Copy, action: string): string {
   if (action === 'config') return copy.actionConfig
   if (action === 'upload') return copy.actionUpload
   if (action === 'download') return copy.actionDownload
   if (action === 'delete') return copy.actionDelete
+  if (action === 'move') return copy.actionMove
+  if (action === 'copy') return copy.actionCopy
+  if (action === 'batch') return copy.actionBatch
   return action
 }
 
@@ -628,10 +699,11 @@ interface Draft {
   basePrefix: string
   maxUpload: string
   maxPreview: string
+  maxArchive: string
   enabled: boolean
 }
 
-const EMPTY: Draft = { bucket: '', region: '', secretId: '', secretKey: '', basePrefix: '', maxUpload: '100', maxPreview: '20', enabled: true }
+const EMPTY: Draft = { bucket: '', region: '', secretId: '', secretKey: '', basePrefix: '', maxUpload: '100', maxPreview: '20', maxArchive: '1024', enabled: true }
 
 function toDraft(entry: ConfigEntry | null): Draft {
   if (entry === null) return { ...EMPTY }
@@ -643,6 +715,7 @@ function toDraft(entry: ConfigEntry | null): Draft {
     basePrefix: entry.basePrefix,
     maxUpload: String(Math.round(entry.maxUploadBytes / 1048576)),
     maxPreview: String(Math.round((entry.maxPreviewBytes ?? 20_971_520) / 1048576)),
+    maxArchive: String(Math.round((entry.maxArchiveBytes ?? 1_073_741_824) / 1048576)),
     enabled: entry.enabled,
   }
 }
@@ -687,6 +760,7 @@ export function SettingsPage(props: { locale: LocaleFace }) {
     basePrefix: draft.basePrefix,
     maxUploadBytes: Math.round(Number(draft.maxUpload || '100') * 1048576),
     maxPreviewBytes: Math.round(Number(draft.maxPreview || '20') * 1048576),
+    maxArchiveBytes: Math.round(Number(draft.maxArchive || '1024') * 1048576),
     enabled: draft.enabled,
   })
 
@@ -784,6 +858,10 @@ export function SettingsPage(props: { locale: LocaleFace }) {
             <label className="smp-cos-field">
               <span>{copy.maxPreview}</span>
               <input type="number" min={1} max={200} value={draft.maxPreview} onChange={(event) => update({ ...draft, maxPreview: event.target.value })} />
+            </label>
+            <label className="smp-cos-field">
+              <span>{copy.maxArchive}</span>
+              <input type="number" min={1} max={10240} value={draft.maxArchive} onChange={(event) => update({ ...draft, maxArchive: event.target.value })} />
             </label>
           </>
         )}

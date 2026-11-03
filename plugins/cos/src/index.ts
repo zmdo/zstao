@@ -1,6 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { randomUUID } from 'node:crypto'
+import { rm } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
+import { ArchiveError, archiveFolderName, createArchivePath, importArchive, normalizeArchivePrefix, openAndInspect, pruneArchives, receiveArchive, recordArchiveAudit, stripMatchingRoot } from './host/archive.ts'
 import { queryAudit, recordAudit } from './host/audit.ts'
+import { compileBatch, executeBatch, type BatchOpInput, type ConflictPolicy, type ErrorPolicy } from './host/batch.ts'
+import { recordBatchAudit } from './host/batch-audit.ts'
 import { clearBuckets, isRole, loadBucket, loadBuckets, saveBucket, validateInput, type BucketInput, type Queryable, type Role, type Secrets } from './host/config.ts'
 import { createClient, invoke, mapError, sanitizeKey } from './host/cos.ts'
 import { deleteObject, listObjects, putObject, readObjectText, signedDownloadUrl, signedInlineUrl, statObject } from './host/objects.ts'
@@ -48,6 +53,8 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
     if (path === '/config' && request.method === 'PUT') return await writeConfig(ctx, request, response)
     if (path === '/config' && request.method === 'DELETE') return await removeConfig(ctx, response)
     if (path === '/config/test' && request.method === 'POST') return await testConfig(ctx, request, response)
+    if (path === '/batch' && request.method === 'POST') return await batch(ctx, request, response)
+    if (path === '/archive' && request.method === 'POST') return await archive(ctx, request, url, response)
     if (path === '/objects' && request.method === 'GET') return await list(ctx, url, response)
     if (path === '/objects' && request.method === 'POST') return await upload(ctx, request, url, response)
     if (path === '/objects' && request.method === 'DELETE') return await remove(ctx, url, request, response)
@@ -62,9 +69,139 @@ async function handle(ctx: HostCtx, request: IncomingMessage, response: ServerRe
   }
 }
 
+async function batch(ctx: HostCtx, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const settings = await requireDefault(ctx.database.pool, ctx.secrets, response)
+  if (settings === undefined) return
+  const body = await readJson(request)
+  if (body === undefined) return sendJson(response, 400, { code: 'bad_request', detail: '请求无法读取' })
+  const ops = body.ops
+  if (!Array.isArray(ops) || ops.length === 0) {
+    return sendJson(response, 400, { code: 'batch_empty', detail: 'ops 不能为空' })
+  }
+  if (ops.some((op) => op !== null && typeof op === 'object' && (op as Record<string, unknown>).op === 'upload')) {
+    return sendJson(response, 400, { code: 'upload_requires_agent', detail: '控制台批量上传请使用文件上传入口' })
+  }
+  const conflict = body.on_conflict
+  if (conflict !== undefined && conflict !== 'fail' && conflict !== 'skip' && conflict !== 'overwrite') {
+    return sendJson(response, 400, { code: 'invalid_batch', detail: 'on_conflict 必须是 fail、skip 或 overwrite' })
+  }
+  const onError = body.on_error
+  if (onError !== undefined && onError !== 'continue' && onError !== 'stop') {
+    return sendJson(response, 400, { code: 'invalid_batch', detail: 'on_error 必须是 continue 或 stop' })
+  }
+
+  const client = createClient(settings)
+  const compiled = await compileBatch(settings, client, ops as BatchOpInput[], {
+    onConflict: (conflict ?? 'fail') as ConflictPolicy,
+    onError: (onError ?? 'continue') as ErrorPolicy,
+  })
+  if (!compiled.ok) {
+    return sendJson(response, 400, { code: compiled.code, detail: compiled.detail, problems: compiled.problems })
+  }
+  if (body.dry_run === true) {
+    return sendJson(response, 200, {
+      dryRun: true,
+      planId: compiled.plan.planId,
+      summary: compiled.plan.summary,
+      sample: compiled.plan.sample,
+      warnings: compiled.plan.warnings,
+    })
+  }
+
+  const outcome = await executeBatch(settings, client, compiled.plan)
+  await recordBatchAudit(ctx.database.pool, {
+    actor: 'console',
+    sessionId: null,
+    plan: compiled.plan,
+    outcome,
+  })
+  sendJson(response, 200, outcome)
+}
+
+async function archive(ctx: HostCtx, request: IncomingMessage, url: URL, response: ServerResponse): Promise<void> {
+  const settings = await requireDefault(ctx.database.pool, ctx.secrets, response)
+  if (settings === undefined) return
+  const length = Number(request.headers['content-length'] ?? '')
+  if (!Number.isFinite(length) || length < 0) {
+    return sendJson(response, 411, { code: 'length_required', detail: '需要 Content-Length' })
+  }
+  if (length > settings.maxArchiveBytes) {
+    return sendJson(response, 413, {
+      code: 'upload_too_large',
+      detail: `压缩包超过上限 ${Math.floor(settings.maxArchiveBytes / 1048576)}MB`,
+    })
+  }
+  let prefix: string
+  try {
+    prefix = normalizeArchivePrefix(url.searchParams.get('prefix') ?? '')
+  } catch (cause) {
+    const code = cause instanceof ArchiveError ? cause.code : 'invalid_prefix'
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    return sendJson(response, 400, { code, detail })
+  }
+  let folder: string
+  try {
+    folder = archiveFolderName(url.searchParams.get('name') ?? '')
+  } catch (cause) {
+    const code = cause instanceof ArchiveError ? cause.code : 'invalid_archive_name'
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    return sendJson(response, 400, { code, detail })
+  }
+  const targetPrefix = `${prefix}${folder}/`
+  const overwrite = url.searchParams.get('overwrite') === 'true'
+  const archiveId = randomUUID()
+  const path = await createArchivePath(archiveId)
+  try {
+    await pruneArchives()
+    const received = await receiveArchive(request, path, settings.maxArchiveBytes)
+    if (!received.ok) {
+      return sendJson(response, received.code === 'upload_too_large' ? 413 : 400, {
+        code: received.code ?? 'upload_failed',
+        detail: received.detail ?? '上传失败',
+      })
+    }
+
+    let opened
+    try {
+      opened = await openAndInspect(path, settings)
+    } catch (cause) {
+      if (cause instanceof ArchiveError) return sendJson(response, 400, { code: cause.code, detail: cause.message })
+      throw cause
+    }
+    try {
+      if (opened.inspection.errors.length > 0) {
+        return sendJson(response, 400, {
+          code: 'invalid_archive',
+          detail: '压缩包校验失败',
+          errors: opened.inspection.errors.slice(0, 20),
+          ignored: opened.inspection.ignored,
+        })
+      }
+      const outcome = await importArchive({
+        settings,
+        client: createClient(settings),
+        zip: opened.zip,
+        files: stripMatchingRoot(opened.inspection.files, folder),
+        prefix: targetPrefix,
+        overwrite,
+      })
+      await recordArchiveAudit({ archiveId, prefix: targetPrefix, outcome, pool: ctx.database.pool })
+      sendJson(response, 200, { archiveId, prefix: targetPrefix, folder, ignored: opened.inspection.ignored, ...outcome })
+    } finally {
+      try {
+        opened.zip.close()
+      } catch {
+        // The zip may already be closed after a read error.
+      }
+    }
+  } finally {
+    await rm(path, { force: true }).catch(() => undefined)
+  }
+}
+
 async function readConfig(ctx: HostCtx, response: ServerResponse): Promise<void> {
   const both = await loadBuckets(ctx.database.pool, ctx.secrets)
-  const mask = (settings: { role: Role; bucket: string; region: string; secretId: string; basePrefix: string; maxUploadBytes: number; maxPreviewBytes: number; enabled: boolean; secretKey: string } | undefined) =>
+  const mask = (settings: { role: Role; bucket: string; region: string; secretId: string; basePrefix: string; maxUploadBytes: number; maxPreviewBytes: number; maxArchiveBytes: number; enabled: boolean; secretKey: string } | undefined) =>
     settings === undefined
       ? null
       : {
@@ -76,6 +213,7 @@ async function readConfig(ctx: HostCtx, response: ServerResponse): Promise<void>
           basePrefix: settings.basePrefix,
           maxUploadBytes: settings.maxUploadBytes,
           maxPreviewBytes: settings.maxPreviewBytes,
+          maxArchiveBytes: settings.maxArchiveBytes,
           enabled: settings.enabled,
         }
   sendJson(response, 200, { attachments: mask(both.attachments), default: mask(both.default) })
@@ -110,6 +248,7 @@ async function writeConfig(ctx: HostCtx, request: IncomingMessage, response: Ser
       basePrefix: input.basePrefix ?? '',
       maxUploadBytes: input.maxUploadBytes ?? 104_857_600,
       maxPreviewBytes: input.maxPreviewBytes ?? 20_971_520,
+      maxArchiveBytes: input.maxArchiveBytes ?? 1_073_741_824,
       enabled: input.enabled !== false,
     }
     try {
@@ -174,6 +313,7 @@ async function testConfig(ctx: HostCtx, request: IncomingMessage, response: Serv
     basePrefix: input.basePrefix ?? '',
     maxUploadBytes: input.maxUploadBytes ?? 104_857_600,
     maxPreviewBytes: input.maxPreviewBytes ?? 20_971_520,
+    maxArchiveBytes: 1_073_741_824,
     enabled: true,
   }
   const started = Date.now()

@@ -4,6 +4,7 @@ import type { BucketSettings } from './config.ts'
 export interface CosClient {
   getBucket(params: Record<string, unknown>, callback: (error: unknown, data: any) => void): void
   putObject(params: Record<string, unknown>, callback: (error: unknown, data: any) => void): void
+  putObjectCopy(params: Record<string, unknown>, callback: (error: unknown, data: any) => void): void
   getObject(params: Record<string, unknown>, callback: (error: unknown, data: any) => void): void
   headObject(params: Record<string, unknown>, callback: (error: unknown, data: any) => void): void
   deleteObject(params: Record<string, unknown>, callback: (error: unknown, data: any) => void): void

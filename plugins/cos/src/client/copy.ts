@@ -3,6 +3,7 @@ export interface Copy {
   filesTitle: string
   auditTitle: string
   settingsTitle: string
+  platformTitle: string
   refresh: string
   upload: string
   uploadHint: string
@@ -83,6 +84,7 @@ const ZH: Copy = {
   filesTitle: '文件管理',
   auditTitle: '审计记录',
   settingsTitle: '对象存储',
+  platformTitle: '平台设置',
   refresh: '刷新',
   upload: '上传',
   uploadHint: '拖入文件或点击上传',
@@ -163,6 +165,7 @@ const EN: Copy = {
   filesTitle: 'Files',
   auditTitle: 'Audit log',
   settingsTitle: 'Object storage',
+  platformTitle: 'Platform settings',
   refresh: 'Refresh',
   upload: 'Upload',
   uploadHint: 'Drop files or click to upload',

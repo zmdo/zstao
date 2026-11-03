@@ -1,4 +1,4 @@
-﻿import { existsSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import COS from 'cos-nodejs-sdk-v5'
@@ -104,7 +104,7 @@ export default class CosAttachmentStore extends LocalAttachmentStore {
       await this.upload(settings, `${settings.prefix}objects/${sha.slice(0, 2)}/${sha}`, await readFile(path), 'image/png')
     } catch (cause) {
       throw new AttachmentError(
-        `COS 闄勪欢鍐欏叆澶辫触锛?{cause instanceof Error ? cause.message : String(cause)}`,
+        `COS 附件写入失败：${cause instanceof Error ? cause.message : String(cause)}`,
         'ATTACHMENT_WRITE_FAILED',
         { cause },
       )
@@ -121,7 +121,7 @@ export default class CosAttachmentStore extends LocalAttachmentStore {
       await this.upload(settings, `${settings.prefix}file-objects/${sha.slice(0, 2)}/${sha}`, await readFile(path), 'application/octet-stream')
     } catch (cause) {
       throw new AttachmentError(
-        `COS 闄勪欢鍐欏叆澶辫触锛?{cause instanceof Error ? cause.message : String(cause)}`,
+        `COS 附件写入失败：${cause instanceof Error ? cause.message : String(cause)}`,
         'ATTACHMENT_WRITE_FAILED',
         { cause },
       )

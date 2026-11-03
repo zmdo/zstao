@@ -1,4 +1,4 @@
-﻿import { AuditPage, FilesPage, SettingsPage, type LocaleFace } from './client/pages.tsx'
+import { AuditPage, FilesPage, SettingsPage, type LocaleFace } from './client/pages.tsx'
 import { CosFilesBody, CosFilesTitle } from './client/sidebar.tsx'
 import { copyFor } from './client/copy.ts'
 import styles from './client/files.css'
@@ -38,7 +38,7 @@ const SIDEBAR_KIND = 'cos-files'
 interface PageLabel {
   (): string
   group?: string
-  groupLabel?: string
+  groupLabel?: string | (() => string)
   navigation?: 'tabs' | 'sidebar'
   placement?: 'footer'
   icon?: string
@@ -46,7 +46,7 @@ interface PageLabel {
 
 export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight']
 
-function pageLabel(text: () => string, place: { group: string; groupLabel: string; navigation?: 'tabs' | 'sidebar'; placement?: 'footer'; icon?: string }): PageLabel {
+function pageLabel(text: () => string, place: { group: string; groupLabel: string | (() => string); navigation?: 'tabs' | 'sidebar'; placement?: 'footer'; icon?: string }): PageLabel {
   const label: PageLabel = () => text()
   label.group = place.group
   label.groupLabel = place.groupLabel
@@ -68,7 +68,10 @@ export function apply(ctx: ClientCtx): void {
   })
 
   const copy = () => copyFor(ctx.locale.getSnapshot().active)
-  const place = { group: 'cos', groupLabel: copy().groupTitle, navigation: 'sidebar' as const }
+  // The group label must stay a function: the client locale starts from the
+  // browser language and adopts the stored preference asynchronously, so a
+  // value captured during apply would keep the first snapshot forever.
+  const place = { group: 'cos', groupLabel: () => copy().groupTitle, navigation: 'sidebar' as const }
 
   ctx.slots.inject('console.page', () =>
     ctx.slots.register(
@@ -87,7 +90,7 @@ export function apply(ctx: ClientCtx): void {
       {
         name: 'console.page',
         key: 'cos-settings',
-        label: pageLabel(() => copy().settingsTitle, { group: 'platform', groupLabel: '楠炲啿褰寸拋鍓х枂', placement: 'footer', icon: 'settings' }),
+        label: pageLabel(() => copy().settingsTitle, { group: 'platform', groupLabel: () => copy().platformTitle, placement: 'footer', icon: 'settings' }),
         order: 8,
         inject: () => ({ locale: ctx.locale }),
       },

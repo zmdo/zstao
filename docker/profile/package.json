@@ -18,7 +18,9 @@
     "@smp/console-workspace-groups": "file:/app/plugins/workspace-groups",
     "@smp/console-workspace-storage": "file:/app/plugins/workspace-storage",
     "@smp/console-cos": "file:/app/plugins/cos",
-    "@smp/cos-attachments": "file:/app/plugins/cos-attachments"
+    "@smp/cos-attachments": "file:/app/plugins/cos-attachments",
+    "@smp/console-dashboard": "file:/app/plugins/dashboard",
+    "@smp/console-model-billing": "file:/app/plugins/model-billing"
   },
   "dsh": {
     "profile": {
@@ -41,7 +43,9 @@
         "@smp/console-workspace-groups",
         "@smp/console-workspace-storage",
         "@smp/cos-attachments",
-        "@smp/console-cos"
+        "@smp/console-cos",
+        "@smp/console-dashboard",
+        "@smp/console-model-billing"
       ]
     }
   }

@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-model-billing
+      name: '@smp/console-model-billing'

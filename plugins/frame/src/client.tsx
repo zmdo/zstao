@@ -361,6 +361,14 @@ function NavGlyph(props: { name: string }) {
       </svg>
     )
   }
+  if (props.name === 'chart') {
+    return (
+      <svg {...common}>
+        <path d="M2.4 13.6V9.2M6.4 13.6V5.2M10.4 13.6V7.4M14.4 13.6V3.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M2 14.4h12.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity=".45" />
+      </svg>
+    )
+  }
   return (
     <svg {...common}>
       <rect x="3" y="3" width="10" height="10" rx="1.6" stroke="currentColor" strokeWidth="1.4" />

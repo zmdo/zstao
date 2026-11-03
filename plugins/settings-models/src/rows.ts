@@ -35,6 +35,7 @@ export interface ModelRow {
   protocolEditable: boolean
   credentialRef: string | undefined
   models: ModelName[]
+  pricing?: unknown
 }
 
 export type FieldOp = { op: 'set'; path: string[]; value: unknown } | { op: 'unset'; path: string[] }
@@ -247,6 +248,9 @@ export function modelRows(providers: readonly ProviderSource[], documents: reado
       protocolEditable: provider.settingsNs === 'llm-pi-ai',
       credentialRef: credentialRef(provider.provider, profile),
       models: listedModels(profile),
+      ...(typeof profile === 'object' && profile !== null && (profile as { pricing?: unknown }).pricing !== undefined
+        ? { pricing: (profile as { pricing?: unknown }).pricing }
+        : {}),
     }
   }).sort((left, right) => left.displayName.localeCompare(right.displayName))
 }

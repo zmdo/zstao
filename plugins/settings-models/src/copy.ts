@@ -41,6 +41,10 @@ export function modelsCopy(active: string) {
       needProtocol: '请选择 API 协议',
       needBaseUrl: '请填写 API 地址',
       needModels: '请选择至少一个模型',
+      pricing: '模型价格',
+      pricingHint: 'JSON，例如 {"models":{"deepseek-flash":{"currency":"CNY","inputPerMillion":0.5,"outputPerMillion":2}}}',
+      pricingInvalid: '价格 JSON 不合法',
+      pricingSaved: '价格已保存',
     }
   }
   return {
@@ -75,5 +79,9 @@ export function modelsCopy(active: string) {
     needProtocol: 'Choose an API protocol',
     needBaseUrl: 'Enter an API address',
     needModels: 'Choose at least one model',
+    pricing: 'Model pricing',
+    pricingHint: 'JSON, for example {"models":{"deepseek-flash":{"currency":"CNY","inputPerMillion":0.5,"outputPerMillion":2}}}',
+    pricingInvalid: 'Pricing JSON is invalid',
+    pricingSaved: 'Pricing saved',
   }
 }

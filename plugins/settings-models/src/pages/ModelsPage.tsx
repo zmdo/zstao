@@ -66,6 +66,9 @@ const PAGE_STYLE = `
 .smp-console table.smp-models-table tbody tr.smp-models-row { cursor: pointer; }
 .smp-console table.smp-models-table tbody tr.smp-models-row:hover td, .smp-console table.smp-models-table tbody tr.smp-models-row.is-open td { background: #f7f9fc; }
 .smp-model-add input { width: 100%; min-width: 0; box-sizing: border-box; }
+.smp-model-pricing { margin-top: 12px; }
+.smp-model-pricing summary { cursor: pointer; font-weight: 600; }
+.smp-model-pricing textarea { width: 100%; min-height: 130px; box-sizing: border-box; margin-top: 6px; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; font: inherit; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 `
 
 export function installModelsStyle(): () => void {
@@ -278,9 +281,11 @@ function ModelLine(props: {
   const [baseURL, setBaseURL] = useState(row.baseURL)
   const [protocol, setProtocol] = useState<ProtocolChoice>(row.protocol)
   const [apiKey, setApiKey] = useState('')
+  const [pricing, setPricing] = useState(row.pricing === undefined ? '' : JSON.stringify(row.pricing, null, 2))
 
   useEffect(() => { setBaseURL(row.baseURL) }, [row.baseURL])
   useEffect(() => { setProtocol(row.protocol) }, [row.protocol])
+  useEffect(() => { setPricing(row.pricing === undefined ? '' : JSON.stringify(row.pricing, null, 2)) }, [row.pricing])
 
   const writeField = async (field: string, value: string): Promise<void> => {
     const response = await props.settings.mutate(row.settingsNs, [fieldOp(row.settingsPath, field, value)], row.revision)
@@ -300,6 +305,26 @@ function ModelLine(props: {
     }
     const refreshed = modelRows([source], described.value.namespaces)[0]
     if (refreshed !== undefined) props.onRow(refreshed)
+  }
+
+  const savePricing = async (): Promise<void> => {
+    let value: unknown
+    try {
+      value = pricing.trim() === '' ? undefined : JSON.parse(pricing)
+    } catch {
+      props.onError(copy.pricingInvalid)
+      return
+    }
+    const op = value === undefined
+      ? { op: 'unset' as const, path: [...row.settingsPath, 'pricing'] }
+      : { op: 'set' as const, path: [...row.settingsPath, 'pricing'], value }
+    const response = await props.settings.mutate(row.settingsNs, [op], row.revision)
+    if (!response.ok) {
+      props.onError(messageOf(response.error, copy.saveFailed))
+      return
+    }
+    props.onError('')
+    props.onRow({ ...row, ...(value === undefined ? { pricing: undefined } : { pricing: value }) })
   }
 
   const stored = row.models
@@ -444,6 +469,17 @@ function ModelLine(props: {
                         {copy.save}
                       </button>
                     </p>
+                    <details className="smp-model-pricing">
+                      <summary>{copy.pricing}</summary>
+                      <p className="muted">{copy.pricingHint}</p>
+                      <textarea
+                        aria-label={`${row.displayName} ${copy.pricing}`}
+                        rows={6}
+                        value={pricing}
+                        onChange={event => setPricing(event.target.value)}
+                      />
+                      <p><button className="secondary" type="button" onClick={() => { void savePricing() }}>{copy.save}</button></p>
+                    </details>
                   </>
                 )}
           </td>

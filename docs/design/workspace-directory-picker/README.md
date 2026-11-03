@@ -219,7 +219,8 @@ type PickerState = {
 - 顶栏：`44px`
 - 底栏：`52px`
 - 列宽：`248px`
-- 列视图容器使用 `layer-2` 浅灰，单列使用 `layer-1` 白底，列间保留分隔线，避免多列连成一片
+- 列视图容器使用 `bg-module-platform` 浅灰，单列使用 `layer-1` 白底，列间保留分隔线，避免多列连成一片
+- 侧栏与列视图之间使用 `border-l3` 分隔线，列与列之间使用 `border-l2` 分隔线
 - 行高：`32px`
 - 圆角：`10–12px`
 - 阴影：轻量浮层阴影，不使用 macOS 窗口交通灯
@@ -227,7 +228,7 @@ type PickerState = {
 ### 颜色
 
 - 弹窗背景：`var(--dsw-alias-bg-layer-1)`
-- 侧栏：`var(--dsw-alias-bg-layer-2)`
+- 侧栏：`var(--dsw-alias-bg-module-platform, #f5f6f7)`，比主区域更深一层
 - 分隔线：`var(--line)`
 - 选中行：`var(--dsw-alias-interactive-bg-selected, rgb(37 99 235 / 12%))`
 - 主按钮：`var(--accent, #2563eb)`

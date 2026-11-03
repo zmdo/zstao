@@ -51,8 +51,9 @@ const PICKER_STYLE = `
 .smp-wg-picker-empty{display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:var(--muted);font-size:12px}
 .smp-wg-picker-error{margin:10px;padding:8px 10px;border:1px solid rgb(239 68 68 / 35%);border-radius:6px;color:var(--dsw-alias-label-error, #dc2626);background:rgb(239 68 68 / 7%);font-size:12px;line-height:1.5}
 .smp-wg-picker-loading{display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:var(--muted);font-size:12px}
-.smp-wg-picker-foot{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--line)}
-.smp-wg-picker-path{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px}
+.smp-wg-picker-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-top:1px solid var(--line)}
+.smp-wg-picker-foot-group{display:flex;align-items:center;gap:8px;min-width:0}
+.smp-wg-picker-foot-group.is-right{flex:none}
 .smp-wg-picker-btn{border:1px solid var(--line);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
 .smp-wg-picker-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
 .smp-wg-picker-btn:disabled{opacity:.5;cursor:default}
@@ -357,27 +358,30 @@ export function DirectoryTreeFlow(props: DirectoryFlowProps & { client: GroupCli
             </section>
           </div>
           <footer className="smp-wg-picker-foot">
-            <span className="smp-wg-picker-path" title={current}>{current}</span>
-            {creating ? (
-              <span className="smp-wg-picker-new">
-                <input
-                  autoFocus
-                  value={newName}
-                  placeholder={copy.newPlaceholder}
-                  onChange={event => setNewName(event.target.value)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter') void createFolder()
-                    if (event.key === 'Escape') { event.stopPropagation(); setCreating(false); setNewName('') }
-                  }}
-                />
-                <button type="button" className="smp-wg-picker-btn" onClick={() => { void createFolder() }} disabled={newName.trim() === '' || submitting}>{copy.createOk}</button>
-                <button type="button" className="smp-wg-picker-btn" onClick={() => { setCreating(false); setNewName('') }}>{copy.createCancel}</button>
-              </span>
-            ) : (
-              <button type="button" className="smp-wg-picker-btn" onClick={() => setCreating(true)} disabled={disabled}>{copy.create}</button>
-            )}
-            <button type="button" className="smp-wg-picker-btn" onClick={() => { if (!busy && !submitting) props.onCancel() }} disabled={busy || submitting}>{copy.cancel}</button>
-            <button type="button" className="smp-wg-picker-btn is-primary" onClick={pick} disabled={disabled || current === ''}>{copy.pick}</button>
+            <div className="smp-wg-picker-foot-group">
+              {creating ? (
+                <span className="smp-wg-picker-new">
+                  <input
+                    autoFocus
+                    value={newName}
+                    placeholder={copy.newPlaceholder}
+                    onChange={event => setNewName(event.target.value)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter') void createFolder()
+                      if (event.key === 'Escape') { event.stopPropagation(); setCreating(false); setNewName('') }
+                    }}
+                  />
+                  <button type="button" className="smp-wg-picker-btn" onClick={() => { void createFolder() }} disabled={newName.trim() === '' || submitting}>{copy.createOk}</button>
+                  <button type="button" className="smp-wg-picker-btn" onClick={() => { setCreating(false); setNewName('') }}>{copy.createCancel}</button>
+                </span>
+              ) : (
+                <button type="button" className="smp-wg-picker-btn" onClick={() => setCreating(true)} disabled={disabled}>{copy.create}</button>
+              )}
+            </div>
+            <div className="smp-wg-picker-foot-group is-right">
+              <button type="button" className="smp-wg-picker-btn" onClick={() => { if (!busy && !submitting) props.onCancel() }} disabled={busy || submitting}>{copy.cancel}</button>
+              <button type="button" className="smp-wg-picker-btn is-primary" onClick={pick} disabled={disabled || current === ''}>{copy.pick}</button>
+            </div>
           </footer>
         </div>
       </div>

@@ -1,0 +1,64 @@
+name: server-maintenance
+description: 检查服务器磁盘，超过阈值时清理临时文件并复查
+on:
+  manual:
+    inputs:
+      server:
+        type: string
+        description: 服务器 ID
+        required: true
+      threshold:
+        type: number
+        description: 磁盘使用率阈值（百分比）
+        default: 80
+  schedule:
+    cron: "0 3 * * *"
+    timezone: Asia/Shanghai
+    inputs:
+      server: web-1
+      threshold: 80
+
+env:
+  TZ: Asia/Shanghai
+
+nodes:
+  - id: check
+    name: 检查磁盘
+    run: |
+      const used = 92
+      require('node:fs').writeFileSync(process.env.WF_OUTPUT, JSON.stringify({ used }))
+    runtime: node
+
+  - id: cleanup
+    name: 清理临时文件
+    needs: [check]
+    if: ${{ nodes.check.outputs.used > inputs.threshold }}
+    uses: server-management.exec
+    with:
+      server: ${{ inputs.server }}
+      command: "rm -rf /tmp/cache/*"
+    approval: always
+    timeout: 5m
+
+  - id: verify
+    name: 复查
+    needs: [cleanup]
+    if: ${{ always() }}
+    run: |
+      const used = 42
+      require('node:fs').writeFileSync(process.env.WF_OUTPUT, JSON.stringify({ used, ok: used < 80 }))
+    runtime: node
+
+  - id: notify
+    name: 发送通知
+    needs: [verify]
+    if: ${{ always() }}
+    uses: notification.send
+    with:
+      channel: ops
+      text: "服务器 ${{ inputs.server }} 磁盘从 ${{ nodes.check.outputs.used }}% 降到 ${{ nodes.verify.outputs.used }}%"
+
+outputs:
+  before: ${{ nodes.check.outputs.used }}
+  after: ${{ nodes.verify.outputs.used }}
+  ok: ${{ nodes.verify.outputs.ok }}

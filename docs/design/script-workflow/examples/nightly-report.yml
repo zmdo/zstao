@@ -1,0 +1,55 @@
+name: nightly-report
+description: 构建前端产物，上传到 COS，并输出发布地址
+on:
+  manual: {}
+  schedule:
+    cron: "0 2 * * *"
+    timezone: Asia/Shanghai
+
+env:
+  NODE_ENV: production
+
+nodes:
+  - id: build
+    name: 构建
+    run: |
+      const { execFileSync } = require('node:child_process')
+      execFileSync('npm', ['run', 'build'], { stdio: 'inherit' })
+      require('node:fs').writeFileSync(process.env.WF_OUTPUT, JSON.stringify({ dir: 'dist' }))
+    runtime: node
+    timeout: 20m
+
+  - id: upload
+    name: 上传到 COS
+    needs: [build]
+    uses: cos.upload
+    with:
+      path: ${{ nodes.build.outputs.dir }}
+      prefix: releases/${{ run.id }}/
+    approval: always
+    timeout: 10m
+
+  - id: verify
+    name: 校验对象
+    needs: [upload]
+    uses: cos.list
+    with:
+      prefix: releases/${{ run.id }}/
+      limit: 10
+
+  - id: report
+    name: 汇总结果
+    needs: [verify]
+    if: ${{ always() }}
+    run: |
+      const result = {
+        release: process.env.WF_RUN_ID,
+        files: 3,
+      }
+      require('node:fs').writeFileSync(process.env.WF_OUTPUT, JSON.stringify(result))
+    runtime: node
+
+outputs:
+  release: ${{ run.id }}
+  url: ${{ nodes.upload.outputs.url }}
+  files: ${{ nodes.report.outputs.files }}

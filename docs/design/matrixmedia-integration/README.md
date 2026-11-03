@@ -7,6 +7,14 @@
 - 目标：在 CES 中增加一个“矩阵媒体”插件，通过 MatrixMedia 的 API 完成多平台视频发布、账号/历史查看和后续的数据统计
 - 结论：**可以接入，但必须增加一个部署在 MatrixMedia 主机上的本地网关（Gateway）**。不能让 CES 直接访问 MatrixMedia 的 `127.0.0.1:30088`。
 
+## 0. 已确认决策
+
+1. **部署平台**：优先专用 Windows 主机；macOS 为备选；Linux + Xvfb 仅作为实验性方案。
+2. **网络**：CES 与 MatrixMedia 在同一内网，Gateway 只监听内网地址，不对公网开放。
+3. **媒体流转**：视频由其他生成服务产出并上传对象存储；CES/工作流保存对象引用，发布时解析成 MatrixMedia 可下载的 URL。
+4. **审批**：发布前必须有审批；审批通过后直接进入发布，不再做二次确认。
+5. **平台范围**：不在代码中写死平台列表；由 MatrixMedia 的 `/platforms` 返回，CES 通过配置启用/禁用。
+
 ## 1. 调研结论
 
 MatrixMedia（矩媒）是一个基于 Electron 的自媒体矩阵发布工具，支持：
@@ -70,28 +78,136 @@ CES ─────► 公网 30088 ─────► MatrixMedia
 
 ## 3. 推荐部署形态
 
-### 方案 A：专用 Windows/Mac 主机 + Gateway（推荐）
+### 方案 A：专用 Windows 主机 + Gateway（推荐）
 
-- 一台长期在线的 Windows 或 macOS 主机运行 MatrixMedia GUI。
-- 用 VNC / 远程桌面完成首次扫码登录；之后保持登录态。
+- 一台长期在线的 Windows 11 主机/虚拟机运行 MatrixMedia GUI。
+- 用 RDP / VNC 完成首次扫码登录；之后保持登录态。
 - 同机运行 `matrixmedia-gateway`（Node 服务）。
-- Gateway 只监听内网/VPN 地址，例如 `10.0.0.20:30188`。
-- CES 通过私有网络或 HTTPS 反代访问 Gateway。
+- Gateway 只监听内网地址，例如 `10.0.0.20:30188`。
+- CES 与 MatrixMedia 在同一内网，通过内网 HTTPS 或私有反代访问 Gateway。
 
-优点：MatrixMedia 官方支持桌面端，登录和真实浏览器模式最稳定。
+推荐 Windows 的原因：
 
-### 方案 B：Linux + Xvfb + 桌面环境
+- MatrixMedia 官方提供 Windows/macOS 桌面端，Linux 不是官方一等桌面平台。
+- GUI 自动化、Chrome/真实浏览器模式、远程桌面和无人值守在 Windows 上更容易维护。
+- 可以把 MatrixMedia 作为独立小主机，避免与 CES 容器耦合和图形依赖污染。
+
+macOS 也可以，适合团队已经以 Mac 为主的环境；不建议为了部署去维护 Linux 桌面/Xvfb 组合。
+
+### 方案 B：macOS 主机 + Gateway（可选）
+
+- 与方案 A 相同，只是宿主为 macOS。
+- 适合已有 Mac mini/Studio 的团队。
+- 必须处理 macOS 休眠、自动登录、系统更新和远程桌面。
+- 真实浏览器发布模式在 macOS 上同样可用。
+
+### 方案 C：Linux + Xvfb（实验性，不推荐生产）
 
 - Linux 服务器安装 Electron 依赖，使用 Xvfb/虚拟显示运行 MatrixMedia。
 - 通过 noVNC 或 VNC 完成扫码登录。
 - Gateway 同机运行。
 
-优点：可放在云服务器；缺点：Electron/桌面依赖复杂，MatrixMedia 并非官方 Linux 无头服务器，升级和排障成本高。
+缺点：MatrixMedia 并非官方 Linux 无头服务器，桌面依赖、浏览器自动化、升级和排障成本高；只建议做技术验证。
 
-### 方案 C：本地桌面 + 隧道（不推荐）
+### 方案 D：本地桌面 + 隧道（不推荐）
 
 - 在个人电脑运行 MatrixMedia，通过 SSH 隧道把 30088 暴露给 CES。
 - 只适合临时验证；电脑休眠、网络变化、登录态失效都会导致不可用。
+
+### 3.1 内网与网络边界
+
+已确认 CES 与 MatrixMedia 在同一内网，网络设计为：
+
+```text
+CES 容器
+  │ 内网 HTTPS / 私有反代
+  ▼
+Gateway 10.0.0.20:30188（只监听内网）
+  │ 127.0.0.1:30088
+  ▼
+MatrixMedia GUI
+```
+
+- Gateway 不绑定 `0.0.0.0`，只绑定内网网卡或回环 + 内网反代。
+- CES → Gateway 走内网 HTTPS；证书可用内部 CA 或反代证书。
+- Gateway → MatrixMedia 只走 loopback，不经过内网。
+- 防火墙只允许 CES 所在网段访问 Gateway；MatrixMedia 主机的 30088 不允许被其他机器访问。
+- 推荐开启 mTLS 或至少使用反向代理来源 IP 白名单 + Bearer Token。
+
+### 3.2 对象存储媒体流
+
+视频生成不在本插件内；生成服务完成视频后上传对象存储。推荐流转：
+
+```text
+视频生成服务
+  → 对象存储（COS/S3/OSS）
+  → 产生对象 key + 元数据
+  → CES/工作流创建发布单
+  → 审批通过
+  → 发布执行时生成可下载 URL（预签名或对象存储网关 URL）
+  → MatrixMedia 下载 URL 到临时目录
+  → 上传到目标平台
+```
+
+设计约定：
+
+- CES 保存 `MediaRef`，不保存视频二进制：
+
+```ts
+interface MediaRef {
+  provider: 'cos' | 's3' | 'oss'
+  bucket: string
+  key: string
+  contentType?: string
+  size?: number
+  checksum?: string
+  expiresAt?: string
+}
+```
+
+- 发布任务同时保存 `mediaRef` 和可选的直接 URL；直接 URL 只作为兼容入口。
+- **预签名 URL 在发布执行时生成**，不要在提交审批时生成：
+  - 审批可能等待数小时；提前生成的 URL 会过期。
+  - 定时发布在到点执行时再生成 URL。
+- URL 有效期应覆盖 MatrixMedia 下载视频的时间（建议至少 2 小时；大文件按大小调整）。
+- MatrixMedia 主机必须能访问对象存储域名或内网 endpoint；不允许访问任意内网地址。
+- URL 只出现在 host/gateway 内存中，不写入普通日志；需要审计时记录对象 key，不记录签名查询串。
+- 没有对象存储时，P1 也允许手工填写 HTTPS 视频 URL，但仍需通过域名白名单。
+- 工作流接入时，发布节点接收 `MediaRef`，而不是直接传大文件。
+
+### 3.3 工作流接入约定
+
+本插件不绑定具体工作流实现，给工作流暴露稳定的发布意图：
+
+```ts
+interface PublishIntent {
+  media: MediaRef
+  title: string
+  description?: string
+  tags?: string[]
+  platforms: Array<{ platform: string; phone: string }>
+  draft?: boolean
+  scheduledAt?: string
+}
+```
+
+工作流负责：
+
+1. 视频生成完成并上传对象存储。
+2. 生成 `MediaRef`。
+3. 创建发布意图。
+4. 进入审批节点。
+5. 审批通过后触发插件发布。
+6. 轮询发布 job，把结果写回工作流/仪表盘。
+
+插件负责：
+
+- 校验 `MediaRef`/URL。
+- 执行时解析短期 URL。
+- 调用 Gateway 发布。
+- 返回 job id 和平台结果。
+
+工作流与插件之间不传视频二进制，只传对象引用和元数据。
 
 ## 4. Gateway 设计
 
@@ -207,12 +323,12 @@ P1 可以用单页面内 Tab：
 [发布] [记录] [连接状态]
 
 ┌───────────────────────────────────────────────┬──────────────────┐
-│ 视频地址（https://...）                        │ 平台账号          │
+│ 媒体对象（对象存储 key / https://...）           │ 平台账号          │
 │ 标题                                           │ ☑ 抖音 138...    │
 │ 简介 / 标签                                    │ ☑ 视频号 138...  │
 │ 平台选择                                       │ ☐ 小红书 ...      │
 │ 草稿 / 定时                                     │                  │
-│ [发布]                                         │ 网关状态          │
+│ [提交审批]                                     │ 网关状态          │
 ├───────────────────────────────────────────────┴──────────────────┤
 │ 最近发布：标题 · 平台 · 状态 · 时间 · 查看详情                     │
 └──────────────────────────────────────────────────────────────────┘
@@ -220,18 +336,18 @@ P1 可以用单页面内 Tab：
 
 P1 字段：
 
-- 视频 URL（必须是 `https://`，由 CES/COS 提供）
+- 媒体引用：对象存储 `MediaRef`（provider/bucket/key）或已经可用的 HTTPS URL
 - 标题（必填）
 - 简介
 - 标签
 - 账号/平台多选
 - 草稿
 - 可选定时时间
-- 发布按钮
+- 提交审批按钮（审批通过后自动发布，不再二次确认）
 
 P2：
 
-- 本地文件上传到 COS 后自动生成 URL
+- 对象存储上传控件（生成服务仍可继续作为主链路）
 - 封面
 - 视频号商品/短剧/剧集字段
 - 创作声明
@@ -243,7 +359,7 @@ Gateway 返回：
 
 ```ts
 interface MatrixAccount {
-  platform: 'dy' | 'ks' | 'blbl' | 'bjh' | 'tt' | 'sph' | 'xhs' | 'fqsp'
+  platform: string             // 由 Gateway /platforms 返回，不写死
   platformName: string
   phone: string
   partition: string
@@ -269,7 +385,47 @@ interface MatrixAccount {
 - 支持按平台/状态筛选；P2 支持重试。
 - 发布结果详情展示每个平台的 `message`/`exitCode`。
 
-### 5.5 设置
+### 5.5 发布审批
+
+发布前必须有审批；审批通过后直接执行，不再做二次确认。
+
+状态机：
+
+```text
+draft
+  → pending_approval
+  → approved
+  → queued
+  → submitted / running
+  → success | partial | failed
+
+pending_approval → rejected
+draft/approved → cancelled
+```
+
+规则：
+
+- 用户提交发布单后进入 `pending_approval`，不调用 MatrixMedia。
+- 审批人通过后状态变为 `approved`，发布 worker 立即入队并调用 Gateway。
+- **审批通过后不再弹“确认发布”对话框**；审批本身就是唯一确认。
+- 被拒绝的发布单不能直接重试，必须修改内容后重新提交审批。
+- 已审批内容和媒体引用不可静默修改；修改后审批失效，重新走审批。
+- 审批记录写入 `approved_by`、`approved_at`、`approval_note`，并进入审计日志。
+- 审批人/角色由配置决定；如果接入工作流，则由工作流审批节点推进状态。
+- 定时发布仍在审批通过后排队，到点执行；到点不再次确认。
+
+### 5.6 平台可配置
+
+平台列表不写死：
+
+- Gateway 的 `GET /v1/platforms` 返回 MatrixMedia 当前支持的平台、code、名称、别名和自动化状态。
+- CES 配置可选 `enabledPlatforms`（允许列表）和 `disabledPlatforms`（排除列表）；空允许列表表示使用 Gateway 全部平台。
+- 设置页展示当前启用平台；发布页只展示启用且已登录的平台。
+- 新增平台时优先只更新 Gateway/MatrixMedia，CES 配置不需要发版；如果平台字段有特殊差异，由 Gateway 适配。
+- 账号 DTO 的平台字段使用 `platform: string`，不使用封闭联合类型。
+- 未知平台或 MatrixMedia 不支持的平台不显示在发布表单中。
+
+### 5.7 设置
 
 放在“平台设置”下，页面 key `matrixmedia-settings`：
 
@@ -277,6 +433,9 @@ interface MatrixAccount {
 - Gateway Token（密码输入，保存后不回显）
 - 测试连接
 - 默认平台/默认账号（可选）
+- 启用平台（可多选，默认来自 Gateway）
+- 审批策略/审批人
+- 对象存储 provider、endpoint、bucket 前缀
 - 媒体 URL 前缀/允许的存储域名（安全限制）
 
 设置保存在 CES 服务端：
@@ -321,6 +480,19 @@ interface Config {
   requestTimeoutMs: number
   mediaHostAllowlist: string[]
   pollIntervalMs: number
+  enabledPlatforms: string[] // 空 = 使用 Gateway 全部平台
+  disabledPlatforms: string[]
+  approval: {
+    required: boolean        // 默认 true
+    approvers: string[]      // CES 用户/角色标识
+  }
+  media: {
+    provider: 'cos' | 's3' | 'oss'
+    endpoint: string
+    bucket: string
+    prefix: string
+    signedUrlTtlSeconds: number
+  }
 }
 ```
 
@@ -374,12 +546,13 @@ create table matrixmedia_jobs (
 ### 发布
 
 1. 用户选择已登录账号和平台。
-2. 填写标题、简介、标签、视频 URL。
-3. CES 检查 URL 白名单。
-4. Host 调 Gateway `/v1/publish`。
-5. 单平台：显示最终结果；多平台：显示 `submitted` 和 job。
-6. 前端轮询 CES job 状态，直到完成/失败/部分成功。
-7. MatrixMedia 登录失效时显示 `login_required`，提示去 GUI 扫码后重试。
+2. 填写标题、简介、标签和对象存储 `MediaRef`（或 HTTPS URL）。
+3. CES 检查 URL/对象存储白名单，生成待审批发布单。
+4. 审批人通过后，发布 worker 在执行时把 `MediaRef` 解析成短期下载 URL。
+5. Host 调 Gateway `/v1/publish`。
+6. 单平台：显示最终结果；多平台：显示 `submitted` 和 job。
+7. 前端轮询 CES job 状态，直到完成/失败/部分成功。
+8. MatrixMedia 登录失效时显示 `login_required`，提示去 GUI 扫码后重试。
 
 ### 账号状态
 
@@ -387,11 +560,12 @@ create table matrixmedia_jobs (
 - 账号状态过期时提示重新登录。
 - 不允许在 CES 页面输入 MatrixMedia 账号密码或 Cookie，登录只在 MatrixMedia GUI 完成。
 
-### 媒体 URL
+### 媒体引用
 
-- MatrixMedia 支持 `http(s)` 远程视频 URL；CES 可继续使用 COS/对象存储的 URL。
-- P1 不做文件上传，避免 CES 与 MatrixMedia 之间传输大文件。
-- 如果必须上传，P2 先上传到 COS，再传 COS URL 给 MatrixMedia。
+- MatrixMedia 支持 `http(s)` 远程视频 URL；CES 主链路传对象存储 `MediaRef`，执行时生成短期 URL。
+- P1 不做 CES 到 MatrixMedia 的文件上传，避免两个服务之间搬大文件。
+- 工作流节点负责把视频生成服务的对象 key 传给发布任务；插件不依赖具体工作流实现。
+- 没有对象存储时仍允许手动 HTTPS URL，但必须通过域名白名单。
 
 ## 8. 现有 DSH 插件与 MCP 的关系
 
@@ -416,7 +590,7 @@ MatrixMedia 仓库自带 `dsh-plugin-matrixmedia`：
 - Gateway Token 只存在 CES 服务端和 Gateway 环境变量中。
 - 媒体 URL 使用白名单，防止 SSRF 和内部地址探测。
 - 不保存平台密码、Cookie、二维码。
-- 发布属于外部平台写操作，需在 UI 明确确认；P2 增加二次确认/发布审批。
+- 发布属于外部平台写操作，必须有审批；审批通过即发布，不再二次确认。
 - 遵守目标平台的内容和自动化规则；账号被风控/封禁的风险由运营方承担。
 - 日志不记录完整视频 URL 查询串、Token 或平台账号敏感信息。
 
@@ -444,28 +618,32 @@ MatrixMedia 仓库自带 `dsh-plugin-matrixmedia`：
 
 1. CES 侧边栏出现“矩阵媒体”。
 2. 可查看 MatrixMedia 平台账号状态。
-3. 可以选择已登录账号和平台，提交视频 URL 发布。
+3. 可以选择已登录账号和平台，提交对象存储媒体引用（或 HTTPS URL）进入审批。
 4. 多平台发布能显示 submitted 和最终结果。
 5. 发布记录可查询。
 6. 可配置 Gateway URL/Token 并测试连接。
 7. 不暴露 30088，不把 Token 发送到浏览器。
-8. 自定义媒体 URL 通过白名单校验。
+8. 对象存储 MediaRef 或自定义媒体 URL 通过白名单/对象存储校验。
+9. 发布单必须审批；审批通过后直接发布，无二次确认。
+10. 平台列表来自 Gateway，启停通过配置控制。
 
 ## 11. 实施分期
 
 ### P1（建议先做）
 
 - MatrixMedia Gateway（最小版：health/platforms/accounts/publish/jobs/history）
-- CES 插件：设置、账号状态、发布表单、发布记录
-- 只支持 HTTPS 视频 URL
+- CES 插件：设置、账号状态、发布表单、发布记录、审批状态
+- 对象存储 `MediaRef` / HTTPS URL；执行时解析短期 URL
+- 审批通过后直接发布，不做二次确认
+- 平台列表从 Gateway 读取，配置启用/禁用
 - 单/多平台，草稿，基本错误处理
 
 ### P2
 
-- COS 上传后自动发布
+- 对象存储上传控件/工作流深度集成
 - 定时发布、封面、创作声明
 - 平台专属字段（视频号商品/短剧/剧集）
-- 重试、取消、审批
+- 重试、取消、审批工作流深度集成
 - 统计与评论只读页
 
 ### P3
@@ -483,16 +661,16 @@ MatrixMedia 仓库自带 `dsh-plugin-matrixmedia`：
 | 30088 只有 loopback + 本地 Origin 守卫 | 必须部署 Gateway，不能直接暴露 |
 | 平台登录需要 GUI 扫码 | Gateway 不承担登录；用 VNC/远程桌面 |
 | 多平台最终结果异步 | Gateway job + 发布记录轮询，不谎报成功 |
-| 大文件传输 | P1 只传 URL；P2 走 COS |
+| 预签名 URL 过期 | 执行时生成；审批/定时等待期间不生成 URL |
+| 大文件传输 | P1 只传 MediaRef/URL；视频由对象存储承载 |
 | 平台风控/封号 | 限速、人工确认、遵守平台规则 |
 | MatrixMedia 版本升级导致接口变化 | Gateway 固定版本兼容层，插件不直接依赖内部实现 |
 | Token 泄漏 | 服务端保存、私有网络、轮换、最小权限 |
 
 待确认：
 
-1. MatrixMedia 部署在 Windows、macOS 还是 Linux Xvfb？
-2. CES 与 MatrixMedia 是否在同一内网，是否需要公网 TLS 反代？
-3. P1 是否只支持视频 URL，还是必须支持本地上传？
-4. 是否需要发布审批/二次确认，还是单用户直接发布？
-5. 首批平台是否只做抖音、视频号、小红书，还是一次性开放 8 个平台？
-6. 是否需要把发布记录/统计同步到 CES 仪表盘？
+1. 专用主机的具体规格（Windows 版本、CPU/内存/磁盘、是否需要 GPU）？
+2. 对象存储使用现有 COS，还是独立 S3/OSS？bucket/prefix 如何分配？
+3. 审批人由 CES 用户、外部工作流角色，还是固定管理员担任？
+4. 首批启用平台清单（由配置决定，不写死）？
+5. 是否需要把发布记录/统计同步到 CES 仪表盘？

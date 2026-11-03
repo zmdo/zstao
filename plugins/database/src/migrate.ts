@@ -7,7 +7,7 @@ const TABLE = 'console_schema_migrations'
 /** SQL file names in the order they should run. */
 export async function migrationFiles(directory: string): Promise<string[]> {
   const names = await readdir(directory)
-  return names.filter((name) => name.endsWith('.sql')).sort()
+  return names.filter((name) => name.endsWith('.sql') && !name.startsWith('._')).sort()
 }
 
 /**

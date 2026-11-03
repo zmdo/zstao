@@ -1,0 +1,43 @@
+services:
+  ces:
+    image: ${CES_IMAGE:-ces:0.0.1-alpha}
+    container_name: ces
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: "9090"
+      DSH_TELEMETRY_DISABLED: "1"
+      TMPDIR: /dsh-home/tmp
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      # DSH_HOME: credentials, sessions, logs, profile state and Harness data.
+      - ./data/dsh:/dsh-home
+      # Workspace files imported by the console.
+      - ./data/workspaces:/srv/workspaces
+      # Server-management component definitions.
+      - ./data/components:/srv/components
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - 1panel-network
+    mem_limit: 2g
+    cpus: 2
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:mode=1777,size=256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "node", "/app/docker/healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  1panel-network:
+    external: true

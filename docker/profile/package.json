@@ -17,8 +17,8 @@
     "@smp/console-settings-models": "file:/app/plugins/settings-models",
     "@smp/console-workspace-groups": "file:/app/plugins/workspace-groups",
     "@smp/console-workspace-storage": "file:/app/plugins/workspace-storage",
-    "@smp/console-cos": "file:E:/Projects/zstao/plugins/cos",
-    "@smp/cos-attachments": "file:E:/Projects/zstao/plugins/cos-attachments"
+    "@smp/console-cos": "file:/app/plugins/cos",
+    "@smp/cos-attachments": "file:/app/plugins/cos-attachments"
   },
   "dsh": {
     "profile": {

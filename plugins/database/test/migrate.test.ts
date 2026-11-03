@@ -11,6 +11,7 @@ test('migration files run in name order', async () => {
   await writeFile(join(directory, 'notes.txt'), '')
   await writeFile(join(directory, '0002_b.sql'), 'select 1')
   await writeFile(join(directory, '0001_a.sql'), 'select 1')
+  await writeFile(join(directory, '._0000_baseline.sql'), 'not sql')
   assert.deepEqual(await migrationFiles(directory), ['0001_a.sql', '0002_b.sql'])
 })
 

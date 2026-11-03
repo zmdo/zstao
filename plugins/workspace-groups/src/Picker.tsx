@@ -2,8 +2,9 @@ import { createElement, useEffect, useMemo, useRef, useSyncExternalStore, type C
 import type { GroupClient } from './client-api.ts'
 import type { Workspace, WorkspaceSnapshot } from './contract.ts'
 import type { Slots } from './bridge.ts'
+import { DirectoryTreeFlow, type DirectoryFlowProps } from './DirectoryPicker.tsx'
 import { PickerController, pickerGroup, pickerWorkspaces } from './picker-controller.ts'
-import { GROUP_FLOW_SLOT, NATIVE_FLOW_SLOT, PICKER_SLOT, mirrorPickerFlow } from './picker-flow.ts'
+import { GROUP_FLOW_SLOT, NATIVE_FLOW_SLOT, PICKER_SLOT, SIDEBAR_FLOW_SLOT } from './picker-flow.ts'
 import { UNASSIGNED_GROUP_ID } from './rules.ts'
 
 interface PickerProps {
@@ -25,8 +26,13 @@ export function installPicker(slots: Slots, client: GroupClient): void {
       name: PICKER_SLOT, priority: -100, locale: 'workspace',
       children: { [GROUP_FLOW_SLOT]: { kind: 'single', scope: 'root' } },
     }, (props: PickerProps) => <GroupPicker {...props} slots={slots} client={client} />)
-    const stopFlow = slots.inject(NATIVE_FLOW_SLOT, () => slots.inject(GROUP_FLOW_SLOT, () => mirrorPickerFlow(slots)))
-    return () => { stopFlow(); dispose() }
+    const flow = (props: DirectoryFlowProps) => <DirectoryTreeFlow {...props} client={client} />
+    const stops = [
+      slots.inject(GROUP_FLOW_SLOT, () => slots.register({ name: GROUP_FLOW_SLOT, priority: 100, locale: 'workspace' }, flow)),
+      slots.inject(NATIVE_FLOW_SLOT, () => slots.register({ name: NATIVE_FLOW_SLOT, priority: 100, locale: 'workspace' }, flow)),
+      slots.inject(SIDEBAR_FLOW_SLOT, () => slots.register({ name: SIDEBAR_FLOW_SLOT, priority: 100, locale: 'workspace' }, flow)),
+    ]
+    return () => { for (const stop of stops) stop(); dispose() }
   })
 }
 

@@ -2,6 +2,7 @@ import type { Slots, SlotEntry } from './bridge.ts'
 
 export const PICKER_SLOT = 'conversation.hero.workspace'
 export const NATIVE_FLOW_SLOT = 'conversation.hero.workspace.directoryFlow'
+export const SIDEBAR_FLOW_SLOT = 'sidebar.workspaces.directoryFlow'
 export const GROUP_FLOW_SLOT = 'smp.workspace-groups.picker.directoryFlow'
 
 /** Reuse the installed directory flow in an owned alias; the original child stays with its native entry. */

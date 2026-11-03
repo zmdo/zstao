@@ -1,10 +1,18 @@
 # CES 仪表盘插件设计
 
-- 状态：方案设计，待评审
+- 状态：方案设计（核心决策已确认）
 - 日期：2026-11-04
 - 分支：`feat/dashboard`
 - 插件包名：`@smp/console-dashboard`
 - 目标：在侧边栏提供一个可直接打开的仪表盘，展示账户余额、投入、盈利、最近单据和投入/产出趋势，并提供稳定的插件数据接入点
+
+## 0. 已确认决策
+
+- 盈利金额 = 收入 - 支出，即净收益。
+- 默认时间范围 = 近 30 天。
+- 默认显示币种 = CNY，可切换 USD；使用配置汇率折算，不在 P1 接实时汇率 API。
+- 首批接入 = 模型调用：余额、调用花费、单据推送。
+- 侧边栏位置 = 最上方。
 
 ## 1. 背景
 
@@ -34,7 +42,7 @@ CES 目前有服务器管理、COS、工作区组等栏目，但没有一个统�
 - 不做支付、转账、充值、扣款等资金操作。
 - 不做发票 OCR、文件上传、账单 PDF 解析。
 - 不做多用户权限体系；CES 仍是单用户控制台。
-- 不做汇率换算和跨币种合并（P1 仅 CNY；表结构预留 currency）。
+- 不做实时汇率行情；P1 使用部署配置的 USD/CNY 汇率，支持 CNY/USD 显示切换。
 - 不替代服务器管理、模型设置等原有页面。
 - 不把账户密钥、API Key、发票原文存进仪表盘。
 
@@ -51,7 +59,7 @@ CES 目前有服务器管理、COS、工作区组等栏目，但没有一个统�
     groupLabel: () => copy.groupTitle, // 仪表盘
     icon: 'chart',
   }),
-  order: 0,
+  order: -2,
 }
 ```
 
@@ -59,14 +67,15 @@ CES 目前有服务器管理、COS、工作区组等栏目，但没有一个统�
 
 - 不设置 `navigation: 'sidebar'`。默认 `tabs` 模式下，只有一个页面的栏目会渲染为**可直接点击的侧边栏项**，而不是带展开箭头的父菜单。
 - `icon` 使用新增的 `chart` 图标；如果暂不改 frame，则先退回 `audit`/`box`，但不建议长期使用。
+- 侧边栏分组顺序使用 `order: -2`，位于“对话 / Harness”之上。
 - 点击侧边栏“仪表盘”直接打开页面。
-- 页面标题、范围切换和刷新按钮放在页面内容区顶部。
+- 页面标题、范围切换、币种切换和刷新按钮放在页面内容区顶部。
 
 ## 4. 页面布局
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────┐
-│ 仪表盘                                      [近7天] [近30天] [本月] [全部] [刷新] │
+│ 仪表盘                     [CNY|USD] [近7天] [近30天] [本月] [全部] [刷新] │
 ├──────────────────────────────────────────────────────────────────────┤
 │ ┌────────────────────┐ ┌────────────────────┐ ┌────────────────────┐ │
 │ │ 账户余额            │ │ 投入金额            │ │ 盈利金额            │ │
@@ -90,7 +99,7 @@ CES 目前有服务器管理、COS、工作区组等栏目，但没有一个统�
 三张卡片横向排列；窄屏下纵向堆叠。
 
 1. **账户余额**
-   - 主值：所有启用账户最新余额之和（基础币种）。
+   - 主值：所有启用账户最新余额折算到当前显示币种后的合计。
    - 副标题：`N 个账户 · 截至 HH:mm`。
    - 点击卡片打开账户明细弹层，按厂商/账户列出余额。
    - 余额是当前快照，不受时间范围切换影响。
@@ -136,6 +145,21 @@ CES 目前有服务器管理、COS、工作区组等栏目，但没有一个统�
 - `720–1099px`：卡片保持三列但缩小；图表/列表改为上下。
 - `< 720px`：卡片纵向堆叠；图表高度压缩；单据列表卡片式展示。
 
+### 4.4 币种切换
+
+- 页面顶部提供 `CNY | USD` 切换，默认 CNY。
+- 切换只改变**展示币种**；数据库保留每条账户/余额/单据的原始币种。
+- 后端按配置汇率折算到展示币种，返回 `fx` 信息：
+  - 汇率值
+  - 汇率时间
+  - 汇率来源（P1 为 `config`）
+- 汇率缺失时：
+  - 同币种数据仍可显示；
+  - 需要折算的数据排除，并在页面显示“缺少 USD/CNY 汇率”的提示；
+  - 不静默把 USD 当 CNY 相加。
+- 选择结果只保存在当前浏览器偏好，下次打开沿用。
+- 账户明细同时显示原币金额和折算金额。
+
 ## 5. 指标口径
 
 必须在 UI 和接口层保持一致，避免“余额”“投入”“盈利”各算一套。
@@ -148,7 +172,8 @@ balance = Σ latest_balance(account)
 
 - 每个 `active` 账户取 `captured_at` 最新的一条余额快照。
 - 同一账户旧快照不累加。
-- 只统计基础币种（P1 为 CNY）。
+- 每个账户的原币金额按展示币种折算后汇总；缺少汇率时排除并提示。
+- 默认展示币种为 CNY，可切换 USD。
 - `asOf` 取各账户最新快照时间的最大值；账户明细显示各自时间。
 - 没有快照的账户不计入总额，但仍在账户明细中显示“暂无余额”。
 
@@ -175,6 +200,18 @@ profit = Σ income(amount_minor) - Σ expense(amount_minor)
 - 可选：`近 7 天`、`近 30 天`、`本月`、`全部`。
 - 余额不受范围影响；投入、盈利、图表、最近单据受范围影响。
 - 时间边界按配置时区（默认 `Asia/Shanghai`）计算，接口传绝对时间 `from`/`to`，避免客户端时区歧义。
+
+### 5.5 币种换算
+
+```text
+converted = amount_minor × rate(original → display) / 10^(originalScale - displayScale)
+```
+
+- P1 只支持 CNY、USD；`usdCnyRate` 在部署配置中提供（1 USD = N CNY）。
+- USD → CNY 使用 `usdCnyRate`；CNY → USD 使用其倒数。
+- 折算结果四舍五入到展示币种最小单位，**先折算再汇总**，避免先汇总后换算的误差。
+- 响应中返回 `displayCurrency` 和 `fx`；前端在金额下方显示汇率与时间。
+- P2 接入汇率表/行情 API；P3 支持更多币种。
 
 ## 6. 数据模型
 
@@ -330,7 +367,7 @@ type DashboardEvent =
 接入示例：
 
 ```ts
-export const inject = ['database', 'dashboard']
+export const inject = ['dashboard']
 
 export function apply(ctx: Context): void {
   ctx.effect(() => {
@@ -407,12 +444,72 @@ P2 可以增加 `dashboard.widget` 客户端 slot：
 - keyed slot，owner 提供 `summary` 和 `range`。
 - 这不是数据接入的替代；数据仍通过 `DashboardService` 进入统一模型。
 
+### 7.4 首批模型调用接入（P1）
+
+首批接入单独做成配套适配器 `@smp/console-model-billing`，避免仪表盘本身绑定模型厂商：
+
+```text
+模型调用 → llm/stream usage → 价格计算 → dashboard transaction
+厂商余额 → 定时查询/API → dashboard account + balance
+厂商账单 → 账单同步/手工推送 → dashboard transaction
+```
+
+#### 调用花费
+
+- 注入 `llm`，通过 `llm/stream` waterfall 包装 `next()`，只读收集 `usage` chunk，原样透传所有 chunk。
+- 必须调用 `next()`，不能截断模型流。
+- 从 `GenerateOptions`/会话上下文中拿 provider、model、session/attempt 标识；取不到时使用请求指纹。
+- 计价参数按模型配置：
+
+```ts
+interface ModelPrice {
+  provider: string
+  model: string
+  currency: 'CNY' | 'USD'
+  inputPerMillion: string
+  outputPerMillion: string
+  cacheReadPerMillion?: string
+  cacheWritePerMillion?: string
+}
+```
+
+- 成本 = 输入 token × 单价 + 输出 token × 单价 + 缓存读写费用；不把 token 数当金额。
+- 生成一条 `expense` 单据：
+  - `source = '@smp/console-model-billing'`
+  - `externalId = model-call:<provider>:<attemptId>`（无 attemptId 时使用稳定指纹）
+  - `title = 模型调用 · <model>`
+  - `metadata` 只保留 provider、model、token 计数，不保存 prompt/回复正文。
+- 价格表缺失时不写入金额为 0 的单据；记录告警，P2 再补“未计价调用”列表。
+- 同一 attempt 重放时由 dashboard 幂等去重。
+
+#### 余额
+
+- 每个模型厂商一个账户，例如 `DeepSeek`、`OpenAI`。
+- 有余额 API 的厂商（P1 先做 DeepSeek）定时拉取，推送 `account` + `balance`：
+  - 账户 `externalId = provider id`
+  - 余额快照 `externalId = balance:<provider>:<capturedAt>`
+- 拉取失败只记日志，不清空旧余额；页面继续显示最后一次成功快照及其时间。
+- 没有余额 API 的厂商可通过脚本/HTTP ingest 手工推送。
+
+#### 单据推送
+
+- 厂商账单/发票同步走 `dashboard.ingest` 或 HTTP 接入点，不放进模型调用路径。
+- 第一版支持“账单导入脚本/适配器”；不在仪表盘内做 PDF OCR。
+- 账单的 `externalId` 使用厂商账单号，重复同步幂等。
+- 账单币种保留原币，由仪表盘按显示币种折算。
+
+#### 接入边界
+
+- 模型计费适配器可以依赖 `llm`、`credentials`、`settings`、`dashboard`；仪表盘不反向依赖模型插件。
+- 模型适配器未加载时，仪表盘仍可展示手工推送或其他来源的数据。
+- 模型价格和厂商余额配置属于适配器，不写死进仪表盘。
+
 ## 8. 后端接口
 
 ### 8.1 概览
 
 ```http
-GET /console-api/dashboard/summary?range=30d
+GET /console-api/dashboard/summary?range=30d&currency=CNY
 ```
 
 返回：
@@ -420,7 +517,14 @@ GET /console-api/dashboard/summary?range=30d
 ```ts
 interface DashboardSummary {
   asOf: string
-  currency: 'CNY'
+  displayCurrency: 'CNY' | 'USD'
+  fx: {
+    base: 'CNY' | 'USD'
+    quote: 'CNY' | 'USD'
+    rate: string
+    asOf: string
+    source: 'config'
+  } | null
   range: { from: string; to: string; label: string }
   balance: {
     amount: string
@@ -429,6 +533,8 @@ interface DashboardSummary {
       id: string
       provider: string
       name: string
+      nativeAmount: string
+      nativeCurrency: 'CNY' | 'USD'
       amount: string
       asOf: string | null
     }>
@@ -440,6 +546,7 @@ interface DashboardSummary {
     income: string
     expense: string
   }>
+  warnings?: string[]
   recent: Array<{
     id: string
     title: string
@@ -457,11 +564,14 @@ interface DashboardSummary {
 - 无缓存：`cache-control: no-store`。
 - 所有金额以十进制字符串返回，避免 JSON number 精度问题。
 - `range=all` 时 `from` 取最早单据时间或空；图表按最近 90 天分桶并注明。
+- `currency` 只接受 `CNY`/`USD`；缺省 CNY。
+- `fx` 为展示币种相对原币的汇率；同币种数据不需要汇率。
+- 汇率缺失时，`fx=null`，需要折算的金额被排除，并返回 `warnings`。
 
 ### 8.2 单据列表
 
 ```http
-GET /console-api/dashboard/transactions?range=30d&limit=50&cursor=...
+GET /console-api/dashboard/transactions?range=30d&currency=CNY&limit=50&cursor=...
 ```
 
 P1 可以只返回最近若干条；P2 增加 cursor 分页和完整列表抽屉。
@@ -510,6 +620,18 @@ plugins/dashboard/
 │     ├─ dashboard.css
 │     └─ api.ts
 └─ test/
+
+plugins/model-billing/           # 首批模型调用适配器，独立于仪表盘
+├─ package.json
+├─ cordis.patch.yml
+├─ icon.svg
+├─ locale/
+└─ src/
+   ├─ index.ts                   # 注入 llm/credentials/settings/dashboard
+   ├─ usage.ts                   # llm/stream usage 收集
+   ├─ pricing.ts                 # 模型价格表
+   ├─ balance.ts                 # 厂商余额同步
+   └─ receipts.ts                # 账单/单据推送
 ```
 
 客户端：
@@ -567,16 +689,20 @@ export const inject = ['slots', 'locale']
 
 ```ts
 interface Config {
-  baseCurrency: string       // 默认 CNY
-  timeZone: string           // 默认 Asia/Shanghai
-  refreshSeconds: number     // 默认 60
-  ingestToken?: string       // 可选；空表示仅允许同源 cookie
+  defaultCurrency: 'CNY' | 'USD' // 默认 CNY
+  supportedCurrencies: ('CNY' | 'USD')[] // 默认 ['CNY', 'USD']
+  usdCnyRate: number          // 1 USD = N CNY；缺少时 USD 折算不可用
+  fxAsOf: string              // 汇率配置时间
+  timeZone: string            // 默认 Asia/Shanghai
+  refreshSeconds: number      // 默认 60
+  ingestToken?: string        // 可选；空表示仅允许同源 cookie
 }
 ```
 
-- 配置通过 `Schema` 校验；`baseCurrency` 只接受 3 位大写币种。
+- 配置通过 `Schema` 校验；`defaultCurrency`/`supportedCurrencies` 只接受 `CNY`/`USD`。
+- `usdCnyRate` 必须是正数；缺失时界面显示汇率提示，USD 数据不参与 CNY 汇总。
 - 部署时在 `docker/render-profile.mjs` 生成 `smp-dashboard` 配置；token 从环境变量读取，不写死。
-- `docker/profile/package.json` 增加 `@smp/console-dashboard` 依赖和 bundle。
+- `docker/profile/package.json` 增加 `@smp/console-dashboard` 与首批适配器 `@smp/console-model-billing` 的依赖和 bundle。
 - `cordis.patch.yml`：
 
 ```yaml
@@ -587,6 +713,7 @@ interface Config {
 
 - 新增 `plugins/database/migrations/0046_dashboard.sql`；由 database 插件启动时执行。
 - 侧边栏图标 `chart` 需要在 `plugins/frame/src/client.tsx` 的 `NavGlyph` 中增加一个分支；这是唯一的 shell 侧小改动。
+- `docker/render-profile.mjs` 增加 `smp-dashboard` 配置：默认币种、USD/CNY 汇率、时区、刷新间隔。
 
 ## 14. 测试与验收
 
@@ -594,7 +721,7 @@ interface Config {
 
 - 金额字符串 ↔ minor units：`0.01`、`1.00`、`999999.99`、非法输入。
 - 范围计算：近 7 天、近 30 天、本月、全部；时区边界。
-- 汇总：最新余额去重、收入/支出/净利、空数据、负利润。
+- 汇总：最新余额去重、收入/支出/净利、CNY/USD 折算、空数据、负利润。
 - 幂等：重复 account/balance/transaction 返回 duplicate。
 - 来源隔离：两个 source 使用相同 externalId 不冲突。
 
@@ -603,7 +730,9 @@ interface Config {
 - 迁移能在现有 PostgreSQL 上执行。
 - `POST /console-api/dashboard/ingest` 的认证、校验、重复请求。
 - `GET /console-api/dashboard/summary` 的认证和金额字符串。
-- 页面两个入口（侧边栏直接打开）加载正常。
+- 页面入口（侧边栏直接打开）加载正常。
+- CNY/USD 切换和汇率缺失提示。
+- 模型调用适配器产生的单据可幂等重放。
 
 ### 验收标准
 
@@ -614,8 +743,10 @@ interface Config {
 5. 下半部分左侧趋势图、右侧最近单据。
 6. 其他插件可通过 `ctx.dashboard.ingest` 推送账户、余额、单据。
 7. HTTP 接入点可幂等重放，重复数据不重复计数。
-8. 空数据、加载、错误、窄屏均有正确状态。
-9. 不引入外部图表依赖，不修改 DSH 核心插件生命周期约定。
+8. CNY/USD 切换后金额按配置汇率折算，缺少汇率时明确提示。
+9. 模型调用适配器能推送余额、调用花费和单据。
+10. 空数据、加载、错误、窄屏均有正确状态。
+11. 不引入外部图表依赖，不修改 DSH 核心插件生命周期约定。
 
 ## 15. 实施顺序
 
@@ -623,7 +754,9 @@ interface Config {
 
 - 迁移、repository、DashboardService
 - summary 路由与认证
-- 页面注册、三张卡片、趋势图、最近单据
+- 页面注册（侧边栏最上方）、三张卡片、趋势图、最近单据
+- CNY/USD 切换与配置汇率折算
+- `@smp/console-model-billing` 适配器：DeepSeek 余额、调用花费、账单推送
 - 手动/定时刷新
 - 基础单元/集成测试
 
@@ -638,7 +771,7 @@ interface Config {
 ### P3
 
 - `dashboard.widget` 客户端扩展槽
-- 多币种与汇率
+- 更多币种、汇率行情与历史
 - 目标/预算、环比、导出
 - 账户自动发现/同步适配器
 
@@ -649,16 +782,15 @@ interface Config {
 | 各插件对“收入/支出”口径不一致 | 接入契约强制 `type`，UI 不猜；文档写明 |
 | 同一账户重复推送导致余额翻倍 | 按账户取最新快照，不累加快照历史 |
 | 重复单据 | `(source, external_id)` 唯一 + duplicate 返回 |
-| 多币种直接相加 | P1 只合并 CNY；其他币种单独展示/排除 |
+| 多币种直接相加 | 按展示币种配置汇率折算；缺失时排除并提示 |
 | 推送量过大 | 批量上限、索引、分页；P2 流式/队列 |
 | 浏览器时区与业务时区不一致 | 服务端按配置时区聚合，接口返回绝对时间 |
 | 仪表盘成为插件硬依赖 | 推荐 host service；外部集成走 HTTP；文档说明加载顺序 |
 
 待确认：
 
-1. “盈利金额”是净收益（收入-支出），还是只想展示总收入？本设计按净收益。
-2. 默认时间范围用“近 30 天”还是“本月”？
-3. 余额是否需要支持多币种换算？P1 先只做 CNY。
-4. 首批接入方是服务器管理、模型调用，还是先手工/脚本推送？
-5. 是否需要“全部单据”独立页面，还是只在仪表盘内抽屉展示？
-6. 侧边栏仪表盘放在顶部还是靠近平台设置的位置？
+1. USD/CNY 汇率由部署配置手工维护，还是后续接入行情 API？P1 先手工配置。
+2. 首批仅 DeepSeek 模型调用，还是同时支持 OpenAI 等厂商的余额接口？
+3. 模型价格表由适配器配置维护，还是跟随后台模型配置自动同步？
+4. 是否需要“全部单据”独立页面，还是只在仪表盘内抽屉展示？
+5. 账单导入第一版是否需要文件上传（CSV）？当前设计只做 API/脚本推送。

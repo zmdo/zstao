@@ -28,9 +28,9 @@ export function installPicker(slots: Slots, client: GroupClient): void {
     }, (props: PickerProps) => <GroupPicker {...props} slots={slots} client={client} />)
     const flow = (props: DirectoryFlowProps) => <DirectoryTreeFlow {...props} client={client} />
     const stops = [
-      slots.inject(GROUP_FLOW_SLOT, () => slots.register({ name: GROUP_FLOW_SLOT, priority: 100, locale: 'workspace' }, flow)),
-      slots.inject(NATIVE_FLOW_SLOT, () => slots.register({ name: NATIVE_FLOW_SLOT, priority: 100, locale: 'workspace' }, flow)),
-      slots.inject(SIDEBAR_FLOW_SLOT, () => slots.register({ name: SIDEBAR_FLOW_SLOT, priority: 100, locale: 'workspace' }, flow)),
+      slots.inject(GROUP_FLOW_SLOT, () => slots.register({ name: GROUP_FLOW_SLOT, priority: -100, locale: 'workspace' }, flow)),
+      slots.inject(NATIVE_FLOW_SLOT, () => slots.register({ name: NATIVE_FLOW_SLOT, priority: -100, locale: 'workspace' }, flow)),
+      slots.inject(SIDEBAR_FLOW_SLOT, () => slots.register({ name: SIDEBAR_FLOW_SLOT, priority: -100, locale: 'workspace' }, flow)),
     ]
     return () => { for (const stop of stops) stop(); dispose() }
   })

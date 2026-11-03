@@ -281,6 +281,24 @@ GATEWAY_PORT=30188
 - 使用 `MATRIXMEDIA_BIN` 调用 CLI 读取账号/历史；若只依赖 HTTP，可逐步替换为 `/changeData`。
 - Gateway 不保存 MatrixMedia 登录 cookie；登录态仍由 GUI 管理。
 
+### 4.5 并发与队列
+
+MatrixMedia 原生是**单并发**：
+
+- 每个 MatrixMedia 实例只有一个发布任务队列，`taskBusy` 为真时后续任务排队。
+- 一次多平台发布也是**逐个平台入队**，不会并行上传多个平台。
+- 视频号任务之间还有额外等待（源码约 4 秒）。
+- 账号统计采集建议与发布共用同一条串行队列，避免同一登录态被并发操作。
+
+因此本方案：
+
+- Gateway/CES 默认 `maxConcurrentPublishes = 1`：同一 MatrixMedia 实例同时只允许一个发布 job。
+- 默认 `maxQueueSize = 20`；超过后拒绝新任务，提示稍后再试。
+- 同一平台账号永远串行，即使未来把并发调大。
+- 远程视频 URL 的下载发生在入队前；Gateway 必须用同一个并发闸门限制下载，避免多个 HTTP 请求同时下载大文件。
+- 如果确实要提高吞吐，增加 MatrixMedia 实例/Gateway，按账号或平台路由；不要靠提高单实例并发。
+- 统计、评论、发布在 Gateway 内共享队列或至少共享账号级互斥。
+
 ## 5. CES 插件形态
 
 新增插件包：
@@ -480,6 +498,8 @@ interface Config {
   requestTimeoutMs: number
   mediaHostAllowlist: string[]
   pollIntervalMs: number
+  maxConcurrentPublishes: number // 默认 1
+  maxQueueSize: number           // 默认 20
   enabledPlatforms: string[] // 空 = 使用 Gateway 全部平台
   disabledPlatforms: string[]
   approval: {
@@ -626,6 +646,7 @@ MatrixMedia 仓库自带 `dsh-plugin-matrixmedia`：
 8. 对象存储 MediaRef 或自定义媒体 URL 通过白名单/对象存储校验。
 9. 发布单必须审批；审批通过后直接发布，无二次确认。
 10. 平台列表来自 Gateway，启停通过配置控制。
+11. 默认单并发发布，队列满时明确拒绝，不把任务无界堆积。
 
 ## 11. 实施分期
 
@@ -663,6 +684,7 @@ MatrixMedia 仓库自带 `dsh-plugin-matrixmedia`：
 | 多平台最终结果异步 | Gateway job + 发布记录轮询，不谎报成功 |
 | 预签名 URL 过期 | 执行时生成；审批/定时等待期间不生成 URL |
 | 大文件传输 | P1 只传 MediaRef/URL；视频由对象存储承载 |
+| 并发过高导致账号风控 | 默认单并发、账号级串行、队列上限；通过增加实例扩容 |
 | 平台风控/封号 | 限速、人工确认、遵守平台规则 |
 | MatrixMedia 版本升级导致接口变化 | Gateway 固定版本兼容层，插件不直接依赖内部实现 |
 | Token 泄漏 | 服务端保存、私有网络、轮换、最小权限 |

@@ -37,7 +37,8 @@ interface Project {
 }
 
 interface Settings {
-  baseUrl: string
+  internalBaseUrl: string
+  externalBaseUrl: string
   username: string
   configured: boolean
   updatedAt: string | null
@@ -61,7 +62,9 @@ function copyOf(active: string) {
     settingsTitle: zh ? '项目管理' : 'Project management',
     name: zh ? '项目' : 'Project',
     oneDev: zh ? 'OneDev 代码仓库' : 'OneDev repository',
-    baseUrl: zh ? 'OneDev 地址' : 'OneDev URL',
+    internalUrl: zh ? '内部访问地址' : 'Internal URL',
+    externalUrl: zh ? '外部访问地址' : 'External URL',
+    externalHint: zh ? '留空时与内部访问地址相同。打开 OneDev 会优先使用外部地址。' : 'Defaults to the internal URL. Open OneDev uses this URL when set.',
     username: zh ? '用户名' : 'Username',
     password: zh ? '密码' : 'Password',
     passwordHint: zh ? '留空表示沿用已保存的密码。' : 'Leave blank to keep the saved password.',
@@ -116,7 +119,7 @@ function messageOf(cause: unknown): string {
 
 function ProjectSettingsPage(props: PageProps) {
   const copy = copyOf(props.locale.getSnapshot().active)
-  const [settings, setSettings] = useState<Settings>({ baseUrl: 'http://10.2.8.9', username: 'admin', configured: false, updatedAt: null })
+  const [settings, setSettings] = useState<Settings>({ internalBaseUrl: 'http://10.2.8.9', externalBaseUrl: 'http://10.2.8.9', username: 'admin', configured: false, updatedAt: null })
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -141,7 +144,7 @@ function ProjectSettingsPage(props: PageProps) {
       const next = await json<Settings>('/settings', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ baseUrl: settings.baseUrl, username: settings.username, password }),
+        body: JSON.stringify({ internalBaseUrl: settings.internalBaseUrl, externalBaseUrl: settings.externalBaseUrl, username: settings.username, password }),
       })
       setSettings(next)
       setPassword('')
@@ -163,7 +166,8 @@ function ProjectSettingsPage(props: PageProps) {
     <Panel className="smp-project-panel" title={copy.settingsTitle}>
       <p className="smp-project-muted">{copy.security}</p>
       <div className="smp-project-form">
-        <label><span>{copy.baseUrl}</span><input value={settings.baseUrl} disabled={loading || saving} onChange={event => setSettings({ ...settings, baseUrl: event.target.value })} /></label>
+        <label><span>{copy.internalUrl}</span><input value={settings.internalBaseUrl} disabled={loading || saving} onChange={event => setSettings({ ...settings, internalBaseUrl: event.target.value })} /></label>
+        <label><span>{copy.externalUrl}</span><input value={settings.externalBaseUrl} disabled={loading || saving} onChange={event => setSettings({ ...settings, externalBaseUrl: event.target.value })} /><small>{copy.externalHint}</small></label>
         <label><span>{copy.username}</span><input value={settings.username} disabled={loading || saving} onChange={event => setSettings({ ...settings, username: event.target.value })} /></label>
         <label><span>{copy.password}</span><input type="password" value={password} placeholder={settings.configured ? '••••••••' : ''} disabled={loading || saving} onChange={event => setPassword(event.target.value)} /><small>{copy.passwordHint}</small></label>
       </div>
@@ -190,8 +194,8 @@ function CodeRepositoriesPage(props: PageProps) {
   useEffect(() => {
     let stopped = false
     setLoading(true)
-    json<{ baseUrl: string; projects: Project[] }>('/projects')
-      .then(body => { if (!stopped) { setProjects(body.projects); setBaseUrl(body.baseUrl); setError('') } })
+    json<{ internalBaseUrl: string; externalBaseUrl: string; projects: Project[] }>('/projects')
+      .then(body => { if (!stopped) { setProjects(body.projects); setBaseUrl(body.internalBaseUrl); setError('') } })
       .catch(cause => { if (!stopped) setError(messageOf(cause)) })
       .finally(() => { if (!stopped) setLoading(false) })
     return () => { stopped = true }

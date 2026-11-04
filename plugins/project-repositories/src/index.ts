@@ -46,7 +46,8 @@ export function apply(ctx: HostCtx): void {
 }
 
 interface Settings {
-  baseUrl: string
+  internalBaseUrl: string
+  externalBaseUrl: string
   username: string
   passwordCiphertext: string
   updatedAt: string | null
@@ -65,15 +66,20 @@ interface OneDevProject {
 
 async function readSettings(file: string): Promise<Settings> {
   const fallback: Settings = {
-    baseUrl: 'http://10.2.8.9',
+    internalBaseUrl: 'http://10.2.8.9',
+    externalBaseUrl: 'http://10.2.8.9',
     username: 'admin',
     passwordCiphertext: '',
     updatedAt: null,
   }
   try {
-    const raw = JSON.parse(await readFile(file, 'utf8')) as Partial<Settings>
+    const raw = JSON.parse(await readFile(file, 'utf8')) as Partial<Settings> & { baseUrl?: string }
+    const internal = typeof raw.internalBaseUrl === 'string' && raw.internalBaseUrl !== ''
+      ? raw.internalBaseUrl
+      : typeof raw.baseUrl === 'string' && raw.baseUrl !== '' ? raw.baseUrl : fallback.internalBaseUrl
     return {
-      baseUrl: typeof raw.baseUrl === 'string' && raw.baseUrl !== '' ? raw.baseUrl : fallback.baseUrl,
+      internalBaseUrl: internal,
+      externalBaseUrl: typeof raw.externalBaseUrl === 'string' && raw.externalBaseUrl !== '' ? raw.externalBaseUrl : internal,
       username: typeof raw.username === 'string' && raw.username !== '' ? raw.username : fallback.username,
       passwordCiphertext: typeof raw.passwordCiphertext === 'string' ? raw.passwordCiphertext : '',
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : null,
@@ -85,7 +91,8 @@ async function readSettings(file: string): Promise<Settings> {
 
 function publicSettings(settings: Settings): Record<string, unknown> {
   return {
-    baseUrl: settings.baseUrl,
+    internalBaseUrl: settings.internalBaseUrl,
+    externalBaseUrl: settings.externalBaseUrl,
     username: settings.username,
     configured: settings.passwordCiphertext !== '',
     updatedAt: settings.updatedAt,
@@ -101,7 +108,10 @@ async function settingsRoute(ctx: HostCtx, file: string, request: IncomingMessag
   if (request.method !== 'POST') { send(response, 405, { detail: '需要 GET 或 POST' }); return }
   try {
     const body = await readJson(request)
-    const baseUrl = normalizeBaseUrl(typeof body.baseUrl === 'string' ? body.baseUrl : '')
+    const rawInternal = typeof body.internalBaseUrl === 'string' ? body.internalBaseUrl : body.baseUrl
+    const internalBaseUrl = normalizeBaseUrl(typeof rawInternal === 'string' ? rawInternal : '', '内部访问地址')
+    const rawExternal = typeof body.externalBaseUrl === 'string' ? body.externalBaseUrl.trim() : ''
+    const externalBaseUrl = rawExternal === '' ? internalBaseUrl : normalizeBaseUrl(rawExternal, '外部访问地址')
     const username = typeof body.username === 'string' ? body.username.trim() : ''
     if (username === '') throw new Error('用户名不能为空')
     const previous = await readSettings(file)
@@ -109,7 +119,7 @@ async function settingsRoute(ctx: HostCtx, file: string, request: IncomingMessag
     const passwordCiphertext = password === '' ? previous.passwordCiphertext : ctx.secrets.encrypt(password)
     if (passwordCiphertext === '') throw new Error('首次配置必须填写 OneDev 密码')
     await mkdir(dirname(file), { recursive: true })
-    const next: Settings = { baseUrl, username, passwordCiphertext, updatedAt: new Date().toISOString() }
+    const next: Settings = { internalBaseUrl, externalBaseUrl, username, passwordCiphertext, updatedAt: new Date().toISOString() }
     const temporary = join(dirname(file), `.project-management-${randomUUID()}.json`)
     await writeFile(temporary, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
     await rename(temporary, file)
@@ -138,7 +148,8 @@ async function projectsRoute(ctx: HostCtx, file: string, request: IncomingMessag
     const settings = await readSettings(file)
     const projects = await listProjects(ctx, settings)
     send(response, 200, {
-      baseUrl: settings.baseUrl,
+      internalBaseUrl: settings.internalBaseUrl,
+      externalBaseUrl: settings.externalBaseUrl,
       configured: settings.passwordCiphertext !== '',
       projects: projects.map(project => ({
         id: project.id,
@@ -148,7 +159,7 @@ async function projectsRoute(ctx: HostCtx, file: string, request: IncomingMessag
         codeManagement: project.codeManagement === true,
         issueManagement: project.issueManagement === true,
         packManagement: project.packManagement === true,
-        webUrl: `${settings.baseUrl}/projects/${project.path.split('/').map(encodeURIComponent).join('/')}`,
+        webUrl: `${settings.externalBaseUrl}/projects/${project.path.split('/').map(encodeURIComponent).join('/')}`,
         createDate: project.createDate ?? '',
       })),
     })
@@ -168,7 +179,7 @@ async function listProjects(ctx: HostCtx, settings: Settings): Promise<OneDevPro
   const authorization = `Basic ${Buffer.from(`${settings.username}:${password}`).toString('base64')}`
   let response: globalThis.Response
   try {
-    response = await fetch(`${settings.baseUrl}/~api/projects?offset=0&count=100`, {
+    response = await fetch(`${settings.internalBaseUrl}/~api/projects?offset=0&count=100`, {
       headers: { accept: 'application/json', authorization },
       signal: AbortSignal.timeout(12_000),
     })
@@ -184,13 +195,13 @@ async function listProjects(ctx: HostCtx, settings: Settings): Promise<OneDevPro
   return value as OneDevProject[]
 }
 
-function normalizeBaseUrl(value: string): string {
+function normalizeBaseUrl(value: string, label: string): string {
   const input = value.trim()
-  if (input === '') throw new Error('OneDev 地址不能为空')
+  if (input === '') throw new Error(`${label}不能为空`)
   let url: URL
-  try { url = new URL(input) } catch { throw new Error('OneDev 地址不是合法 URL') }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('OneDev 地址只支持 HTTP 或 HTTPS')
-  if (url.username !== '' || url.password !== '') throw new Error('OneDev 地址不能包含用户名或密码')
+  try { url = new URL(input) } catch { throw new Error(`${label}不是合法 URL`) }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error(`${label}只支持 HTTP 或 HTTPS`)
+  if (url.username !== '' || url.password !== '') throw new Error(`${label}不能包含用户名或密码`)
   return `${url.origin}${url.pathname.replace(/\/+$/, '')}`
 }
 

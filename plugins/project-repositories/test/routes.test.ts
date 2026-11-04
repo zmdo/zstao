@@ -51,7 +51,7 @@ before(async () => {
   upstreamOrigin = `http://127.0.0.1:${address.port}`
   await writeFile(join(root, 'project-management.json'), JSON.stringify({ internalBaseUrl: upstreamOrigin, externalBaseUrl: 'https://public.example', username: 'admin', passwordCiphertext: 'encrypted', updatedAt: '2026-11-04' }))
   apply({ consoleSession: { read: async cookie => cookie === 'session=yes' ? 'admin' : undefined }, secrets: { encrypt: v => `enc:${v}`, decrypt: () => 'one-secret' },
-    webServer: { register: route => { handler = route.handler; return () => {} } }, effect: run => { cleanup = run() } })
+    webServer: { register: route => { handler = route.handler; return () => {} } }, tools: { register: () => () => {} }, systemPrompt: { section: () => () => {} }, effect: run => { cleanup = run() } })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const local = server.address(); assert(local && typeof local !== 'string'); origin = `http://127.0.0.1:${local.port}`
 })

@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ApiError, OneDev, commitSha, decryptPassword, imageType, preview, projectId, repositoryPath } from './onedev.ts'
 import type { Secrets } from './onedev.ts'
 import { API, DOWNLOAD_BYTES } from './shared.ts'
@@ -11,13 +12,67 @@ interface HostCtx {
   consoleSession: { read(cookieHeader: string): Promise<unknown> }
   secrets: Secrets
   webServer: { register(route: { kind: 'prefix'; path: string; handler(request: IncomingMessage, response: ServerResponse): Promise<void> }): () => void }
+  tools: { register(tool: unknown): () => void }
+  systemPrompt: { section(section: { name: string; order: number; text: string }): () => void }
   effect(run: () => (() => void | Promise<void>)): void
 }
 interface Settings { internalBaseUrl: string; externalBaseUrl: string; username: string; passwordCiphertext: string; updatedAt: string | null }
-export const inject = ['consoleSession', 'secrets', 'webServer']
+export const inject = ['consoleSession', 'secrets', 'webServer', 'tools', 'systemPrompt']
 
 export function apply(ctx: HostCtx): void {
   const file = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'project-management.json')
+  ctx.effect(() => ctx.systemPrompt.section({
+    name: 'smp-project-repositories:git',
+    order: 2500,
+    text:
+      'CES has a configured OneDev Git service for new projects. When the user asks to create or write a new project, first call git_create with a lowercase project slug and a short description; do not create only local files for a new project. ' +
+      'An existing project is returned by git_create. After creation, use normal git commands with the CES AI identity: username cesai, email cesai@dianzinao.cn. ' +
+      'The SSH key is at /dsh-home/keys/cesai and the OneDev SSH remote is ssh://git@49.233.139.12:2222/<project>.git. ' +
+      'Never delete a OneDev project or change the OneDev login key.',
+  }))
+
+  ctx.effect(() => {
+    const stop = ctx.tools.register(defineTool({
+      name: 'git_create',
+      description:
+        'Create a new OneDev project for a new CES coding task, then grant the CES AI account cesai Code Writer access. ' +
+        'Call this when the user asks to create or write a new project. The tool is idempotent; an existing project is returned without changing its access. ' +
+        'It never deletes projects or changes the AI login key.',
+      parameters: {
+        project: { type: 'string', required: true, description: 'OneDev project name, lowercase letters, digits, dot, underscore or hyphen.' },
+        description: { type: 'string', description: 'Optional project description.' },
+      },
+      output: { schema: { type: 'string' as const }, render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }] },
+      timeoutMs: 60_000,
+      async execute(args: { project: string; description?: string }, exec: { signal: AbortSignal }) {
+        const name = args.project.trim()
+        if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) throw new ApiError(400, 'invalid_project_name')
+        const description = (args.description ?? '').trim().slice(0, 500)
+        const settings = await readSettings(file)
+        const one = new OneDev(settings, ctx.secrets, exec.signal)
+        const result = await one.createProject(name, description)
+        let granted = false
+        if (result.created) {
+          const userId = await one.findUser('cesai')
+          if (userId === null) throw new ApiError(502, 'ai_user_missing')
+          await one.grantCodeWriter(result.project.id, userId)
+          granted = true
+        }
+        return JSON.stringify({
+          created: result.created, granted,
+          project: {
+            id: result.project.id, name: result.project.name, path: result.project.path,
+            description: result.project.description, webUrl: result.project.webUrl,
+            cloneUrl: `${result.project.webUrl}.git`,
+            sshCloneUrl: `ssh://git@${new URL(result.project.webUrl).hostname}:2222/${result.project.path}.git`,
+          },
+          ai: { username: 'cesai', email: 'cesai@dianzinao.cn' },
+        })
+      },
+    }))
+    return stop
+  })
+
   ctx.effect(() => {
     const shutdown = new AbortController()
     const pending = new Set<Promise<void>>()
@@ -80,6 +135,13 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
     const url = new URL(request.url ?? '/', 'http://localhost')
     if (!url.pathname.startsWith(`${API}/`)) throw new ApiError(404, 'not_found')
     const path = url.pathname.slice(API.length)
+    if (path === '/settings/ai-identity') {
+      if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed')
+      let publicKey = ''
+      try { publicKey = (await readFile(join(dirname(file), 'keys', 'cesai.pub'), 'utf8')).trim() } catch (cause) { void cause }
+      send(response, 200, { username: 'cesai', email: 'cesai@dianzinao.cn', publicKey, privateKeyPath: '/dsh-home/keys/cesai' })
+      return
+    }
     if (path === '/settings') {
       if (request.method === 'GET') { send(response, 200, publicSettings(await readSettings(file))); return }
       if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed')

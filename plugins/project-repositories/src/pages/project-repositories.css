@@ -129,3 +129,10 @@
 .smp-repo-list .smp-list-pager .row { display: flex; align-items: center; gap: 8px; }
 .smp-repo-list .smp-list-pager label { display: inline-flex; align-items: center; gap: 6px; }
 .smp-repo-list .smp-list-pager select { height: 28px; width: auto; }
+.smp-repo-ai-identity { margin: 16px 0; padding: 12px 14px; border: 1px solid var(--repo-line); border-radius: 6px; max-width: 760px; }
+.smp-repo-ai-identity h3 { margin: 0 0 10px; font-size: 13px; }
+.smp-repo-ai-identity dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 7px 12px; margin: 0; }
+.smp-repo-ai-identity dt { color: var(--repo-muted); font-size: 12px; }
+.smp-repo-ai-identity dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.smp-repo-ai-identity small { display: block; margin-top: 9px; color: var(--repo-muted); }
+.smp-repo-public-key { user-select: all; font-size: 11px; }

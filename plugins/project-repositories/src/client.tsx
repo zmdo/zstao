@@ -27,6 +27,8 @@ interface PageProps {
   openConsole?: (key: string) => void
 }
 
+interface AiIdentity { username: string; email: string; publicKey: string; privateKeyPath: string }
+
 interface Settings {
   internalBaseUrl: string
   externalBaseUrl: string
@@ -50,6 +52,12 @@ function copyOf(active: string) {
     pipeline: zh ? '部署流水线' : 'Deploy pipelines',
     settings: zh ? '项目管理' : 'Project management',
     settingsTitle: zh ? '项目管理' : 'Project management',
+    aiIdentity: zh ? 'AI Git 身份' : 'AI Git identity',
+    aiUsername: zh ? '用户名' : 'Username',
+    aiEmail: zh ? '邮箱' : 'Email',
+    aiPublicKey: zh ? 'SSH 公钥' : 'SSH public key',
+    aiPrivateKey: zh ? '私钥路径' : 'Private key path',
+    aiReadOnly: zh ? '以上身份信息只读，由系统预置。' : 'These identity values are provisioned and read-only.',
     name: zh ? '项目' : 'Project',
     oneDev: zh ? 'OneDev 代码仓库' : 'OneDev repository',
     internalUrl: zh ? '内部访问地址' : 'Internal URL',
@@ -107,6 +115,7 @@ function ProjectSettingsPage(props: PageProps) {
   const zh = useLanguage(props.locale)
   const copy = copyOf(zh ? 'zh' : 'en')
   const [settings, setSettings] = useState<Settings>({ internalBaseUrl: 'http://10.2.8.9', externalBaseUrl: 'http://10.2.8.9', username: 'admin', configured: false, updatedAt: null })
+  const [ai, setAi] = useState<AiIdentity>()
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -120,6 +129,9 @@ function ProjectSettingsPage(props: PageProps) {
       .then(value => { if (!stopped) setSettings(value) })
       .catch(cause => { if (!stopped) setError(errorText(cause, zh)) })
       .finally(() => { if (!stopped) setLoading(false) })
+    json<AiIdentity>('/settings/ai-identity')
+      .then(value => { if (!stopped) setAi(value) })
+      .catch(cause => { void cause })
     return () => { stopped = true }
   }, [])
 
@@ -159,6 +171,7 @@ function ProjectSettingsPage(props: PageProps) {
         <label><span>{settings.configured ? (zh ? '新密码' : 'New password') : copy.password}</span><input type="password" autoComplete="new-password" value={password} disabled={loading || saving} onChange={event => setPassword(event.target.value)} /><small>{copy.passwordHint}</small></label>
       </div>
       {settings.configured && !saving && <SavedPassword key={settings.updatedAt} zh={zh} />}
+      {ai && <section className="smp-repo-ai-identity"><h3>{copy.aiIdentity}</h3><dl><dt>{copy.aiUsername}</dt><dd><code>{ai.username}</code></dd><dt>{copy.aiEmail}</dt><dd><code>{ai.email}</code></dd><dt>{copy.aiPublicKey}</dt><dd><code className="smp-repo-public-key">{ai.publicKey}</code></dd><dt>{copy.aiPrivateKey}</dt><dd><code>{ai.privateKeyPath}</code></dd></dl><small>{copy.aiReadOnly}</small></section>}
       <p className={settings.configured ? 'smp-project-status ok' : 'smp-project-status'}>{settings.configured ? `${copy.configured} · ${settings.username}` : copy.notConfigured}</p>
       <div className="smp-project-actions">
         <button type="button" className="primary" disabled={loading || saving} onClick={() => { void save() }}>{copy.save}</button>

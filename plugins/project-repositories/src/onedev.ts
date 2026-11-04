@@ -121,6 +121,67 @@ export class OneDev {
     if (format === 'text') return text
     try { return JSON.parse(text) } catch (cause) { throw new ApiError(502, 'invalid_upstream', { cause }) }
   }
+  async post(path: string, body: unknown): Promise<unknown> {
+    const signal = AbortSignal.any([this.signal, AbortSignal.timeout(12_000)])
+    let response: Response
+    try {
+      response = await fetch(`${this.settings.internalBaseUrl}/~api/${path}`, {
+        method: 'POST', headers: { accept: 'application/json', authorization: this.authorization, 'content-type': 'application/json' },
+        body: JSON.stringify(body), signal, redirect: 'error',
+      })
+    } catch (cause) { throw new ApiError(502, signal.aborted ? 'upstream_timeout' : 'upstream_unavailable', { cause }) }
+    if (!response.ok) {
+      await response.body?.cancel()
+      throw new ApiError(response.status === 401 ? 502 : response.status, response.status === 401 ? 'upstream_credentials' : response.status === 403 ? 'upstream_forbidden' : 'upstream_error')
+    }
+    return await response.json()
+  }
+  async projectByName(name: string): Promise<Project | null> {
+    try {
+      const id = await this.request(`projects/ids/${encodeURIComponent(name)}`)
+      if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) throw new ApiError(502, 'invalid_upstream')
+      return this.project(await this.request(`projects/${id}`))
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) return null
+      throw cause
+    }
+  }
+  async createProject(name: string, description: string): Promise<{ project: Project; created: boolean }> {
+    const existing = await this.projectByName(name)
+    if (existing !== null) return { project: existing, created: false }
+    const id = await this.post('projects', {
+      name, key: '', description, codeManagement: true, wikiManagement: false, packManagement: false,
+      issueManagement: false, timeTracking: false,
+      gitPackConfig: { windowMemory: '', packSizeLimit: '', threads: '', window: '' },
+      codeIndexingSetting: { analysisFiles: '', requireLoginForAutoIndexing: false },
+    })
+    if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) throw new ApiError(502, 'invalid_upstream')
+    return { project: this.project(await this.request(`projects/${id}`)), created: true }
+  }
+  async findUser(name: string): Promise<number | null> {
+    const rows = await this.request('users', new URLSearchParams({ offset: '0', count: '100' }))
+    if (!Array.isArray(rows)) throw new ApiError(502, 'invalid_upstream')
+    for (const value of rows) {
+      const row = object(value)
+      if (row.name === name && typeof row.id === 'number' && Number.isSafeInteger(row.id)) return row.id
+    }
+    return null
+  }
+  async findRole(name: string): Promise<number | null> {
+    const rows = await this.request('roles', new URLSearchParams({ offset: '0', count: '100' }))
+    if (!Array.isArray(rows)) throw new ApiError(502, 'invalid_upstream')
+    for (const value of rows) {
+      const row = object(value)
+      if (row.name === name && typeof row.id === 'number' && Number.isSafeInteger(row.id)) return row.id
+    }
+    return null
+  }
+  async grantCodeWriter(projectId: number, userId: number): Promise<void> {
+    const roleId = await this.findRole('Code Writer')
+    if (roleId === null) throw new ApiError(502, 'upstream_role_missing')
+    await this.post('user-authorizations', { projectId, userId, roleId })
+  }
+
   project(value: unknown): Project {
     const row = object(value)
     if (!Number.isSafeInteger(row.id) || Number(row.id) < 1) throw new ApiError(502, 'invalid_upstream')

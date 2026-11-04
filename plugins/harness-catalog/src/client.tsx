@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Panel } from '@smp/console-kit'
+import { CodeBlock, FileTypeIcon, IconFolderCloseRegular, IconFolderOpenRegular, MarkdownText, classifyFileType, languageForPath } from '@deepseek-ai/dsh-client-ui-primitives'
 import styles from './pages/catalog.css'
 
 interface LocaleFace {
@@ -128,6 +129,12 @@ function copyOf(active: string) {
     confirm: zh ? '确认导入' : 'Import',
     cancel: zh ? '取消' : 'Cancel',
     close: zh ? '关闭' : 'Close',
+    copy: zh ? '复制' : 'Copy',
+    copied: zh ? '已复制' : 'Copied',
+    codeTitle: zh ? '代码' : 'Code',
+    wrap: zh ? '自动换行' : 'Wrap lines',
+    unwrap: zh ? '取消换行' : 'Unwrap lines',
+    footnotes: zh ? '脚注' : 'Footnotes',
     file: zh ? '文件' : 'File',
     directory: zh ? '目录' : 'Directory',
     binary: zh ? '二进制文件，无法预览' : 'Binary file, preview unavailable',
@@ -504,6 +511,40 @@ function ImportDialog(props: {
   )
 }
 
+function PreviewBody(props: { copy: ReturnType<typeof copyOf>; preview: FilePreview }) {
+  const copy = props.copy
+  const path = props.preview.path
+  const lower = path.toLowerCase()
+  const markdown = lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.mdx')
+  const lang = languageForPath(path) ?? ''
+  const code = lang !== '' && !markdown
+  if (markdown) {
+    return (
+      <div className="smp-catalog-markdown">
+        <MarkdownText
+          text={props.preview.content}
+          labels={{
+            code: { copyLabel: copy.copy, copiedLabel: copy.copied, toolbarLabels: { codeLabel: copy.codeTitle, wrapLabel: copy.wrap, unwrapLabel: copy.unwrap } },
+            footnotes: copy.footnotes,
+          }}
+        />
+      </div>
+    )
+  }
+  if (code) {
+    return (
+      <CodeBlock
+        code={props.preview.content}
+        lang={lang}
+        copyLabel={copy.copy}
+        copiedLabel={copy.copied}
+        toolbarLabels={{ codeLabel: copy.codeTitle, wrapLabel: copy.wrap, unwrapLabel: copy.unwrap }}
+      />
+    )
+  }
+  return <pre>{props.preview.content}</pre>
+}
+
 function SkillBrowser(props: { name: string; copy: ReturnType<typeof copyOf>; onClose(): void }) {
   const copy = props.copy
   const [nodes, setNodes] = useState<Record<string, FileEntry[]>>({})
@@ -542,7 +583,11 @@ function SkillBrowser(props: { name: string; copy: ReturnType<typeof copyOf>; on
       {(nodes[path] ?? []).map(entry => (
         <div key={entry.path}>
           <button type="button" className={`smp-catalog-tree-row${preview?.path === entry.path ? ' is-current' : ''}`} style={{ paddingLeft: `${8 + depth * 14}px` }} onClick={() => { void open(entry) }}>
-            <span className="smp-catalog-tree-icon">{entry.type === 'directory' ? (expanded.includes(entry.path) ? '▾' : '▸') : '·'}</span>
+            <span className="smp-catalog-tree-icon">
+              {entry.type === 'directory'
+                ? (expanded.includes(entry.path) ? <IconFolderOpenRegular /> : <IconFolderCloseRegular />)
+                : <FileTypeIcon kind={classifyFileType(entry.name)} />}
+            </span>
             <span>{entry.name}</span>
           </button>
           {entry.type === 'directory' && expanded.includes(entry.path) && render(entry.path, depth + 1)}
@@ -565,7 +610,7 @@ function SkillBrowser(props: { name: string; copy: ReturnType<typeof copyOf>; on
             {preview === undefined ? <p className="muted">{copy.file}</p> : (
               <>
                 <div className="smp-catalog-preview-head"><span className="mono">{preview.path}</span><span>{preview.size} B</span></div>
-                {preview.binary ? <p className="muted">{copy.binary}</p> : <pre>{preview.content}</pre>}
+                {preview.binary ? <p className="muted">{copy.binary}</p> : <PreviewBody copy={copy} preview={preview} />}
               </>
             )}
             {loading !== '' && <p className="smp-catalog-import-status">{copy.loading}</p>}

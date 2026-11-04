@@ -44,7 +44,7 @@ await esbuild.build({
   format: 'cjs',
   platform: 'browser',
   jsx: 'automatic',
-  external: ['react', 'react/jsx-runtime', 'react-dom'],
+  external: ['react', 'react/jsx-runtime', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'],
   loader: { '.css': 'text' },
   plugins: [cssModules],
   banner: {

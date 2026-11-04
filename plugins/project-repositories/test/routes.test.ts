@@ -27,7 +27,7 @@ const upstream = createServer((req, res) => {
   }
   if (url.pathname === '/~api/projects/401') { res.writeHead(401); res.end('one-secret: internal detail'); return }
   if (url.pathname === '/~api/projects/1') { send({ id: 1, name: 'p1', path: 'group/p1', codeManagement: true }); return }
-  if (url.pathname.endsWith('/clone-url')) { send({ http: `${upstreamOrigin}/group/p1.git` }); return }
+  if (url.pathname.endsWith('/clone-url')) { send({ http: `${upstreamOrigin}/group/p1.git`, ssh: 'ssh://10.0.0.1/group/p1.git' }); return }
   if (url.pathname.endsWith('/branches')) { send(['main', 'feature/name']); return }
   if (url.pathname.endsWith('/tags')) { send(['main']); return }
   if (url.pathname.endsWith('/default-branch')) { res.writeHead(204); res.end(); return }
@@ -79,6 +79,8 @@ test('projects page beyond 100, nullable default branch and public clone URL', a
   const repo = await (await request('/repos/1')).json()
   assert.equal(repo.defaultBranch, null)
   assert.equal(repo.cloneUrl, 'https://public.example/group/p1.git')
+  assert.equal(repo.cloneUrls.http, 'https://public.example/group/p1.git')
+  assert.equal(repo.cloneUrls.ssh, 'ssh://public.example/group/p1.git')
   assert.equal(repo.project.webUrl, 'https://public.example/group/p1')
 })
 test('same-name branch and tag are resolved through separate endpoints', async () => {

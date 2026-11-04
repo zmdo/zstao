@@ -1,5 +1,5 @@
 import { COMMIT_LIMIT, DIRECTORY_LIMIT, DOWNLOAD_BYTES, PREVIEW_BYTES, PREVIEW_LINES } from './shared.ts'
-import type { CommitList, FilePreview, Project, RefType, Repository, Tree } from './shared.ts'
+import type { CommitList, FilePreview, LatestCommit, Project, RefType, Repository, Tree } from './shared.ts'
 
 export class ApiError extends Error {
   readonly status: number
@@ -142,17 +142,24 @@ export class OneDev {
       this.request(`repositories/${id}/branches`), this.request(`repositories/${id}/tags`),
       this.request(`repositories/${id}/default-branch`, undefined, 'text'), this.request(`projects/${id}/clone-url`),
     ])
-    const rawClone = string(object(clone).http)
-    let cloneUrl: URL
-    try { cloneUrl = new URL(rawClone) } catch (cause) { throw new ApiError(502, 'invalid_upstream', { cause }) }
-    if (!['http:', 'https:'].includes(cloneUrl.protocol)) throw new ApiError(502, 'invalid_upstream')
-    // The browser's clone URL must use the configured public origin, never credentials.
-    const external = new URL(this.settings.externalBaseUrl)
-    const internal = new URL(this.settings.internalBaseUrl)
-    const suffix = cloneUrl.pathname.startsWith(`${internal.pathname.replace(/\/$/, '')}/`) ? cloneUrl.pathname.slice(internal.pathname.replace(/\/$/, '').length) : cloneUrl.pathname
-    cloneUrl = new URL(external.origin)
-    cloneUrl.pathname = `${external.pathname.replace(/\/$/, '')}${suffix}`
-    return { project, branches: strings(branches), tags: strings(tags), defaultBranch: defaultBranch === null ? null : string(defaultBranch), cloneUrl: cloneUrl.href }
+    const cloneData = object(clone)
+    const rawHttp = string(cloneData.http)
+    const rawSsh = typeof cloneData.ssh === 'string' ? cloneData.ssh : ''
+    const publicClone = (raw: string): string => {
+      let url: URL
+      try { url = new URL(raw) } catch (cause) { return '' }
+      if (!['http:', 'https:', 'ssh:'].includes(url.protocol)) return ''
+      const external = new URL(this.settings.externalBaseUrl)
+      const internal = new URL(this.settings.internalBaseUrl)
+      const suffix = url.pathname.startsWith(`${internal.pathname.replace(/\/$/, '')}/`) ? url.pathname.slice(internal.pathname.replace(/\/$/, '').length) : url.pathname
+      const protocol = url.protocol === 'ssh:' ? 'ssh:' : external.protocol
+      const host = url.protocol === 'ssh:' ? `${external.hostname}${url.port ? `:${url.port}` : ''}` : external.host
+      return new URL(`${protocol}//${host}${external.pathname.replace(/\/$/, '')}${suffix}`).href
+    }
+    const http = publicClone(rawHttp)
+    const ssh = publicClone(rawSsh)
+    if (http === '') throw new ApiError(502, 'invalid_upstream')
+    return { project, branches: strings(branches), tags: strings(tags), defaultBranch: defaultBranch === null ? null : string(defaultBranch), cloneUrl: http, cloneUrls: { http, ssh } }
   }
   async resolve(id: number, type: RefType, name: string): Promise<string> {
     if (!name || name.length > 1024 || /[\x00-\x1f\x7f]/.test(name)) throw new ApiError(400, 'invalid_revision')
@@ -181,6 +188,21 @@ export class OneDev {
     if (bytes.length > size || (!row.isPartial && bytes.length !== size)) throw new ApiError(502, 'invalid_upstream')
     return { path, bytes, size, partial: row.isPartial }
   }
+  async latest(id: number, sha: string, path: string): Promise<LatestCommit | null> {
+    const params = new URLSearchParams({ query: `commit(${sha}) path(${path}) order-by-date`, count: '1' })
+    for (const field of ['AUTHOR', 'COMMIT_DATE', 'SUBJECT']) params.append('field', field)
+    const data = await this.request(`repositories/${id}/commits`, params)
+    if (!Array.isArray(data)) throw new ApiError(502, 'invalid_upstream')
+    const first = data[0]
+    if (first === undefined) return null
+    const row = object(first)
+    const author = row.author === null ? null : object(row.author)
+    if (typeof row.commitDate !== 'string' && typeof row.commitDate !== 'number') throw new ApiError(502, 'invalid_upstream')
+    const date = new Date(row.commitDate)
+    if (Number.isNaN(date.getTime())) throw new ApiError(502, 'invalid_upstream')
+    return { sha: commitSha(string(row.hash)), subject: string(row.subject), author: author === null ? '—' : string(author.name), date: date.toISOString() }
+  }
+
   async commits(id: number, sha: string): Promise<CommitList> {
     const params = new URLSearchParams({ query: `commit(${sha}) order-by-date`, count: String(COMMIT_LIMIT + 1) })
     for (const field of ['AUTHOR', 'COMMIT_DATE', 'SUBJECT']) params.append('field', field)

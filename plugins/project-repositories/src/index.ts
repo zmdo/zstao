@@ -122,7 +122,7 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
       send(response, 200, { projects, nextOffset: projects.length === 100 ? offset + projects.length : null })
       return
     }
-    const match = /^\/repos\/([1-9]\d*)(?:\/(resolve|tree|file|asset|raw|commits))?$/.exec(path)
+    const match = /^\/repos\/([1-9]\d*)(?:\/(resolve|tree|file|asset|raw|latest|commits))?$/.exec(path)
     if (!match) throw new ApiError(404, 'not_found')
     const id = projectId(match[1])
     if (!match[2]) { send(response, 200, await one.repository(id)); return }
@@ -135,6 +135,7 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
     const sha = commitSha(url.searchParams.get('sha') ?? '')
     const repositoryFile = repositoryPath(url.searchParams.get('path') ?? '', match[2] === 'tree' || match[2] === 'commits')
     if (match[2] === 'tree') { send(response, 200, await one.tree(id, sha, repositoryFile)); return }
+    if (match[2] === 'latest') { send(response, 200, await one.latest(id, sha, repositoryFile)); return }
     if (match[2] === 'commits') { send(response, 200, await one.commits(id, sha)); return }
     const blob = await one.file(id, sha, repositoryFile)
     if (match[2] === 'file') { send(response, 200, preview(blob)); return }

@@ -23,6 +23,7 @@ export interface Repository {
   branches: string[]
   tags: string[]
   cloneUrl: string
+  cloneUrls: { http: string; ssh: string }
 }
 export interface TreeEntry { path: string; isFile: boolean }
 export interface Tree { entries: TreeEntry[]; truncated: boolean }
@@ -38,4 +39,5 @@ export interface FilePreview {
 }
 export interface Commit { sha: string; subject: string; author: string; date: string }
 export interface CommitList { commits: Commit[]; hasMore: boolean }
+export type LatestCommit = Commit
 export type RefType = 'branch' | 'tag'

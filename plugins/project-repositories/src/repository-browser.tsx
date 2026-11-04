@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Panel } from '@smp/console-kit'
-import { CodeBlock, FileTypeIcon, IconFolderCloseRegular, IconFolderOpenRegular, classifyFileType, languageForPath } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { CommitList, FilePreview, Project, Repository, Tree, TreeEntry } from './shared.ts'
+import { CodeBlock, FileTypeIcon, IconChevronLeftOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular, classifyFileType, languageForPath } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { CommitList, FilePreview, LatestCommit, Project, Repository, Tree, TreeEntry } from './shared.ts'
 import { browseHash, parentPath, readBrowseState, readmePath, repositoryUrl } from './browser-state.ts'
 import type { BrowseState } from './browser-state.ts'
 import { errorText, json, RequestError, useLanguage } from './client-api.ts'
@@ -92,15 +92,21 @@ function RepositoryView(props: { state: BrowseState; navigate: Navigate; zh: boo
       .catch(cause => { if (!controller.signal.aborted) setError(cause) })
     return () => controller.abort()
   }, [repo, state.id, state.refType, refName, state.sha, state.path, state.kind, state.tab, state.anchor])
-  const copyClone = async () => {
-    if (!repo) return
-    try { await navigator.clipboard.writeText(repo.cloneUrl); setNotice(zh ? '克隆地址已复制' : 'Clone URL copied') } catch (cause) { void cause; setNotice(zh ? '复制失败，请手动复制克隆地址。' : 'Copy failed. Copy the clone URL manually.') }
+  const copyClone = async (value: string): Promise<void> => {
+    try { await navigator.clipboard.writeText(value); setNotice(zh ? '克隆地址已复制' : 'Clone URL copied') } catch (cause) { void cause; setNotice(zh ? '复制失败，请手动复制。' : 'Copy failed. Copy it manually.') }
   }
-  return <Panel className="smp-project-panel smp-repo-panel" title={repo?.project.name ?? (zh ? '仓库详情' : 'Repository')} extra={<button type="button" className="secondary" onClick={() => navigate(null)}>{zh ? '返回项目列表' : 'All projects'}</button>}>
+  const title = <span className="smp-repo-title">
+    <button type="button" className="smp-repo-back" aria-label={zh ? '返回项目列表' : 'All projects'} title={zh ? '返回项目列表' : 'All projects'} onClick={() => navigate(null)}><IconChevronLeftOutlineRegular /></button>
+    <strong>{repo?.project.name ?? (zh ? '仓库详情' : 'Repository')}</strong>
+    {(repo?.project.description || repo?.project.path) && <>
+      <span className="smp-repo-title-divider" aria-hidden="true" />
+      <span className="smp-repo-title-description">{repo?.project.description || repo?.project.path}</span>
+    </>}
+  </span>
+  return <Panel className="smp-project-panel smp-repo-panel smp-repo-detail" title={title} extra={repo && <button type="button" className="secondary" onClick={() => window.open(repo.project.webUrl, '_blank', 'noopener,noreferrer')}>{zh ? '打开 OneDev' : 'Open OneDev'}</button>}>
     {error !== null && <><ErrorNotice error={error} zh={zh} settings={props.settings} /><button type="button" className="secondary" onClick={() => setReload(v => v + 1)}>{zh ? '重试' : 'Retry'}</button></>}
     {!repo && error === null && <p role="status">{zh ? '正在读取仓库…' : 'Loading repository…'}</p>}
     {repo && <>
-      <div className="smp-repo-description"><p>{repo.project.description || repo.project.path}</p><a href={repo.project.webUrl} target="_blank" rel="noopener noreferrer">{zh ? '打开 OneDev' : 'Open OneDev'}</a></div>
       <nav className="smp-repo-tabs" aria-label={zh ? '仓库栏目' : 'Repository sections'}>{(['code', 'commits'] as const).map(tab => <button type="button" key={tab} aria-current={state.tab === tab ? 'page' : undefined} className={state.tab === tab ? 'is-on' : ''} onClick={() => navigate({ ...state, tab, anchor: '' })}>{tab === 'code' ? (zh ? '代码' : 'Code') : (zh ? '提交' : 'Commits')}</button>)}</nav>
       <div className="smp-repo-toolbar">
         <select aria-label={zh ? '分支或 Tag' : 'Branch or tag'} value={JSON.stringify([state.refType, refName])} disabled={!repo.branches.length && !repo.tags.length} onChange={e => { const [refType, name] = JSON.parse(e.target.value); setError(null); navigate({ ...state, refType, refName: name, sha: '', anchor: '' }) }}>
@@ -110,8 +116,14 @@ function RepositoryView(props: { state: BrowseState; navigate: Navigate; zh: boo
           <optgroup label="Tags">{repo.tags.map(name => <option key={name} value={JSON.stringify(['tag', name])}>{name}</option>)}</optgroup>
         </select>
         {state.sha && <code title={state.sha}>{state.sha.slice(0, 12)}</code>}
-        <button type="button" className="secondary" onClick={() => { navigate({ ...state, sha: '', anchor: '' }, true); setReload(v => v + 1) }}>{zh ? '刷新引用' : 'Refresh reference'}</button>
-        <details className="smp-repo-clone"><summary>{zh ? '克隆地址' : 'Clone URL'}</summary><input readOnly value={repo.cloneUrl} aria-label={zh ? '克隆地址' : 'Clone URL'} /><button type="button" className="secondary" onClick={() => { void copyClone() }}>{zh ? '复制' : 'Copy'}</button><span role="status">{notice}</span></details>
+        <details className="smp-repo-clone">
+          <summary className="smp-repo-clone-trigger">{zh ? '克隆地址' : 'Clone URL'}</summary>
+          <div className="smp-repo-clone-popover">
+            <label><span>HTTP</span><span className="smp-repo-clone-line"><input readOnly value={repo.cloneUrls?.http || repo.cloneUrl} aria-label="HTTP clone URL" /><button type="button" className="secondary" onClick={() => { void copyClone(repo.cloneUrls?.http || repo.cloneUrl) }}>{zh ? '复制' : 'Copy'}</button></span></label>
+            {repo.cloneUrls?.ssh && <label><span>SSH</span><span className="smp-repo-clone-line"><input readOnly value={repo.cloneUrls.ssh} aria-label="SSH clone URL" /><button type="button" className="secondary" onClick={() => { void copyClone(repo.cloneUrls.ssh) }}>{zh ? '复制' : 'Copy'}</button></span></label>}
+            {notice && <span role="status" className="smp-repo-clone-notice">{notice}</span>}
+          </div>
+        </details>
       </div>
       {!refName && !state.sha ? <p>{zh ? '仓库尚未初始化。' : 'This repository has not been initialized.'}</p> : !state.sha ? (error === null && <p role="status">{zh ? '正在解析引用…' : 'Resolving reference…'}</p>) : <Snapshot key={`${state.id}:${state.sha}`} state={state} navigate={navigate} zh={zh} webUrl={repo.project.webUrl} />}
     </>}
@@ -123,10 +135,10 @@ function Snapshot(props: { state: BrowseState; navigate: Navigate; zh: boolean; 
   const [trees, setTrees] = useState<Record<string, Tree>>({})
   const [treeError, setTreeError] = useState<unknown>(null)
   const [content, setContent] = useState<{ directory?: Tree; file?: FilePreview }>({})
+  const [latest, setLatest] = useState<Record<string, LatestCommit | null>>({})
   const [error, setError] = useState<unknown>(null)
   const [loading, setLoading] = useState(true)
   const [reload, setReload] = useState(0)
-  const [treeVisible, setTreeVisible] = useState(true)
   const controllers = useRef(new Set<AbortController>())
   const cache = useRef(new Map<string, Promise<Tree>>())
   const body = useRef<HTMLDivElement>(null)
@@ -178,6 +190,16 @@ function Snapshot(props: { state: BrowseState; navigate: Navigate; zh: boolean; 
     return () => controller.abort()
   }, [state.id, state.sha, state.path, state.kind, state.tab, loadTree, reload])
   useEffect(() => {
+    if (!content.directory) return
+    const controller = new AbortController()
+    let active = true
+    const entries = content.directory.entries
+    void Promise.all(entries.map(entry => json<LatestCommit | null>(repositoryUrl(state.id, 'latest', state.sha, entry.path), { signal: controller.signal }).catch(() => null)))
+      .then(values => { if (!active) return; const next: Record<string, LatestCommit | null> = {}; entries.forEach((entry, index) => { next[entry.path] = values[index] ?? null }); setLatest(next) })
+      .catch(() => { if (active) setLatest({}) })
+    return () => { active = false; controller.abort() }
+  }, [content.directory, state.id, state.sha])
+  useEffect(() => {
     if (!state.anchor || loading) return
     const target = Array.from(body.current?.querySelectorAll<HTMLElement>('[id]') ?? []).find(el => el.id === `smp-repo-heading-${state.anchor}`)
     target?.scrollIntoView({ block: 'start' })
@@ -187,22 +209,25 @@ function Snapshot(props: { state: BrowseState; navigate: Navigate; zh: boolean; 
   const directoryPath = state.kind === 'directory' ? state.path : parentPath(state.path)
   const crumbs = state.path.split('/').filter(Boolean)
   return <>
-    <div className="smp-repo-pathbar"><button type="button" className="secondary" onClick={() => setTreeVisible(v => !v)} aria-expanded={treeVisible}>{zh ? '目录树' : 'File tree'}</button>
-      <nav aria-label={zh ? '文件路径' : 'File path'}><button type="button" className="link" onClick={() => navigate({ ...state, path: '', kind: 'directory', anchor: '' })}>/</button>{crumbs.map((part, i) => <span key={i}><span aria-hidden="true"> / </span><button type="button" className="link" onClick={() => navigate({ ...state, path: crumbs.slice(0, i + 1).join('/'), kind: i === crumbs.length - 1 ? state.kind : 'directory', anchor: '' })}>{part}</button></span>)}</nav>
+    <div className="smp-repo-pathbar">
+      <nav aria-label={zh ? '文件路径' : 'File path'}><button type="button" className="link" onClick={() => navigate({ ...state, path: '', kind: 'directory', anchor: '' })}>/</button>{crumbs.map((part, i) => <span key={i}><span aria-hidden="true">{i > 0 ? ' / ' : ''}</span><button type="button" className="link" onClick={() => navigate({ ...state, path: crumbs.slice(0, i + 1).join('/'), kind: i === crumbs.length - 1 ? state.kind : 'directory', anchor: '' })}>{part}</button></span>)}</nav>
     </div>
-    <div className={`smp-repo-browser${treeVisible ? '' : ' tree-hidden'}`}>
-      {treeVisible && <nav className="smp-repo-tree" aria-label={zh ? '仓库目录' : 'Repository tree'}>
+    <div className="smp-repo-browser">
+      <nav className="smp-repo-tree" aria-label={zh ? '仓库目录' : 'Repository tree'}>
         {treeError !== null && <ErrorNotice error={treeError} zh={zh} />}
         {!trees[''] && treeError === null && <p>{zh ? '正在读取…' : 'Loading…'}</p>}
         {(trees['']?.entries ?? []).map(entry => <TreeRow key={entry.path} entry={entry} trees={trees} load={loadTree} open={openEntry} selected={state.path} directory={directoryPath} zh={zh} depth={0} />)}
         {trees['']?.truncated && <p>{zh ? '目录过大，仅展示前 2,000 项。' : 'Only the first 2,000 entries are shown.'}</p>}
-      </nav>}
+      </nav>
       <div className="smp-repo-main" ref={body}>
         {loading && <p role="status">{zh ? '正在读取…' : 'Loading…'}</p>}
         {error !== null && <><ErrorNotice error={error} zh={zh} /><button type="button" className="secondary" onClick={() => setReload(v => v + 1)}>{zh ? '重试' : 'Retry'}</button></>}
         {state.path && <button type="button" className="link smp-repo-parent" onClick={() => navigate({ ...state, path: parentPath(state.path), kind: 'directory', anchor: '' })}>← {zh ? '返回上级目录' : 'Parent directory'}</button>}
         {content.directory && <div className="smp-repo-directory">
-          {content.directory.entries.map(entry => <button type="button" key={entry.path} onClick={() => openEntry(entry)}><EntryIcon entry={entry} /><span>{filename(entry.path)}</span></button>)}
+          {content.directory.entries.map(entry => <button type="button" key={entry.path} className="smp-repo-directory-entry" onClick={() => openEntry(entry)}>
+            <span className="smp-repo-entry-main"><EntryIcon entry={entry} /><span>{filename(entry.path)}</span></span>
+            {latest[entry.path] && <span className="smp-repo-last-commit">{latest[entry.path]?.subject}</span>}
+          </button>)}
           {!content.directory.entries.length && <p>{zh ? '此目录没有文件。' : 'This directory is empty.'}</p>}
           {content.directory.truncated && <p>{zh ? '目录过大，仅展示前 2,000 项，请在 OneDev 中查看完整目录。' : 'Only the first 2,000 entries are shown. Open OneDev for the full directory.'}</p>}
         </div>}

@@ -21,7 +21,7 @@ before(async () => {
   directory = await mkdtemp(join(process.cwd(), '.client-test-'))
   const result = await build({ stdin: { contents: "export { CodeRepositoriesPage } from './src/repository-browser.tsx'; export { SavedPassword } from './src/password-view.tsx'", resolveDir: process.cwd(), loader: 'tsx' }, bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', external: ['react', 'react/jsx-runtime'], loader: { '.css': 'text' }, plugins: [{ name: 'host-ui-test-double', setup(builder) {
     builder.onResolve({ filter: /^@deepseek-ai\/dsh-client-ui-primitives$/ }, () => ({ path: 'ui', namespace: 'fixture' }))
-    builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: "import React from 'react'; export const CodeBlock=({code})=>React.createElement('pre',null,code); export const FileTypeIcon=()=>null; export const IconFolderOpenRegular=()=>null; export const IconFolderCloseRegular=()=>null; export const classifyFileType=()=> 'code'; export const languageForPath=()=> 'typescript';", loader: 'js' }))
+    builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: "import React from 'react'; export const CodeBlock=({code})=>React.createElement('pre',null,code); export const FileTypeIcon=()=>null; export const IconFolderOpenRegular=()=>null; export const IconFolderCloseRegular=()=>null; export const IconChevronLeftOutlineRegular=()=>null; export const classifyFileType=()=> 'code'; export const languageForPath=()=> 'typescript';", loader: 'js' }))
   } }] })
   const file = join(directory, 'client.mjs'); await writeFile(file, result.outputFiles[0].text)
   const module = await import(pathToFileURL(file).href); CodeRepositoriesPage = module.CodeRepositoriesPage; SavedPassword = module.SavedPassword

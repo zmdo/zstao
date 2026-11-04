@@ -25,49 +25,101 @@ export function apply(ctx: HostCtx): void {
     name: 'smp-project-repositories:git',
     order: 2500,
     text:
-      'CES has a configured OneDev Git service for new projects. When the user asks to create or write a new project, first call git_create with a lowercase project slug and a short description; do not create only local files for a new project. ' +
-      'An existing project is returned by git_create. After creation, use normal git commands with the CES AI identity: username cesai, email cesai@dianzinao.cn. ' +
-      'The SSH key is at /dsh-home/keys/cesai and the OneDev SSH remote is ssh://git@49.233.139.12:2222/<project>.git. ' +
+      'CES has a configured OneDev Git service for new projects. When the user asks to create or write a new project, first call platform_onedev with action=create_project and a lowercase project slug and a short description; do not create only local files for a new project. ' +
+      'An existing project is returned by platform_onedev. After creation, use normal git commands with the CES AI identity: username cesai, email cesai@dianzinao.cn. ' +
+      'The SSH key is at /dsh-home/keys/cesai and the OneDev SSH remote is ssh://git@10.2.8.9:2222/<project>.git. ' +
       'Never delete a OneDev project or change the OneDev login key.',
   }))
 
   ctx.effect(() => {
     const stop = ctx.tools.register(defineTool({
-      name: 'git_create',
+      name: 'platform_onedev',
       description:
-        'Create a new OneDev project for a new CES coding task, then grant the CES AI account cesai Code Writer access. ' +
-        'Call this when the user asks to create or write a new project. The tool is idempotent; an existing project is returned without changing its access. ' +
-        'It never deletes projects or changes the AI login key.',
+        'Read and create OneDev projects for CES coding tasks. Use action=list_projects to discover projects; then get_project, list_branches, list_tags, list_commits, get_tree or get_file to inspect code. Use action=create_project for a new project; it grants the CES AI account cesai Code Writer. This tool never deletes projects or changes the AI login key.',
       parameters: {
-        project: { type: 'string', required: true, description: 'OneDev project name, lowercase letters, digits, dot, underscore or hyphen.' },
-        description: { type: 'string', description: 'Optional project description.' },
+        action: {
+          type: 'string', required: true,
+          enum: ['list_projects', 'get_project', 'list_branches', 'list_tags', 'list_commits', 'get_tree', 'get_file', 'create_project'],
+          description: 'Operation to perform.',
+        },
+        project: { type: 'string', description: 'OneDev project name, required except for list_projects.' },
+        ref: { type: 'string', description: 'Branch or tag name. Defaults to the default branch for code reads.' },
+        path: { type: 'string', description: 'Repository path for get_tree or get_file.' },
+        query: { type: 'string', description: 'Optional case-insensitive project search for list_projects.' },
+        description: { type: 'string', description: 'Project description for create_project.' },
       },
       output: { schema: { type: 'string' as const }, render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }] },
       timeoutMs: 60_000,
-      async execute(args: { project: string; description?: string }, exec: { signal: AbortSignal }) {
-        const name = args.project.trim()
-        if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) throw new ApiError(400, 'invalid_project_name')
-        const description = (args.description ?? '').trim().slice(0, 500)
+      async execute(args: { action: string; project?: string; ref?: string; path?: string; query?: string; description?: string }, exec: { signal: AbortSignal }) {
+        const action = args.action
+        const name = (args.project ?? '').trim()
         const settings = await readSettings(file)
         const one = new OneDev(settings, ctx.secrets, exec.signal)
-        const result = await one.createProject(name, description)
-        let granted = false
-        if (result.created) {
-          const userId = await one.findUser('cesai')
-          if (userId === null) throw new ApiError(502, 'ai_user_missing')
-          await one.grantCodeWriter(result.project.id, userId)
-          granted = true
+        if (action === 'list_projects') {
+          const projects = await one.projects(0)
+          const query = (args.query ?? '').trim().toLowerCase()
+          const filtered = projects.filter(project => query === '' || `${project.name} ${project.path} ${project.description}`.toLowerCase().includes(query))
+          return JSON.stringify({
+            projects: filtered.map(project => ({
+              id: project.id, name: project.name, path: project.path, description: project.description,
+              webUrl: project.webUrl, lastUpdated: project.lastUpdated, codeManagement: project.codeManagement,
+            })),
+          })
         }
-        return JSON.stringify({
-          created: result.created, granted,
-          project: {
-            id: result.project.id, name: result.project.name, path: result.project.path,
-            description: result.project.description, webUrl: result.project.webUrl,
-            cloneUrl: `${result.project.webUrl}.git`,
-            sshCloneUrl: `ssh://git@${new URL(result.project.webUrl).hostname}:2222/${result.project.path}.git`,
-          },
-          ai: { username: 'cesai', email: 'cesai@dianzinao.cn' },
-        })
+        if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) throw new ApiError(400, 'invalid_project_name')
+        if (action === 'create_project') {
+          const description = (args.description ?? '').trim().slice(0, 500)
+          const result = await one.createProject(name, description)
+          let granted = false
+          if (result.created) {
+            const userId = await one.findUser('cesai')
+            if (userId === null) throw new ApiError(502, 'ai_user_missing')
+            await one.grantCodeWriter(result.project.id, userId)
+            granted = true
+          }
+          return JSON.stringify({
+            created: result.created, granted,
+            project: {
+              id: result.project.id, name: result.project.name, path: result.project.path,
+              description: result.project.description, webUrl: result.project.webUrl,
+              cloneUrl: `${result.project.webUrl}.git`,
+              sshCloneUrl: `ssh://git@${new URL(result.project.webUrl).hostname}:2222/${result.project.path}.git`,
+            },
+            ai: { username: 'cesai', email: 'cesai@dianzinao.cn' },
+          })
+        }
+        const project = await one.projectByName(name)
+        if (project === null) throw new ApiError(404, 'project_not_found')
+        const repo = await one.repository(project.id)
+        if (action === 'get_project') {
+          return JSON.stringify({
+            project: { id: project.id, name: project.name, path: project.path, description: project.description, webUrl: project.webUrl, lastUpdated: project.lastUpdated },
+            defaultBranch: repo.defaultBranch, branches: repo.branches, tags: repo.tags, cloneUrl: repo.cloneUrl, cloneUrls: repo.cloneUrls,
+          })
+        }
+        if (action === 'list_branches') return JSON.stringify({ project: project.name, branches: repo.branches })
+        if (action === 'list_tags') return JSON.stringify({ project: project.name, tags: repo.tags })
+        const ref = (args.ref ?? repo.defaultBranch ?? '').trim()
+        if (ref === '') throw new ApiError(409, 'repository_not_initialized')
+        let sha: string
+        try {
+          sha = await one.resolve(project.id, 'branch', ref)
+        } catch (cause) {
+          if (!(cause instanceof ApiError) || cause.status !== 404) throw cause
+          sha = await one.resolve(project.id, 'tag', ref)
+        }
+        if (action === 'list_commits') return JSON.stringify({ project: project.name, ref, sha, ...(await one.commits(project.id, sha)) })
+        const path = (args.path ?? '').trim()
+        if (action === 'get_tree') {
+          const tree = await one.tree(project.id, sha, repositoryPath(path, true))
+          return JSON.stringify({ project: project.name, ref, sha, path, ...tree })
+        }
+        if (action === 'get_file') {
+          const filePath = repositoryPath(path, false)
+          const filePreview = preview(await one.file(project.id, sha, filePath))
+          return JSON.stringify({ project: project.name, ref, sha, ...filePreview })
+        }
+        throw new ApiError(400, 'unknown_action')
       },
     }))
     return stop

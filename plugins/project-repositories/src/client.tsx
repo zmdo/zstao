@@ -162,6 +162,7 @@ function ProjectSettingsPage(props: PageProps) {
   }
 
   return (
+    <>
     <Panel className="smp-project-panel" title={copy.settingsTitle}>
       <p className="smp-project-muted">{copy.security}</p>
       <div className="smp-project-form">
@@ -171,7 +172,6 @@ function ProjectSettingsPage(props: PageProps) {
         <label><span>{settings.configured ? (zh ? '新密码' : 'New password') : copy.password}</span><input type="password" autoComplete="new-password" value={password} disabled={loading || saving} onChange={event => setPassword(event.target.value)} /><small>{copy.passwordHint}</small></label>
       </div>
       {settings.configured && !saving && <SavedPassword key={settings.updatedAt} zh={zh} />}
-      {ai && <section className="smp-repo-ai-identity"><h3>{copy.aiIdentity}</h3><dl><dt>{copy.aiUsername}</dt><dd><code>{ai.username}</code></dd><dt>{copy.aiEmail}</dt><dd><code>{ai.email}</code></dd><dt>{copy.aiPublicKey}</dt><dd><code className="smp-repo-public-key">{ai.publicKey}</code></dd><dt>{copy.aiPrivateKey}</dt><dd><code>{ai.privateKeyPath}</code></dd></dl><small>{copy.aiReadOnly}</small></section>}
       <p className={settings.configured ? 'smp-project-status ok' : 'smp-project-status'}>{settings.configured ? `${copy.configured} · ${settings.username}` : copy.notConfigured}</p>
       <div className="smp-project-actions">
         <button type="button" className="primary" disabled={loading || saving} onClick={() => { void save() }}>{copy.save}</button>
@@ -180,6 +180,11 @@ function ProjectSettingsPage(props: PageProps) {
       {notice !== '' && <p className="smp-project-notice ok">{notice}</p>}
       {error !== '' && <p className="smp-project-notice error">{copy.saveFailed}: {error}</p>}
     </Panel>
+    {ai && <Panel className="smp-repo-ai-panel" title={copy.aiIdentity}>
+      <dl className="smp-repo-ai-identity"><dt>{copy.aiUsername}</dt><dd><code>{ai.username}</code></dd><dt>{copy.aiEmail}</dt><dd><code>{ai.email}</code></dd><dt>{copy.aiPublicKey}</dt><dd><code className="smp-repo-public-key">{ai.publicKey}</code></dd><dt>{copy.aiPrivateKey}</dt><dd><code>{ai.privateKeyPath}</code></dd></dl>
+      <small>{copy.aiReadOnly}</small>
+    </Panel>}
+    </>
   )
 }
 

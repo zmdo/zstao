@@ -1,0 +1,20 @@
+.smp-catalog-panel .smp-catalog-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.smp-catalog-panel .smp-catalog-table th { color: var(--muted); font-weight: 500; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.smp-catalog-panel .smp-catalog-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.smp-catalog-panel .smp-catalog-table tbody tr.smp-catalog-row { cursor: pointer; }
+.smp-catalog-panel .smp-catalog-table tbody tr.smp-catalog-row:hover td, .smp-catalog-panel .smp-catalog-table tbody tr.is-open td { background: #f7f9fc; }
+.smp-catalog-panel .smp-catalog-detail { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 7px 16px; margin: 0; }
+.smp-catalog-panel .smp-catalog-detail dt { color: var(--muted); }
+.smp-catalog-panel .smp-catalog-detail dd { margin: 0; overflow-wrap: anywhere; }
+.smp-catalog-panel .smp-catalog-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; }
+.smp-catalog-panel .smp-catalog-pager .row { display: flex; align-items: center; gap: 8px; }
+.smp-catalog-panel .smp-catalog-toolbar { display: flex; align-items: center; gap: 8px; }
+.smp-catalog-panel .smp-catalog-toolbar select, .smp-catalog-panel .smp-catalog-toolbar input { width: auto; }
+.smp-catalog-panel .smp-catalog-source { color: var(--muted); font-size: 11px; }
+.smp-catalog-panel .smp-catalog-provider { display: inline-flex; flex-direction: column; gap: 2px; }
+.smp-catalog-panel .smp-catalog-provider code { color: var(--muted); font-size: 10px; }
+.smp-catalog-panel .smp-catalog-import { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.smp-catalog-panel .smp-catalog-import-status { color: var(--muted); font-size: 12px; }
+.smp-catalog-panel .smp-catalog-file { position: relative; display: inline-flex; cursor: pointer; }
+.smp-catalog-panel .smp-catalog-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.smp-catalog-panel .smp-catalog-file > span { display: inline-flex; align-items: center; white-space: nowrap; padding: 5px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--dsw-alias-bg-layer-1); font-size: 12px; }

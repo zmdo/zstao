@@ -78,6 +78,8 @@ const PLATFORM_GROUP = 'platform'
 const AGENT_GROUP = 'agent'
 const AGENT_CHAT = 'agent-chat'
 const ARCHIVE_PAGE = 'archive'
+const SKILLS_PAGE = 'harness-skills'
+const TOOLS_PAGE = 'harness-tools'
 
 const SHELL_STYLE = `
 .smp-shell, .smp-console, .smp-sidebar-flyout {
@@ -468,7 +470,7 @@ function ShellSidebar(props: {
   const blocks = sidebarBlocks(menuChoices(listed, copy.harness), saved, copy.overview)
   const panelId = props.usePanelInfo?.(info => info.activePanelId)
   const onConversation = panelId === null
-  const harnessOn = current === AGENT_CHAT || current === ARCHIVE_PAGE
+  const harnessOn = current === AGENT_CHAT || current === ARCHIVE_PAGE || current === SKILLS_PAGE || current === TOOLS_PAGE
   useEffect(() => {
     if (pages.length === 0 || pages.some(page => page.key === current)) return
     if (current === props.landing.get().page) return
@@ -637,6 +639,8 @@ function ConversationChrome(props: {
         <nav className="tabs" aria-label={copy.harness}>
           <button className="tab is-on" type="button" onClick={() => props.openConsole(AGENT_CHAT)}>{copy.chat}</button>
           <button className="tab" type="button" onClick={() => props.openConsole(ARCHIVE_PAGE)}>{copy.archive}</button>
+          <button className="tab" type="button" onClick={() => props.openConsole(SKILLS_PAGE)}>{copy.skills}</button>
+          <button className="tab" type="button" onClick={() => props.openConsole(TOOLS_PAGE)}>{copy.tools}</button>
         </nav>
       </header>
       <div style={{ display: 'contents' }} ref={props.chatSide.set} />

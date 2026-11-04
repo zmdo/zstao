@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-harness-catalog
+      name: '@smp/console-harness-catalog'

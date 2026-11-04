@@ -16,6 +16,7 @@ export interface Project {
   packManagement: boolean
   webUrl: string
   createDate: string
+  lastUpdated: string | null
 }
 export interface Repository {
   project: Project

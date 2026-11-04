@@ -115,3 +115,17 @@
   .smp-project-toolbar { flex-wrap: wrap; }
   .smp-repo-main { padding: 10px; }
 }
+.smp-repo-detail > .panel-body { padding-top: 0; }
+.smp-repo-detail .smp-repo-tabs { margin-top: 0; padding-top: 6px; }
+.smp-repo-pathbar button { cursor: pointer; }
+.smp-repo-pathbar button:hover { text-decoration: underline; }
+.smp-repo-open, .smp-repo-clone-trigger, .smp-repo-download { cursor: pointer; }
+.smp-repo-download { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid var(--repo-line); border-radius: 4px; color: var(--dsw-alias-label-primary); text-decoration: none; font-size: 13px; }
+.smp-repo-download:hover { background: var(--repo-hover); }
+.smp-repo-updated { color: var(--repo-muted); white-space: nowrap; font-size: 12px; }
+.smp-repo-list { margin-bottom: 0; }
+.smp-repo-list .smp-list-scroll { margin-top: 0; }
+.smp-repo-list .smp-list-pager { padding: 10px 16px; }
+.smp-repo-list .smp-list-pager .row { display: flex; align-items: center; gap: 8px; }
+.smp-repo-list .smp-list-pager label { display: inline-flex; align-items: center; gap: 6px; }
+.smp-repo-list .smp-list-pager select { height: 28px; width: auto; }

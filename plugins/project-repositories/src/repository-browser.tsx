@@ -35,10 +35,17 @@ export function CodeRepositoriesPage(props: { locale: LocaleFace; openConsole?: 
 }
 function ProjectList(props: { zh: boolean; navigate: Navigate; settings(): void }) {
   const { zh } = props
+  const copy = {
+    open: zh ? '从 OneDev 浏览' : 'Browse in OneDev', updated: zh ? '最近更新' : 'Last updated',
+    prev: zh ? '上一页' : 'Previous', next: zh ? '下一页' : 'Next', pageOf: zh ? '第 {page} / {pages} 页' : 'Page {page} / {pages}',
+    pageSize: zh ? '每页' : 'Per page', total: zh ? '共 {count} 项' : '{count} items', loadMore: zh ? '加载更多' : 'Load more',
+  }
   const [projects, setProjects] = useState<Project[]>([])
   const [offset, setOffset] = useState(0)
   const [nextOffset, setNextOffset] = useState<number | null>(null)
   const [query, setQuery] = useState('')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
   const [reload, setReload] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<unknown>(null)
@@ -53,23 +60,42 @@ function ProjectList(props: { zh: boolean; navigate: Navigate; settings(): void 
   }, [offset, reload])
   const open = (p: Project) => { if (p.codeManagement) props.navigate({ id: p.id, refType: 'branch', refName: '', sha: '', path: '', kind: 'directory', tab: 'code', anchor: '' }) }
   const filtered = projects.filter(p => `${p.name} ${p.path} ${p.description}`.toLowerCase().includes(query.trim().toLowerCase()))
-  return <Panel className="smp-project-panel smp-repo-panel" title={zh ? '项目代码仓库' : 'Code repositories'} extra={<div className="smp-project-toolbar">
-    <input type="search" aria-label={zh ? '搜索已加载项目' : 'Search loaded projects'} placeholder={zh ? '搜索已加载项目' : 'Search loaded projects'} value={query} onChange={e => setQuery(e.target.value)} />
-    <button className="secondary" type="button" disabled={loading} onClick={() => { setOffset(0); setReload(v => v + 1) }}>{zh ? '刷新' : 'Refresh'}</button>
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const current = Math.min(page, pages)
+  const visible = filtered.slice((current - 1) * pageSize, current * pageSize)
+  const updated = (p: Project): string => p.lastUpdated ? new Date(p.lastUpdated).toLocaleString(zh ? 'zh-CN' : 'en-US') : '—'
+  return <Panel className="smp-list-panel smp-repo-list" title={zh ? '项目代码仓库' : 'Code repositories'} extra={<div className="row smp-plugins-head-extra">
+    <input className="search" type="search" aria-label={zh ? '搜索已加载项目' : 'Search loaded projects'} placeholder={zh ? '搜索已加载项目' : 'Search loaded projects'} value={query} onChange={e => { setQuery(e.target.value); setPage(1) }} />
+    <button className="secondary" type="button" disabled={loading} onClick={() => { setOffset(0); setPage(1); setReload(v => v + 1) }}>{zh ? '刷新' : 'Refresh'}</button>
   </div>}>
     {error !== null && <ErrorNotice error={error} zh={zh} settings={props.settings} />}
-    <div className="table-wrap"><table className="smp-table smp-project-table"><thead><tr><th>{zh ? '项目' : 'Project'}</th><th>{zh ? '路径' : 'Path'}</th><th>{zh ? '说明' : 'Description'}</th><th>{zh ? '能力' : 'Capabilities'}</th><th /></tr></thead>
-      <tbody>{filtered.map(project => <tr key={project.id} className={project.codeManagement ? 'smp-repo-clickable' : ''} onClick={() => open(project)}>
-        <td><button type="button" className="link" disabled={!project.codeManagement} onClick={event => { event.stopPropagation(); open(project) }}>{project.name}</button></td><td className="mono">{project.path}</td><td>{project.description}</td>
-        <td>{project.codeManagement ? (zh ? '代码' : 'Code') : (zh ? '未开启代码管理' : 'Code disabled')}</td>
-        <td><a href={project.webUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{zh ? '打开 OneDev' : 'Open OneDev'}</a></td>
-      </tr>)}</tbody></table></div>
-    {!loading && !filtered.length && error === null && <p className="smp-project-muted">{query ? (zh ? '已加载项目中没有匹配项。' : 'No match in loaded projects.') : (zh ? 'OneDev 中还没有项目。' : 'No projects yet.')}</p>}
-    {loading && <p role="status">{zh ? '正在读取…' : 'Loading…'}</p>}
-    <p className="smp-project-muted">{zh ? `已加载 ${projects.length} 个项目；搜索仅过滤已加载项目。` : `${projects.length} projects loaded. Search filters loaded projects only.`}</p>
-    {nextOffset !== null && <button className="secondary" type="button" disabled={loading} onClick={() => { if (error !== null) setReload(v => v + 1); else setOffset(nextOffset) }}>{error !== null ? (zh ? '重试' : 'Retry') : (zh ? '加载更多项目' : 'Load more projects')}</button>}
+    {loading && projects.length === 0 ? <p className="muted" role="status">{zh ? '正在读取…' : 'Loading…'}</p> : visible.length === 0 ? <p className="empty">{query ? (zh ? '没有匹配项目。' : 'No matching projects.') : (zh ? 'OneDev 中还没有项目。' : 'No projects yet.')}</p> : (
+      <div className="table-wrap smp-list-scroll">
+        <table className="smp-plugins smp-table smp-repo-list-table">
+          <thead><tr><th>{zh ? '项目' : 'Project'}</th><th>{zh ? '路径' : 'Path'}</th><th>{zh ? '说明' : 'Description'}</th><th>{copy.updated}</th><th /></tr></thead>
+          <tbody>{visible.map(project => <tr key={project.id} className={project.codeManagement ? 'smp-plugin-row smp-repo-clickable' : ''} onClick={() => open(project)}>
+            <td><button type="button" className="link" disabled={!project.codeManagement} onClick={event => { event.stopPropagation(); open(project) }}>{project.name}</button></td>
+            <td className="mono">{project.path}</td>
+            <td>{project.description}</td>
+            <td className="smp-repo-updated">{updated(project)}</td>
+            <td><button type="button" className="link" disabled={!project.codeManagement} onClick={event => { event.stopPropagation(); window.open(project.webUrl, '_blank', 'noopener,noreferrer') }}>{copy.open}</button></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    )}
+    {filtered.length > 0 && <div className="smp-plugins-pager smp-list-pager">
+      <span className="muted">{copy.total.replace('{count}', String(filtered.length))}</span>
+      <div className="row">
+        <label>{copy.pageSize}<select className="smp-page-size" aria-label={copy.pageSize} value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>{[20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+        <button className="secondary" type="button" disabled={current <= 1 || loading} onClick={() => setPage(current - 1)}>{copy.prev}</button>
+        <span>{copy.pageOf.replace('{page}', String(current)).replace('{pages}', String(pages))}</span>
+        <button className="secondary" type="button" disabled={current >= pages || loading} onClick={() => setPage(current + 1)}>{copy.next}</button>
+        {nextOffset !== null && current === pages && <button className="secondary" type="button" disabled={loading} onClick={() => { if (nextOffset !== null) { setOffset(nextOffset); setPage(current + 1) } }}>{copy.loadMore}</button>}
+      </div>
+    </div>}
   </Panel>
 }
+
 function RepositoryView(props: { state: BrowseState; navigate: Navigate; zh: boolean; settings(): void }) {
   const { state, navigate, zh } = props
   const [repo, setRepo] = useState<Repository | null>(null)
@@ -103,7 +129,7 @@ function RepositoryView(props: { state: BrowseState; navigate: Navigate; zh: boo
       <span className="smp-repo-title-description">{repo?.project.description || repo?.project.path}</span>
     </>}
   </span>
-  return <Panel className="smp-project-panel smp-repo-panel smp-repo-detail" title={title} extra={repo && <button type="button" className="secondary" onClick={() => window.open(repo.project.webUrl, '_blank', 'noopener,noreferrer')}>{zh ? '打开 OneDev' : 'Open OneDev'}</button>}>
+  return <Panel className="smp-project-panel smp-repo-panel smp-repo-detail" title={title} extra={repo && <button type="button" className="secondary smp-repo-open" onClick={() => window.open(repo.project.webUrl, '_blank', 'noopener,noreferrer')}>{zh ? '从 OneDev 浏览' : 'Browse in OneDev'}</button>}>
     {error !== null && <><ErrorNotice error={error} zh={zh} settings={props.settings} /><button type="button" className="secondary" onClick={() => setReload(v => v + 1)}>{zh ? '重试' : 'Retry'}</button></>}
     {!repo && error === null && <p role="status">{zh ? '正在读取仓库…' : 'Loading repository…'}</p>}
     {repo && <>
@@ -270,7 +296,7 @@ function FileView(props: { file: FilePreview; state: BrowseState; navigate: Navi
   return <section className="smp-repo-file">
     <header><strong>{file.path}</strong><span>{file.size.toLocaleString()} B</span>
       {markdown && !file.truncated && !file.binary && <button type="button" className="secondary" onClick={() => setSource(v => !v)}>{source ? (zh ? '预览' : 'Preview') : (zh ? '源码' : 'Source')}</button>}
-      {file.downloadable && <a href={repositoryUrl(props.state.id, 'raw', props.state.sha, file.path)} download>{zh ? '下载原始文件' : 'Download raw file'}</a>}
+      {file.downloadable && <a className="secondary smp-repo-download" href={repositoryUrl(props.state.id, 'raw', props.state.sha, file.path)} download>{zh ? '下载原始文件' : 'Download raw file'}</a>}
     </header>
     {file.truncated && <p className="smp-repo-warning">{zh ? '内容已截断（最多 200 KiB / 5,000 行，或上游仅返回部分内容）。' : 'Content is truncated (200 KiB / 5,000 lines, or a partial upstream response).'}</p>}
     {!file.downloadable && <p className="smp-project-muted">{zh ? '完整文件请通过 OneDev 下载。' : 'Download the complete file from OneDev.'}</p>}

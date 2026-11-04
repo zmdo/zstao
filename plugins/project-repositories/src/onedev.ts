@@ -128,12 +128,28 @@ export class OneDev {
     return { id: Number(row.id), name: string(row.name), path, description: typeof row.description === 'string' ? row.description : '',
       codeManagement: row.codeManagement === true, issueManagement: row.issueManagement === true, packManagement: row.packManagement === true,
       webUrl: `${this.settings.externalBaseUrl}/${path.split('/').map(encodeURIComponent).join('/')}`,
-      createDate: typeof row.createDate === 'string' ? row.createDate : '' }
+      createDate: typeof row.createDate === 'string' ? row.createDate : '', lastUpdated: null }
   }
   async projects(offset: number): Promise<Project[]> {
     const data = await this.request('projects', new URLSearchParams({ offset: String(offset), count: '100' }))
     if (!Array.isArray(data)) throw new ApiError(502, 'invalid_upstream')
-    return data.map(row => this.project(row))
+    const projects = data.map(row => this.project(row))
+    await Promise.all(projects.map(async project => {
+      if (!project.codeManagement) return
+      try {
+        const rows = await this.request('repositories/' + project.id + '/commits', new URLSearchParams({ count: '1', query: 'order-by-date', field: 'COMMIT_DATE' }))
+        if (Array.isArray(rows) && rows.length > 0) {
+          const row = object(rows[0])
+          if (typeof row.commitDate === 'string' || typeof row.commitDate === 'number') {
+            const date = new Date(row.commitDate)
+            if (!Number.isNaN(date.getTime())) project.lastUpdated = date.toISOString()
+          }
+        }
+      } catch (cause) {
+        // A project may have no initialized repository; the list still loads.
+      }
+    }))
+    return projects
   }
   async repository(id: number): Promise<Repository> {
     const project = this.project(await this.request(`projects/${id}`))

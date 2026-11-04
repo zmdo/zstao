@@ -21,7 +21,8 @@
     "@smp/cos-attachments": "file:/app/plugins/cos-attachments",
     "@smp/console-dashboard": "file:/app/plugins/dashboard",
     "@smp/console-model-billing": "file:/app/plugins/model-billing",
-    "@smp/console-harness-catalog": "file:/app/plugins/harness-catalog"
+    "@smp/console-harness-catalog": "file:/app/plugins/harness-catalog",
+    "@smp/console-project-repositories": "file:/app/plugins/project-repositories"
   },
   "dsh": {
     "profile": {
@@ -47,7 +48,8 @@
         "@smp/console-cos",
         "@smp/console-dashboard",
         "@smp/console-model-billing",
-        "@smp/console-harness-catalog"
+        "@smp/console-harness-catalog",
+        "@smp/console-project-repositories"
       ]
     }
   }

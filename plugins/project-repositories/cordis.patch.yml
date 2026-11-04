@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-project-repositories
+      name: '@smp/console-project-repositories'

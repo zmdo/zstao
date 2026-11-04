@@ -1,12 +1,25 @@
 # CES 代码仓库管理插件设计
 
-- 状态：方案设计，未实现
+- 状态：P1 代码仓库接入已实现；项目镜像仓库、部署流水线未实现
 - 日期：2026-11-04
 - 分支：`feat/code-repository`
 - 目标：在 CES 中管理平台相关代码仓库、代码提交和流水线，形成“开发 → 构建 → 候选验证 → 验收 → 发布”的闭环
 - 关联方案：[CES 自演进服务器与基础设施](../ces-self-evolution-infrastructure/README.md)、[OneDev 初始化与 Agent 自动接入验证](../ces-self-evolution-infrastructure/ONEDEV_BOOTSTRAP_VERIFICATION.md)
 
 ## 0. 结论摘要
+
+## 0.1 当前实现记录
+
+- OneDev 16.9.7 已部署在 `49.233.139.12`，内网地址 `10.2.8.9`，HTTP 端口 80。
+- CES 通过内网 `http://10.2.8.9` 访问 OneDev；OneDev 使用 PostgreSQL 持久化。
+- 已创建测试项目 `ces-platform`，用于验证项目列表 API。
+- CES 插件 `@smp/console-project-repositories` 已实现：
+  - 平台设置 / 项目管理：OneDev 地址、用户名、密码配置与连接测试。
+  - 侧边栏 / 项目仓库管理 / 项目代码仓库：通过 OneDev REST API 搜索和打开项目。
+  - 项目镜像仓库、部署流水线：占位页面，等待后续设计。
+- OneDev 密码使用 CES `secrets` 服务加密保存，不回到浏览器。
+- 构建和部署流水线尚未实现，本文后续章节仍是目标设计，不代表已经具备这些能力。
+
 
 1. **OneDev 作为代码仓库和流水线执行引擎，CES 插件作为控制面。**
 2. CES 不内置 Git 仓库、不内置构建调度器，也不直接在 CES 进程里执行 Shell、Docker 或部署命令。

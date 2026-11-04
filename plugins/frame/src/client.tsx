@@ -371,6 +371,13 @@ function NavGlyph(props: { name: string }) {
       </svg>
     )
   }
+  if (props.name === 'code') {
+    return (
+      <svg {...common}>
+        <path d="m5.4 4.2-3 3.8 3 3.8M10.6 4.2l3 3.8-3 3.8M9 2.6 7 13.4" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
   return (
     <svg {...common}>
       <rect x="3" y="3" width="10" height="10" rx="1.6" stroke="currentColor" strokeWidth="1.4" />

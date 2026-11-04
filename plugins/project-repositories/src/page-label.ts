@@ -1,7 +1,7 @@
 export interface PageLabel {
   (): string
   group?: string
-  groupLabel?: string
+  groupLabel?: string | (() => string)
   placement?: 'nav' | 'footer'
   navigation?: 'tabs' | 'sidebar'
   icon?: string
@@ -11,7 +11,7 @@ export function pageLabel(
   text: () => string,
   place: {
     group: string
-    groupLabel: string
+    groupLabel: string | (() => string)
     placement?: 'nav' | 'footer'
     navigation?: 'tabs' | 'sidebar'
     icon?: string

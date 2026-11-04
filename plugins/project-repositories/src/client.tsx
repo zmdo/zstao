@@ -247,27 +247,29 @@ export const inject = ['slots', 'locale']
 export function apply(ctx: ClientCtx): void {
   ctx.effect(installStyle)
   const zh = () => ctx.locale.getSnapshot().active !== 'en'
+  const projectGroup = () => zh() ? '项目仓库管理' : 'Project repositories'
+  const platformGroup = () => zh() ? '平台设置' : 'Platform settings'
   ctx.slots.inject('console.page', () => ctx.slots.register({
     name: 'console.page', key: CODE_PAGE,
-    label: pageLabel(() => zh() ? '项目代码仓库' : 'Code repositories', { group: GROUP, groupLabel: zh() ? '项目仓库管理' : 'Project repositories', navigation: 'sidebar', icon: 'server' }),
+    label: pageLabel(() => zh() ? '项目代码仓库' : 'Code repositories', { group: GROUP, groupLabel: projectGroup, navigation: 'sidebar', icon: 'code' }),
     order: 4,
     inject: () => ({ locale: ctx.locale }),
   }, CodeRepositoriesPage))
   ctx.slots.inject('console.page', () => ctx.slots.register({
     name: 'console.page', key: IMAGE_PAGE,
-    label: pageLabel(() => zh() ? '项目镜像仓库' : 'Image registry', { group: GROUP, groupLabel: zh() ? '项目仓库管理' : 'Project repositories', navigation: 'sidebar', icon: 'server' }),
+    label: pageLabel(() => zh() ? '项目镜像仓库' : 'Image registry', { group: GROUP, groupLabel: projectGroup, navigation: 'sidebar', icon: 'code' }),
     order: 5,
     inject: () => ({ locale: ctx.locale }),
   }, (props: PageProps) => <PlaceholderPage {...props} title={zh() ? '项目镜像仓库' : 'Image registry'} hint={zh() ? '项目镜像仓库尚未接入，后续完成设计后再开放。' : 'The project image registry is not connected yet.'} />))
   ctx.slots.inject('console.page', () => ctx.slots.register({
     name: 'console.page', key: PIPELINE_PAGE,
-    label: pageLabel(() => zh() ? '部署流水线' : 'Deploy pipelines', { group: GROUP, groupLabel: zh() ? '项目仓库管理' : 'Project repositories', navigation: 'sidebar', icon: 'server' }),
+    label: pageLabel(() => zh() ? '部署流水线' : 'Deploy pipelines', { group: GROUP, groupLabel: projectGroup, navigation: 'sidebar', icon: 'code' }),
     order: 6,
     inject: () => ({ locale: ctx.locale }),
   }, (props: PageProps) => <PlaceholderPage {...props} title={zh() ? '部署流水线' : 'Deploy pipelines'} hint={zh() ? '部署流水线尚未接入，后续完成设计后再开放。' : 'Deploy pipelines are not connected yet.'} />))
   ctx.slots.inject('console.page', () => ctx.slots.register({
     name: 'console.page', key: SETTINGS_PAGE,
-    label: pageLabel(() => zh() ? '项目管理' : 'Project management', { group: 'platform', groupLabel: zh() ? '平台设置' : 'Platform settings', placement: 'footer', icon: 'settings' }),
+    label: pageLabel(() => zh() ? '项目管理' : 'Project management', { group: 'platform', groupLabel: platformGroup, placement: 'footer', icon: 'settings' }),
     order: 9,
     inject: () => ({ locale: ctx.locale }),
   }, ProjectSettingsPage))

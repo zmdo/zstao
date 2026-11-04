@@ -18,6 +18,8 @@ frame 的 `main` 内容声明 `console.page`、`console.page-navigation` 和 `co
 
 壳通过 slot props 传入 `openConsole` 等导航回调。服务器升级导航与内容共享单次客户端实例创建的 `pageState`，不在两个组件里分别维护当前 Tab。
 
+2026-11-04 补充：代码仓库使用 `#console=project-code-repositories&repo=…` 保存引用、SHA 与路径。frame 在页面槽登记、`hashchange` 和 `popstate` 时恢复已注册栏目；插件恢复栏目内部状态。切换其他栏目时更新 `console` 并移除仓库参数，不引入独立路由器。
+
 ## 已实现的页面结构
 
 - Harness 提供会话／档案视角；会话区和工作区侧栏继续使用宿主交互。

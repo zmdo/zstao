@@ -1,436 +1,155 @@
 # CES 项目代码浏览 UI 设计
 
-- 状态：方案设计，未实现
+- 状态：P1 与独立密码管理功能已实现并通过本地验收；真实部署待联调，P2 未实现
 - 日期：2026-11-04
 - 分支：`feat/code-repository`
-- 目标：在“项目代码仓库”中提供 GitHub 风格的只读代码浏览体验，不再依赖跳转 OneDev；同时在“项目管理”中支持查看已配置的 OneDev 密码
-- 关联方案：[CES 代码仓库管理插件设计](../code-repository/README.md)
+- 关联：[代码仓库管理设计](../code-repository/README.md)
+- 基线：OneDev 16.9.7、dsh 0.2.1-rc.5、现有 `@smp/console-project-repositories` 插件
 
-## 0. 结论
+## 1. 目标与范围
 
-1. “项目代码仓库”从项目列表升级为项目列表 + 仓库详情，仓库详情在 CES 内完成。
-2. “打开 OneDev”保留为辅助入口，不再作为查看代码的主要方式。
-3. 首版只做只读浏览：目录、文件、分支、Tag、提交记录、README。
-4. 不做在线编辑、PR、Issue、Blame、Actions 和完整代码搜索。
-5. 不做 CodeMirror 交互编辑，不做手动虚拟滚动。
-6. 首版不做完整 Diff；提交详情先展示提交元数据和变更文件摘要，Diff 留到 P2。
-7. 视觉参考 GitHub，但颜色、边框和字体使用 CES 主题 token，必须同时支持亮色和暗色模式。
-8. “项目管理”中的密码改为可以按需显示；密码通过 CES 后端解密后一次性返回，不进入 URL、日志或页面初始 HTML。
+在 CES 内浏览已配置 OneDev 账户可访问的代码仓库，保留“打开 OneDev”作为管理入口。CES 为单用户系统，不增加账号角色、项目授权表或 Git 托管服务。当前接入范围是配置账户的可见项目，不承诺尚未实现的 CES 仓库白名单。
 
-## 1. 目标与非目标
+页面继续注册到 `console.page`，Host 使用内部 OneDev 地址和加密保存的凭据。外部链接使用外部访问地址；浏览器不携带 OneDev 凭据。配置仍在 `DSH_HOME/project-management.json`，本次不增加数据库迁移。
 
-### 目标
+| 阶段 | 范围 |
+| --- | --- |
+| P1 | 项目列表与详情、分支/Tag 选择、目录树、文件/Markdown/README、最近 100 条提交、克隆地址、URL 状态、亮暗主题、错误与性能边界 |
+| 独立管理功能，与 P1 一起交付 | 已保存密码的显示、隐藏、复制，与密码修改输入框分离 |
+| P2 | 提交详情、变更文件与增删行统计、Diff、文件历史、分支/Tag 详细列表、完整历史遍历 |
 
-- 在 CES 内查看 OneDev 项目。
-- 在 CES 内切换分支和 Tag。
-- 浏览仓库目录树和文件内容。
-- 渲染 Markdown、README 和代码高亮。
-- 查看提交列表和单次提交摘要。
-- 保持轻量，不引入第二个设计系统。
-- 适配现有 CES 亮色和暗色主题。
-- 让非 OneDev 用户不需要记住 OneDev 管理员密码就能查看代码。
+首版不做写操作、在线编辑、PR、Issue、Blame、代码全文搜索、匿名认证回退、多个仓库同时打开。只有 Code 与 Commits 两个标签；Branches/Tags 集中在引用选择器中。
 
-### 非目标
+## 2. 页面行为
 
-- 不实现 Git 写操作。
-- 不实现在线提交、分支创建、Tag 创建、文件编辑。
-- 不实现 Pull Request、Issue、Review、Blame。
-- 不实现完整 Diff 页面和代码搜索。
-- 不实现 OneDev 权限系统替代品；CES 登录用户默认只能浏览已接入项目。
-- 不把 OneDev 密码暴露在 URL、localStorage、日志或页面源码中。
+### 项目列表
 
-## 2. 页面结构
+项目行或名称按钮进入 CES 详情，名称按钮支持键盘操作；行尾 OneDev 链接不触发行跳转。项目按 `offset/count` 每批 100 项读取，通过“加载更多”继续；搜索明确只过滤已加载项目。列表展示名称、路径、说明、能力，不逐项目补查最新提交。未启用代码管理的项目仍可打开 OneDev，但不进入代码浏览。
 
-### 2.1 项目列表
-
-保留现有 `/项目仓库管理/项目代码仓库` 页面，但调整交互：
-
-- 项目行点击后进入 **仓库详情**，不跳转 OneDev。
-- 行尾保留“打开 OneDev”链接，作为管理入口。
-- 行尾显示默认分支、最近提交、最近更新时间和项目状态。
-- 搜索保持本地过滤，数据来自 OneDev API。
-
-### 2.2 仓库详情
+### 仓库详情
 
 ```text
-┌──────────────────────────────────────────────────────────────────────┐
-│ ces-platform                                          [打开 OneDev]  │
-│ CES platform source repositories                                   │
-├──────────────────────────────────────────────────────────────────────┤
-│ [<> Code] [Commits] [Branches] [Tags]                              │
-├──────────────────────────────────────────────────────────────────────┤
-│ [main ▾]  [路径 / 面包屑]                              [复制克隆地址] │
-├───────────────────┬──────────────────────────────────────────────────┤
-│ 目录树             │ 文件内容 / README                                │
-│ ▾ src              │                                                  │
-│   ▸ client         │  # CES                                           │
-│   ▸ host           │                                                  │
-│   README.md        │  ...                                             │
-└───────────────────┴──────────────────────────────────────────────────┘
+返回项目列表 · 项目名称 / 描述                 打开 OneDev
+Code | Commits
+分支/Tag 选择器 · 当前 SHA · 刷新引用          复制克隆地址
+目录树                    面包屑 / 目录列表 / 文件内容
+                          当前目录 README
 ```
 
-### 2.3 文件浏览
+- 默认使用默认分支；无默认分支显示仓库尚未初始化。
+- 目录树按需加载，折叠不重复请求缓存内容；换项目或 SHA 后释放缓存。
+- 当前目录显示目录列表及该目录 README，不以根 README 替代子目录 README。查找不区分大小写，优先 `README.md`、`README.markdown`、`README`。
+- 文件显示路径、原始大小、截断标志、源码/预览切换和下载入口。
+- 未识别语言用纯文本；二进制仅显示元信息。Markdown 内图片使用受限资源接口。
+- 窄屏目录树可折叠，代码与表格内部滚动。
+- Commits 仅展示固定 SHA 可达的最近 100 条提交：标题、SHA、作者、提交时间。超过上限提示去 OneDev 查看更早记录，不伪造分页或变更文件数。
 
-仓库详情默认显示 Code 标签页：
+## 3. 引用、路径与页面状态
 
-- 顶部：分支/Tag 选择器、面包屑、克隆地址。
-- 左侧：目录树，支持展开/折叠，目录和文件都有类型图标。
-- 右侧：当前目录文件列表，或文件内容。
-- 如果没有选择文件，展示 README。
-- 点击目录进入下一级；点击文件加载全文。
-- 文件内容上方显示路径、文件大小和原始文件链接。
+选择分支/Tag 后，先通过对应引用详情解析完整 commit SHA。目录、文件、README、图片和提交列表均使用此 SHA，直到切换引用或主动刷新引用；push 不得让目录与文件混用版本。
 
-### 2.4 分支与 Tag
+状态为 `projectId/refType/refName/resolvedCommitSha/path/kind/tab`，其中 `refType` 为 branch/tag，`kind` 为 directory/file。引用名称必须携带类型，支持同名分支/Tag；路径参数和引用名称分别编码。缓存按项目 ID + SHA + 路径隔离。
 
-Code 标签页顶部的引用选择器合并显示：
+页面状态放入带 `console=project-code-repositories` 的 hash。frame 恢复外层栏目，插件恢复仓库状态，不引入 React Router。URL 带 SHA 时恢复固定快照；切换引用清除 SHA 后重新解析。支持返回目录、返回列表、浏览器后退/前进。
 
-```text
-Branches
-  main
-  develop
-Tags
-  v0.1.0
-  v0.2.0
-```
+状态变化取消旧请求，异步结果写入前检查请求是否仍有效。文件在新引用中不存在时显示明确错误并提供返回目录/根目录入口。
 
-规则：
+## 4. 组件、主题与构建
 
-- 默认选中项目默认分支。
-- 如果默认分支为空，提示仓库尚未初始化。
-- 切换分支或 Tag 后重新加载目录和文件。
-- 当前引用状态保存在页面组件内；刷新页面可以回到默认分支。
-- 不单独为分支和 Tag 建页面，顶部选择器足够覆盖只读场景。
+- 布局使用 `@smp/console-kit` 与 CES 主题变量。
+- 复用宿主 `@deepseek-ai/dsh-client-ui-primitives` 的 `CodeBlock`、`FileTypeIcon`、目录图标与语言识别，不额外打包编辑器或 Shiki。
+- Markdown 使用 `react-markdown` + `remark-gfm`，通过自定义链接/图片组件处理仓库资源；关闭原始 HTML，不启用 MDX、rehype-raw 或任意 HTML 注入。
+- 目录树采用受控 React 组件，借鉴技能浏览器，不新增 react-arborist、Octicons 或第二套设计系统。
+- React 与宿主 UI primitives 使用现有 external；其余依赖随插件打包并锁定版本。
+- 当前构建是单文件 CJS，动态 import 不等同于按需下载。未来自行引入 Shiki 时另行设计语言子集、资源加载和实例生命周期。
+- 文案中英文，CSS 使用主题变量，覆盖系统与手动亮暗主题。
 
-### 2.5 Commits 标签
+## 5. Markdown、资源与性能边界
 
-提交列表按时间倒序展示：
+相对链接以当前 Markdown 父目录为基准，先解析 `.`/`..` 再检查不能越过仓库根目录。不能简单拒绝所有带 `..` 的链接。内部跳转和图片均保持项目与 SHA；标题生成稳定锚点，`#anchor` 保持当前文档上下文。
 
-- 提交标题
-- 提交 SHA 短码
-- 作者
-- 提交时间
-- 变更文件数
-- 提交所属分支/Tag 上下文
+普通链接在 CES 中打开；外部链接只允许 HTTP/HTTPS，使用新窗口及 `noopener noreferrer`。外部图片不自动加载，显示链接。仓库图片只允许签名验证的 PNG/JPEG/GIF/WebP；SVG/HTML 不在 CES 同源执行。
 
-点击提交后展示：
+下载强制 `application/octet-stream`、`Content-Disposition: attachment`、`X-Content-Type-Options: nosniff`。上游截断内容不能作为完整文件下载。
 
-- 完整 SHA
-- 作者和提交时间
-- 提交正文
-- 变更文件列表
-- 每个文件的增删行数
+| 资源 | 上限与降级 |
+| --- | --- |
+| 文本预览 | 200 KiB、5,000 行，按 UTF-8 边界截断；非 UTF-8 按不可预览处理 |
+| 高亮 | 超过 2,000 字符的单行降级纯文本；截断 Markdown 显示源码 |
+| 上游 JSON | 8 MiB，包含响应正文的 12 秒超时 |
+| 图片与下载 | 4 MiB 且内容完整，超限提示使用 OneDev |
+| 单目录 | 最多显示 2,000 项，超限明确提示 |
 
-首版不渲染完整 Diff。P2 再接入 `react-diff-view`。
+保留 OneDev 的原始 `size` 与 `isPartial`。请求受浏览器断开与插件卸载取消，卸载等待在途请求结束。代码不入数据库，不使用无界全局缓存。
 
-### 2.6 Branches 和 Tags 标签
+## 6. OneDev 16.9.7 API 契约
 
-这两个标签只做浏览，不做写操作：
-
-- Branches：名称、最新提交 SHA、提交时间、是否默认分支。
-- Tags：名称、指向的提交、创建时间或提交时间。
-
-如果 OneDev API 只返回引用名称，可以先展示名称和对应 commit，再按需补充提交信息。
-
-## 3. 视觉设计
-
-### 3.1 GitHub 风格的边界
-
-参考：
-
-- 顶部仓库标题和描述
-- 标签式导航
-- 文件表格布局
-- 目录/文件图标
-- 提交列表的紧凑行布局
-- 等宽代码字体
-- 细边框和低对比背景
-
-不直接采用：
-
-- GitHub 的完整色板
-- Primer 的全局 CSS
-- GitHub 的复杂交互和动效
-
-### 3.2 暗色模式
-
-使用现有 CSS 变量：
-
-```text
---dsw-alias-bg-layer-1/2
---dsw-alias-label-primary/secondary/tertiary
---dsw-alias-border-l1/l2/l3
---dsw-alias-interactive-bg-hover
---dsw-alias-interactive-bg-selected
-```
-
-要求：
-
-- 亮色：白底、浅灰边框、深色文字。
-- 暗色：深灰背景、低对比边框、浅色文字。
-- 代码高亮使用 Shiki 的 CSS variables 主题，由主题 token 控制背景和前景。
-- 不使用硬编码的 `#fff`、`#000` 作为主要颜色。
-- 所有新增页面在系统暗色和手动暗色下都要检查。
-
-### 3.3 图标
-
-- 文件类型：复用 DSH `FileTypeIcon`
-- 目录：`IconFolderOpenRegular` / `IconFolderCloseRegular`
-- 其他操作：`@primer/octicons`
-- 所有图标继承 `currentColor`，确保暗色模式可见
-
-## 4. 组件选型
-
-### 4.1 采用的组件
-
-| 能力 | 选型 | 说明 |
-|---|---|---|
-| 页面布局 | `@smp/console-kit` | 复用 Panel、表格、按钮、主题 token |
-| 目录树 | `react-arborist` | 目录树和展开状态；首版不额外引入虚拟滚动 |
-| 文件/目录图标 | DSH FileTypeIcon + `@primer/octicons` | 与工作区文件外观一致 |
-| 代码高亮 | `shiki` | 只读展示，不做交互编辑 |
-| Markdown | `react-markdown` + `remark-gfm` + `rehype-sanitize` | README 和 `.md` 文件 |
-| 请求 | `fetch` + `AbortController` | 不做复杂缓存层 |
-| 状态 | React `useState` / `useReducer` | 页面状态简单，不引入 Redux |
-
-### 4.2 明确不采用
-
-| 组件 | 原因 |
-|---|---|
-| CodeMirror 6 | 首版只读，不需要编辑器、光标、选区、搜索等交互 |
-| Monaco Editor | 体积过大，功能过剩 |
-| `@tanstack/react-virtual` | 首版不做手动虚拟滚动；普通目录和提交列表足够 |
-| `react-diff-view` | 首版不做完整 Diff，留到 P2 |
-| MUI / Ant Design / Primer React | 不引入第二套设计系统 |
-| iframe 嵌入 OneDev | 登录态、路由和主题难以统一 |
-
-### 4.3 大文件和性能
-
-- 文件超过 200KB：只展示前 200KB，并明确提示已截断。
-- 二进制文件：展示文件元信息，不渲染内容。
-- Shiki 语言包按需加载。
-- 目录树按需加载子目录，不在首屏递归请求整棵树。
-- 提交列表使用 OneDev 的分页参数；首版不虚拟滚动。
-- 页面切换时用 `AbortController` 取消旧请求。
-
-## 5. 密码显示设计
-
-### 5.1 交互
-
-“平台设置 / 项目管理”中的密码字段改为：
-
-```text
-密码  [********]  [显示] [复制]
-```
-
-行为：
-
-1. 默认仍显示掩码。
-2. 点击“显示”后请求 CES 后端解密当前密码。
-3. 显示为明文，按钮变为“隐藏”。
-4. 30 秒后自动隐藏。
-5. 点击“复制”写入剪贴板，并提示“已复制”。
-6. 页面切换、保存、关闭或重新加载后不保留明文。
-
-### 5.2 后端接口
-
-新增受登录保护的接口：
-
-```text
-POST /console-api/project-management/settings/reveal-password
-```
-
-返回：
-
-```json
-{
-  "password": "..."
-}
-```
-
-要求：
-
-- 只允许已登录的 CES 管理员会话。
-- 响应头使用 `Cache-Control: no-store`。
-- 不写入访问日志、错误日志或浏览器 history。
-- 不允许 GET 查询参数携带密码。
-- 失败只返回通用错误，不泄露加密细节。
-- 建议加简单频率限制，避免短时间重复调用。
-
-### 5.3 安全边界
-
-- 密码只在用户主动点击“显示”时解密。
-- 明文不进入 React 全局状态，只保存在当前组件的短生命周期状态中。
-- 不使用 `localStorage`、`sessionStorage`、URL 参数或剪贴板自动写入。
-- 密码字段不会出现在页面初始 HTML、SSR 数据或错误堆栈中。
-- 未来如果切换为 OneDev Access Token，仍然复用这套“按需显示”交互。
-
-## 6. OneDev API 映射
-
-所有请求由 CES Host 发往内部 OneDev 地址，浏览器不直接访问 OneDev。
-
-### 6.1 项目
+已对照 [RepositoryResource](https://github.com/theonedev/onedev/blob/v16.9.7/server-core/src/main/java/io/onedev/server/rest/resource/RepositoryResource.java)、[ProjectResource](https://github.com/theonedev/onedev/blob/v16.9.7/server-core/src/main/java/io/onedev/server/rest/resource/ProjectResource.java)、[CommitQuery.g4](https://github.com/theonedev/onedev/blob/v16.9.7/server-core/src/main/java/io/onedev/server/search/commit/CommitQuery.g4)。真实部署联调单独记录。
 
 ```text
 GET /~api/projects?offset=0&count=100
-GET /~api/projects/{projectId}
-GET /~api/projects/{projectId}/clone-url
+GET /~api/projects/{id}
+GET /~api/projects/{id}/clone-url
+GET /~api/repositories/{id}/branches
+GET /~api/repositories/{id}/tags
+GET /~api/repositories/{id}/default-branch
+GET /~api/repositories/{id}/branches/{encodedBranch}
+GET /~api/repositories/{id}/tags/{encodedTag}
+GET /~api/repositories/{id}/directories/{sha}/{encodedPathSegments}
+GET /~api/repositories/{id}/files?revision={sha}&file={encodedPath}
+GET /~api/repositories/{id}/commits?query={encodedQuery}&count=101&field=AUTHOR&field=COMMIT_DATE&field=SUBJECT
 ```
 
-### 6.2 分支和 Tag
+默认分支端点是原始字符串响应（例如未加引号的 `main`，即使 Content-Type 是 application/json），单独按文本读取；不存在时返回 204，不解析空 JSON。引用列表返回名字，引用详情返回 `refName/commitHash`。文件返回 `path/sha/base64Content/size/isPartial`。
+
+提交 query 为 `commit(SHA) order-by-date`，数量是独立 count 参数，不使用 `count(20)` 查询条件。该接口没有 page/offset；P1 请求 101 条，展示前 100 条并判断更多记录，不请求 FILE_CHANGES。P2 才实现经过验证的完整历史遍历。
+
+目录仅返回 `path/isFile`；不能将所有非文件视为普通目录。符号链接/submodule 无法读取时显示不支持，不跟随到宿主文件系统。
+
+### CES 接口
 
 ```text
-GET /~api/repositories/{projectId}/branches
-GET /~api/repositories/{projectId}/tags
-GET /~api/repositories/{projectId}/default-branch
+GET  /console-api/project-management/projects?offset=0
+GET  /console-api/project-management/repos/:id
+GET  /console-api/project-management/repos/:id/resolve?type=branch|tag&name=
+GET  /console-api/project-management/repos/:id/tree?sha=&path=
+GET  /console-api/project-management/repos/:id/file?sha=&path=
+GET  /console-api/project-management/repos/:id/asset?sha=&path=
+GET  /console-api/project-management/repos/:id/raw?sha=&path=
+GET  /console-api/project-management/repos/:id/commits?sha=
+POST /console-api/project-management/settings/reveal-password
 ```
 
-### 6.3 目录
+元数据包含项目、默认分支、分支/Tag 名称及无凭据克隆地址。README 复用目录与文件接口。所有接口先检查 CES 登录，只读接口仅允许 GET。校验 ID/SHA/路径，不接受任意上游 URL 或查询；上游结构校验，错误分类脱敏，不回传原始错误正文、内部认证头或秘密。
 
-```text
-GET /~api/repositories/{projectId}/directories/{revisionAndDirectory}
-```
+## 7. 密码显示与复制
 
-`revisionAndDirectory` 建议编码为：
+“新密码”输入框留空仍表示沿用保存值。新增独立“已保存密码”区域，初始只有掩码。
 
-```text
-{branchOrTag}/{path}
-```
+- 显示/复制均主动请求独立 POST 接口；只有这些动作向浏览器返回保存密码。正常代理认证仍需在后端解密。
+- 要求同源 JSON 请求，检查 Origin/Fetch Metadata，复用 CES 会话，不新增管理员角色。
+- 成功和失败均 no-store；失败仅通用错误，不暴露加密细节；简单限流归插件实例持有。
+- 显示最多 30 秒，手动隐藏、保存、页面隐藏/切换/卸载均清除明文并取消未完成请求。
+- 隐藏时也能主动复制，只在本次操作持有明文；复制失败明确提示。
+- 不使用 URL、持久存储、日志、初始 HTML 或全局状态保存明文。
+- 用户能在开发者工具观察已返回的明文；自动隐藏不能清除系统剪贴板，不承诺远程销毁。
 
-例如：
+## 8. 验收与交付
 
-```text
-main/src/client
-```
+1. 第二批项目可加载，搜索明确作用于已加载项目；无代码管理的项目有明确状态。
+2. 点击项目进入 CES，外部链接不触发行跳转。
+3. 同名分支/Tag、带斜杠引用、中文与特殊字符路径正常。
+4. 浏览资源固定到同一 SHA，push 不改变快照，快速切换不会被旧响应覆盖。
+5. 刷新恢复、后退/前进、返回目录与项目列表正常。
+6. 嵌套 README、上级目录链接、图片、锚点正常；越界路径和危险协议被拒绝。
+7. 字节/行数/长行、二进制、上游 partial、超限下载均有明确状态。
+8. 提交显示最近 100 条并注明上限。
+9. 未登录、凭据错误、404、超时、不可达与空仓库都有明确状态，错误不泄露上游秘密。
+10. 密码显示/复制与新密码草稿分离，过期和页面隐藏清除明文。
+11. 亮暗、中英文、窄屏布局正常，构建不重复打包 React。
 
-无子目录时只传：
+交付记录测试、构建、浏览器验证与实际 OneDev 联调范围。P2 不得标为已实现。
 
-```text
-main
-```
+## 9. 实施记录
 
-### 6.4 文件
-
-```text
-GET /~api/repositories/{projectId}/files?revision={branchOrTag}&file={path}
-```
-
-OneDev 返回 Base64 编码的文件内容。CES Host 负责解码，并根据大小、二进制类型和扩展名返回前端可展示的数据。
-
-### 6.5 提交
-
-```text
-GET /~api/repositories/{projectId}/commits?query={ref}%20count(20)&count=20
-GET /~api/repositories/{projectId}/commits/{commitHash}
-```
-
-实现时需要按 OneDev 实际查询语法调整 query，并请求：
-
-- `PARENTS`
-- `AUTHOR`
-- `COMMITTER`
-- `COMMIT_DATE`
-- `SUBJECT`
-- `BODY`
-- `FILE_CHANGES`
-
-### 6.6 CES 代理接口
-
-建议新增：
-
-```text
-GET /console-api/project-management/repos/:id
-GET /console-api/project-management/repos/:id/branches
-GET /console-api/project-management/repos/:id/tags
-GET /console-api/project-management/repos/:id/tree?ref=&path=
-GET /console-api/project-management/repos/:id/file?ref=&path=
-GET /console-api/project-management/repos/:id/readme?ref=
-GET /console-api/project-management/repos/:id/commits?ref=&page=
-GET /console-api/project-management/repos/:id/commits/:sha
-```
-
-这些接口统一：
-
-- 使用内部 OneDev 地址
-- 使用服务端保存的 OneDev 凭据
-- 做路径校验，禁止 `..` 和绝对路径
-- 对 OneDev 错误做脱敏
-- 不把 OneDev 密码或内部 Token 返回前端
-
-## 7. 前端状态模型
-
-仓库详情只维护少量状态：
-
-```text
-selectedProjectId
-selectedRefType: branch | tag
-selectedRef
-currentPath
-selectedFile
-activeTab: code | commits | branches | tags
-treeCache
-fileContent
-commitPage
-loading / error
-```
-
-不引入全局仓库状态；关闭页面即释放。
-
-页面内路由建议保持在 `console.page` 内，不新增 React Router。若需要可分享链接，再使用 hash 或查询参数保存项目、分支和路径。
-
-## 8. 错误与空状态
-
-- 项目没有默认分支：显示“仓库尚未初始化”。
-- 分支为空：显示空状态，不请求目录。
-- 目录为空：显示“此目录没有文件”。
-- 文件过大：显示截断提示。
-- 文件为二进制：显示文件大小和类型，不渲染。
-- OneDev 不可达：显示配置检查入口。
-- 凭据失效：显示“请到项目管理重新保存密码”。
-- 权限不足：显示 OneDev 返回的脱敏错误。
-- 请求被取消：不显示错误。
-
-## 9. 实施阶段
-
-### P1：只读浏览
-
-- 项目管理密码显示/隐藏/复制
-- 仓库详情入口
-- Code 标签页
-- 分支和 Tag 选择
-- 目录树
-- 文件内容
-- README / Markdown
-- 提交列表
-- 亮色和暗色适配
-
-### P2：增强
-
-- 提交详情
-- 文件变更摘要
-- Diff
-- 文件历史
-- 分支/Tag 详情
-- 可分享的页面状态
-- 大文件/提交列表性能优化
-
-## 10. 验收标准
-
-1. 点击项目行进入 CES 内仓库详情，不跳转 OneDev。
-2. “打开 OneDev”仍然保留，但只作为辅助入口。
-3. 可以切换分支和 Tag，目录和文件随之刷新。
-4. 目录树中的目录和文件都有正确图标。
-5. 文件内容支持代码高亮；Markdown 和 README 正确渲染。
-6. 提交列表展示标题、SHA、作者、时间和变更文件数。
-7. 暗色模式下页面背景、边框、文字、代码高亮均正常。
-8. 密码默认掩码，点击显示后可见，30 秒自动隐藏。
-9. 密码不会出现在 URL、页面源码、localStorage 或日志中。
-10. OneDev 不可达、凭据错误、空仓库和超大文件都有明确状态。
-
-## 11. 待确认
-
-1. 首版是否需要显示克隆地址和复制按钮。
-2. 提交详情中的 Diff 是否必须进入 P1，还是接受 P2。
-3. 是否需要支持按路径过滤提交历史。
-4. 是否需要保存当前分支/路径到 URL，以便刷新和分享。
-5. 是否需要多项目同时打开，还是单项目详情即可。
-6. 是否允许匿名 OneDev 访问作为后备；当前设计仍由 CES 代理认证。
+本次已实现第 1 节 P1 和独立密码管理功能。测试、构建、真实宿主组件的浏览器夹具验证及截图见[验收记录](../../reports/project-code-browser-2026-11-04/README.md)。验证未使用实际 OneDev 凭据、未部署到现有运行实例。

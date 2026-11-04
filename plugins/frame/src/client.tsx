@@ -1,3 +1,4 @@
+import { consolePageFromHash, consolePageHash } from './navigation.ts'
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { consoleCss } from '@smp/console-kit'
@@ -728,6 +729,10 @@ export function apply(ctx: ShellCtx): void {
   }
   const openConsole = (id: string): void => {
     chosen = true
+    if (id === 'project-code-repositories' || consolePageFromHash(window.location.hash) !== undefined) {
+      const hash = consolePageHash(window.location.hash, id)
+      if (hash !== window.location.hash) window.history.pushState(null, '', hash)
+    }
     show(id)
   }
   ctx.slots.inject('sidebar', () => ctx.slots.register({
@@ -775,10 +780,26 @@ export function apply(ctx: ShellCtx): void {
         'console.settings-host': { kind: 'single', scope: 'root' },
       },
     }, (props: { renderSlot?: RenderSlot }) => <ConsolePanel slots={ctx.slots} locale={ctx.locale} section={section} auth={auth} groups={ctx.workspaceGroups} openConsole={openConsole} renderSlot={props.renderSlot} />)
+    const restore = (): void => {
+      const page = consolePageFromHash(window.location.hash)
+      if (page === AGENT_CHAT || (page !== undefined && ctx.slots.entries('console.page').some(entry => entry.options.key === page))) {
+        chosen = true
+        show(page)
+      }
+    }
+    const unsubscribe = ctx.slots.subscribe('console.page', restore)
+    window.addEventListener('hashchange', restore)
+    window.addEventListener('popstate', restore)
+    restore()
     void landing.refresh().finally(() => {
       if (!chosen) show(landing.get().page)
     })
-    return dispose
+    return () => {
+      window.removeEventListener('hashchange', restore)
+      window.removeEventListener('popstate', restore)
+      unsubscribe()
+      dispose()
+    }
   })
   const theme: ThemeFace = {
     getTheme: () => ctx.theme.getTheme(),

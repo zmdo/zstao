@@ -70,17 +70,19 @@ export function apply(ctx: HostContext, config: Config): void {
     : config.skillsRoot.trim()
   if (!isAbsolute(skillsRoot)) throw new Error('Harness skill root must be absolute')
   const disabledRoot = join(dirname(skillsRoot), 'skills-disabled')
+  const settingsFile = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'harness-catalog.json')
 
   ctx.effect(() => {
     const stops = [
       ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills`, handler: (request, response) => listSkills(ctx, skillsRoot, disabledRoot, request, response) }),
       ctx.webServer.register({ kind: 'exact', path: `${ROOT}/tools`, handler: (request, response) => listTools(ctx, request, response) }),
-      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/inspect`, handler: (request, response) => inspectSkill(ctx, skillsRoot, request, response) }),
-      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/import`, handler: (request, response) => importSkill(ctx, skillsRoot, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/inspect`, handler: (request, response) => inspectSkill(ctx, skillsRoot, settingsFile, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/import`, handler: (request, response) => importSkill(ctx, skillsRoot, settingsFile, request, response) }),
       ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/state`, handler: (request, response) => changeState(ctx, skillsRoot, disabledRoot, request, response) }),
       ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/remove`, handler: (request, response) => removeSkill(ctx, skillsRoot, disabledRoot, request, response) }),
       ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/files`, handler: (request, response) => listFiles(ctx, skillsRoot, disabledRoot, request, response) }),
       ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/file`, handler: (request, response) => readFileRoute(ctx, skillsRoot, disabledRoot, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/settings`, handler: (request, response) => settingsRoute(ctx, settingsFile, request, response) }),
     ]
     return () => { for (const stop of stops) stop() }
   })
@@ -180,11 +182,11 @@ async function listTools(ctx: HostContext, request: IncomingMessage, response: S
 interface ZipEntry { name: string; data: Buffer; mode: number | undefined }
 interface SkillPackage { name: string; description: string; whenToUse: string; content: string; entries: ZipEntry[]; base: string }
 
-async function inspectSkill(ctx: HostContext, root: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+async function inspectSkill(ctx: HostContext, root: string, settingsFile: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
   if (request.method !== 'POST') { send(response, 405, { detail: '需要 POST' }); return }
   try {
-    const pkg = await readPackage(request)
+    const pkg = await readPackage(request, (await readSettings(settingsFile)).filterAppleFiles)
     if (await exists(join(root, pkg.name))) {
       send(response, 200, { valid: false, error: '同名技能已存在' })
       return
@@ -206,11 +208,11 @@ async function inspectSkill(ctx: HostContext, root: string, request: IncomingMes
   }
 }
 
-async function importSkill(ctx: HostContext, root: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+async function importSkill(ctx: HostContext, root: string, settingsFile: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
   if (request.method !== 'POST') { send(response, 405, { detail: '需要 POST' }); return }
   try {
-    const pkg = await readPackage(request)
+    const pkg = await readPackage(request, (await readSettings(settingsFile)).filterAppleFiles)
     const directory = join(root, pkg.name)
     await mkdir(root, { recursive: true })
     if (await exists(directory)) { send(response, 409, { detail: '同名技能已存在' }); return }
@@ -346,10 +348,43 @@ function isUnder(path: string, root: string): boolean {
   return resolve(path).startsWith(parent)
 }
 
-async function readPackage(request: IncomingMessage): Promise<SkillPackage> {
+interface CatalogSettings {
+  filterAppleFiles: boolean
+}
+
+async function readSettings(file: string): Promise<CatalogSettings> {
+  try {
+    const parsed = JSON.parse(await readFile(file, 'utf8')) as { filterAppleFiles?: unknown }
+    return { filterAppleFiles: parsed.filterAppleFiles !== false }
+  } catch {
+    return { filterAppleFiles: true }
+  }
+}
+
+async function settingsRoute(ctx: HostContext, file: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
+  if (request.method === 'GET') {
+    send(response, 200, await readSettings(file))
+    return
+  }
+  if (request.method !== 'POST') { send(response, 405, { detail: '需要 GET 或 POST' }); return }
+  try {
+    const body = await readJson(request)
+    if (typeof body.filterAppleFiles !== 'boolean') throw new Error('filterAppleFiles 必须是布尔值')
+    await mkdir(dirname(file), { recursive: true })
+    const next = join(dirname(file), `.harness-catalog-${randomUUID()}.json`)
+    await writeFile(next, `${JSON.stringify({ filterAppleFiles: body.filterAppleFiles }, null, 2)}\n`, 'utf8')
+    await rename(next, file)
+    send(response, 200, { filterAppleFiles: body.filterAppleFiles })
+  } catch (cause) {
+    send(response, 400, { detail: cause instanceof Error ? cause.message : String(cause) })
+  }
+}
+
+async function readPackage(request: IncomingMessage, filterAppleFiles: boolean): Promise<SkillPackage> {
   const type = String(request.headers['content-type'] ?? '')
   if (type.startsWith('application/zip') || type.startsWith('application/x-zip-compressed')) {
-    const entries = await readZip(await readBody(request, 20 * 1024 * 1024))
+    const entries = await readZip(await readBody(request, 20 * 1024 * 1024), filterAppleFiles)
     return packageFromZip(entries)
   }
   const body = await readJson(request)
@@ -378,7 +413,7 @@ function packageFromZip(entries: ZipEntry[]): SkillPackage {
   return { name: fm.name, description: fm.description, whenToUse: fm.whenToUse, content, entries, base }
 }
 
-async function readZip(buffer: Buffer): Promise<ZipEntry[]> {
+async function readZip(buffer: Buffer, filterAppleFiles: boolean): Promise<ZipEntry[]> {
   if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) throw new Error('不是有效的 zip')
   return await new Promise((resolvePromise, reject) => {
     yauzl.fromBuffer(buffer, { lazyEntries: true, decodeStrings: true, validateEntrySizes: true }, (error: Error | null, zip: any) => {
@@ -392,7 +427,8 @@ async function readZip(buffer: Buffer): Promise<ZipEntry[]> {
         try {
           if (entry.isEncrypted === true) throw new Error('不支持加密 zip')
           const rawName = String(entry.fileName).replace(/\\/g, '/')
-          if (rawName.startsWith('__MACOSX/') || rawName === '.DS_Store' || rawName.endsWith('/.DS_Store')) { zip.readEntry(); return }
+          const appleFile = rawName.split('/').some(part => part === '__MACOSX' || part === '.DS_Store' || part.startsWith('._'))
+          if (filterAppleFiles && appleFile) { zip.readEntry(); return }
           if (rawName.endsWith('/')) { zip.readEntry(); return }
           if (entry.uncompressedSize > 25 * 1024 * 1024) throw new Error('zip 内单个文件过大')
           total += entry.uncompressedSize

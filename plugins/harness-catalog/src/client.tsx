@@ -143,6 +143,12 @@ function copyOf(active: string) {
     retry: zh ? '重试' : 'Retry',
     builtin: zh ? '内置' : 'built-in',
     toolCount: zh ? '个工具' : 'tools',
+    settingsTitle: zh ? 'Skill 管理' : 'Skill management',
+    filterApple: zh ? '过滤 macOS 元数据文件' : 'Filter macOS metadata files',
+    filterAppleHint: zh ? '导入 zip 时忽略 __MACOSX/ 和 .DS_Store，避免把 Finder 生成的元数据装进 Skill。' : 'Skip __MACOSX/ and .DS_Store entries when importing a zip.', 
+    save: zh ? '保存' : 'Save',
+    saved: zh ? '已保存' : 'Saved',
+    saveFailed: zh ? '保存失败' : 'Could not save',
   }
 }
 
@@ -511,6 +517,49 @@ function ImportDialog(props: {
   )
 }
 
+function markdownBody(content: string): string {
+  return content.replace(/^---\s*\r?\n[\s\S]*?\r?\n---\s*(?:\r?\n|$)/, '')
+}
+
+function SkillSettingsSection(props: { locale: LocaleFace }) {
+  const copy = copyOf(props.locale.getSnapshot().active)
+  const [filterAppleFiles, setFilterAppleFiles] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let stopped = false
+    getJson<{ filterAppleFiles: boolean }>('/console-api/harness-catalog/settings')
+      .then(value => { if (!stopped) setFilterAppleFiles(value.filterAppleFiles) })
+      .catch(cause => { if (!stopped) setError(messageOf(cause)) })
+      .finally(() => { if (!stopped) setLoading(false) })
+    return () => { stopped = true }
+  }, [])
+  const save = async (value: boolean): Promise<void> => {
+    setFilterAppleFiles(value)
+    setSaving(true)
+    setSaved(false)
+    setError('')
+    try {
+      await sendJson('/console-api/harness-catalog/settings', { filterAppleFiles: value })
+      setSaved(true)
+    } catch (cause) { setError(messageOf(cause)) } finally { setSaving(false) }
+  }
+  return (
+    <section className="smp-catalog-settings">
+      <h2>{copy.settingsTitle}</h2>
+      <label className="smp-catalog-settings-row">
+        <input type="checkbox" checked={filterAppleFiles} disabled={loading || saving} onChange={event => { void save(event.target.checked) }} />
+        <span><strong>{copy.filterApple}</strong><br /><span className="muted">{copy.filterAppleHint}</span></span>
+      </label>
+      {saving && <p className="muted">{copy.loading}</p>}
+      {saved && <p className="banner success">{copy.saved}</p>}
+      {error !== '' && <p className="banner error">{copy.saveFailed}: {error}</p>}
+    </section>
+  )
+}
+
 function PreviewBody(props: { copy: ReturnType<typeof copyOf>; preview: FilePreview }) {
   const copy = props.copy
   const path = props.preview.path
@@ -522,7 +571,7 @@ function PreviewBody(props: { copy: ReturnType<typeof copyOf>; preview: FilePrev
     return (
       <div className="smp-catalog-markdown">
         <MarkdownText
-          text={props.preview.content}
+          text={markdownBody(props.preview.content)}
           labels={{
             code: { copyLabel: copy.copy, copiedLabel: copy.copied, toolbarLabels: { codeLabel: copy.codeTitle, wrapLabel: copy.wrap, unwrapLabel: copy.unwrap } },
             footnotes: copy.footnotes,
@@ -625,6 +674,13 @@ export const inject = ['slots', 'locale']
 
 export function apply(ctx: ClientCtx): void {
   ctx.effect(installCatalogStyle)
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'skill-management',
+    order: 10,
+    label: () => copyOf(ctx.locale.getSnapshot().active).settingsTitle,
+    inject: () => ({ locale: ctx.locale }),
+  }, SkillSettingsSection))
   ctx.slots.inject('console.page', () => ctx.slots.register({
     name: 'console.page', key: SKILLS_PAGE,
     label: pageLabel(() => copyOf(ctx.locale.getSnapshot().active).skills, 'box'),

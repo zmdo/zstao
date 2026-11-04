@@ -3,6 +3,7 @@ import { Panel } from '@smp/console-kit'
 import { pageLabel } from './page-label.ts'
 import styles from './pages/project-repositories.css'
 import { CodeRepositoriesPage } from './repository-browser.tsx'
+import { PipelinesPage } from './pipelines.tsx'
 import { SavedPassword } from './password-view.tsx'
 import { errorText, json, useLanguage } from './client-api.ts'
 
@@ -220,7 +221,7 @@ export function apply(ctx: ClientCtx): void {
     label: pageLabel(() => zh() ? '部署流水线' : 'Deploy pipelines', { group: GROUP, groupLabel: projectGroup, navigation: 'sidebar', icon: 'code' }),
     order: 6,
     inject: () => ({ locale: ctx.locale }),
-  }, (props: PageProps) => <PlaceholderPage {...props} title={zh() ? '部署流水线' : 'Deploy pipelines'} hint={zh() ? '部署流水线尚未接入，后续完成设计后再开放。' : 'Deploy pipelines are not connected yet.'} />))
+  }, PipelinesPage))
   ctx.slots.inject('console.page', () => ctx.slots.register({
     name: 'console.page', key: SETTINGS_PAGE,
     label: pageLabel(() => zh() ? '项目管理' : 'Project management', { group: 'platform', groupLabel: platformGroup, placement: 'footer', icon: 'settings' }),

@@ -41,4 +41,31 @@ export interface FilePreview {
 export interface Commit { sha: string; subject: string; author: string; date: string }
 export interface CommitList { commits: Commit[]; hasMore: boolean }
 export type LatestCommit = Commit
+
+export interface BuildStep {
+  name: string
+  status: string
+  duration: number | null
+  startedAt: number | null
+  skipped: boolean
+}
+
+export interface Build {
+  id: number
+  number: number
+  projectId: number
+  jobName: string
+  refName: string
+  commitHash: string
+  status: string
+  steps: BuildStep[]
+  submitterId: number | null
+  agentId: number | null
+  submitDate: string | null
+  runningDate: string | null
+  finishDate: string | null
+  pendingDuration: number | null
+  runningDuration: number | null
+  submitReason: string | null
+}
 export type RefType = 'branch' | 'tag'

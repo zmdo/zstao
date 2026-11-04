@@ -136,3 +136,44 @@
 .smp-repo-ai-identity dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .smp-repo-ai-panel small { display: block; margin-top: 9px; color: var(--repo-muted); }
 .smp-repo-public-key { user-select: all; font-size: 11px; }
+
+.smp-pipeline-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.smp-pipeline-toolbar input, .smp-pipeline-toolbar select { min-width: 130px; height: 30px; border: 1px solid var(--repo-line); border-radius: 5px; background: var(--repo-input); color: var(--repo-text); padding: 0 8px; font: inherit; font-size: 12px; }
+.smp-pipeline-toolbar input:first-child { flex: 1 1 220px; }
+.smp-pipeline-table { overflow: auto; border: 1px solid var(--repo-line); border-radius: 6px; }
+.smp-pipeline-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.smp-pipeline-table th { text-align: left; font-weight: 500; color: var(--repo-muted); border-bottom: 1px solid var(--repo-line); padding: 9px 10px; white-space: nowrap; }
+.smp-pipeline-table td { padding: 9px 10px; border-bottom: 1px solid var(--repo-line); white-space: nowrap; }
+.smp-pipeline-table tr:last-child td { border-bottom: 0; }
+.smp-pipeline-table tbody tr { cursor: pointer; }
+.smp-pipeline-table tbody tr:hover { background: var(--repo-hover); }
+.smp-build-status { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+.smp-build-status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.smp-build-status.success { color: var(--repo-success); }
+.smp-build-status.failure { color: var(--repo-danger); }
+.smp-build-status.running { color: var(--repo-accent); }
+.smp-build-status.queued { color: var(--repo-warn); }
+.smp-build-status.neutral { color: var(--repo-muted); }
+.smp-pipeline-pager { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; color: var(--repo-muted); font-size: 12px; }
+.smp-pipeline-detail { min-height: 0; }
+.smp-pipeline-back { border: 0; background: transparent; color: var(--repo-accent); padding: 0 0 12px; cursor: pointer; font: inherit; }
+.smp-pipeline-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 1px solid var(--repo-line); padding-bottom: 14px; }
+.smp-pipeline-header h2 { margin: 8px 0 0; font-size: 17px; font-weight: 500; }
+.smp-pipeline-header h2 span { color: var(--repo-muted); font-weight: 400; }
+.smp-pipeline-duration { color: var(--repo-muted); font-size: 12px; white-space: nowrap; }
+.smp-pipeline-meta { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px 14px; margin: 16px 0; font-size: 12px; }
+.smp-pipeline-meta dt { color: var(--repo-muted); }
+.smp-pipeline-meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.smp-pipeline-steps, .smp-pipeline-logs { border-top: 1px solid var(--repo-line); padding-top: 14px; }
+.smp-pipeline-steps h3, .smp-pipeline-logs h3 { margin: 0 0 10px; font-size: 13px; font-weight: 500; }
+.smp-pipeline-steps ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.smp-pipeline-steps li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.smp-step-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--repo-muted); }
+.smp-step-dot.success { background: var(--repo-success); }
+.smp-step-dot.failure { background: var(--repo-danger); }
+.smp-step-dot.running { background: var(--repo-accent); }
+.smp-step-dot.queued { background: var(--repo-warn); }
+.smp-pipeline-logs-head { display: flex; justify-content: space-between; align-items: center; }
+.smp-pipeline-logs pre { max-height: 420px; overflow: auto; margin: 10px 0 0; padding: 12px; border: 1px solid var(--repo-line); border-radius: 5px; background: var(--repo-code-bg); color: var(--repo-text); font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .smp-pipeline-header { flex-direction: column; } .smp-pipeline-meta { grid-template-columns: 70px minmax(0, 1fr); } }
+.smp-list-panel { --repo-text: var(--dsw-alias-label-primary); --repo-line: var(--dsw-alias-border-l2); --repo-muted: var(--dsw-alias-label-secondary); --repo-hover: var(--dsw-alias-interactive-bg-hover); --repo-input: var(--dsw-alias-bg-layer-2); --repo-code-bg: var(--dsw-alias-bg-layer-2); --repo-success: var(--dsw-alias-state-success-primary); --repo-danger: var(--dsw-alias-state-error-primary); --repo-warn: var(--dsw-alias-state-warn-label); --repo-accent: var(--dsw-alias-state-business-primary); }

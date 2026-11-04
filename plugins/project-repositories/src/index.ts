@@ -238,6 +238,35 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
       send(response, 200, { projects, nextOffset: projects.length === 100 ? offset + projects.length : null })
       return
     }
+    if (path === '/pipelines') {
+      if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed')
+      const rawOffset = url.searchParams.get('offset') ?? '0'
+      const rawCount = url.searchParams.get('count') ?? '50'
+      if (!/^\d+$/.test(rawOffset) || !Number.isSafeInteger(Number(rawOffset)) || Number(rawOffset) > 1_000_000) throw new ApiError(400, 'invalid_offset')
+      if (!/^\d+$/.test(rawCount) || !Number.isSafeInteger(Number(rawCount)) || Number(rawCount) < 1 || Number(rawCount) > 100) throw new ApiError(400, 'invalid_count')
+      const offset = Number(rawOffset)
+      const count = Number(rawCount)
+      const [builds, projectNames] = await Promise.all([one.builds(offset, count), one.projectNames()])
+      send(response, 200, {
+        builds: builds.map(build => ({ ...build, projectName: projectNames.get(build.projectId) ?? `#${build.projectId}` })),
+        nextOffset: builds.length === count ? offset + builds.length : null,
+      })
+      return
+    }
+    const pipelineMatch = /^\/pipelines\/([1-9]\d*)(?:\/(logs))?$/.exec(path)
+    if (pipelineMatch) {
+      if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed')
+      const id = Number(pipelineMatch[1])
+      if (!Number.isSafeInteger(id)) throw new ApiError(400, 'invalid_build_id')
+      if (pipelineMatch[2] === 'logs') {
+        if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed')
+        send(response, 200, { text: await one.buildLogs(id) })
+        return
+      }
+      const [build, projectNames] = await Promise.all([one.build(id), one.projectNames()])
+      send(response, 200, { ...build, projectName: projectNames.get(build.projectId) ?? `#${build.projectId}` })
+      return
+    }
     const match = /^\/repos\/([1-9]\d*)(?:\/(resolve|tree|file|asset|raw|latest|commits))?$/.exec(path)
     if (!match) throw new ApiError(404, 'not_found')
     const id = projectId(match[1])

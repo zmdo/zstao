@@ -1,5 +1,5 @@
 import { COMMIT_LIMIT, DIRECTORY_LIMIT, DOWNLOAD_BYTES, PREVIEW_BYTES, PREVIEW_LINES } from './shared.ts'
-import type { CommitList, FilePreview, LatestCommit, Project, RefType, Repository, Tree } from './shared.ts'
+import type { Build, BuildStep, CommitList, FilePreview, LatestCommit, Project, RefType, Repository, Tree } from './shared.ts'
 
 export class ApiError extends Error {
   readonly status: number
@@ -71,6 +71,45 @@ export function preview(file: BlobFile): FilePreview {
   return { path: file.path, size: file.size, content, binary, truncated, upstreamPartial: file.partial,
     highlight: !binary && !content.split('\n').some(line => line.length > 2000),
     downloadable: !file.partial && file.size <= DOWNLOAD_BYTES }
+}
+
+function parseBuildLog(bytes: Buffer): string {
+  const lines: string[] = []
+  let offset = 0
+  while (offset + 4 <= bytes.length) {
+    const length = bytes.readInt32BE(offset)
+    offset += 4
+    if (length === 0) continue
+    if (length < 0) {
+      const size = -length
+      if (size > bytes.length - offset) break
+      offset += size
+      continue
+    }
+    if (length > bytes.length - offset) break
+    const raw = bytes.subarray(offset, offset + length).toString('utf8')
+    offset += length
+    try {
+      const value = object(JSON.parse(raw))
+      if (Array.isArray(value.messages)) {
+        for (const message of value.messages) {
+          const text = object(message).text
+          if (typeof text === 'string') lines.push(text)
+        }
+      }
+    } catch (cause) { void cause }
+  }
+  return lines.join('\n')
+}
+
+function numberField(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) throw new ApiError(502, 'invalid_upstream')
+  return value
+}
+function dateField(value: unknown): string | null {
+  if (typeof value !== 'string' || value === '') return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 export class OneDev {
@@ -278,6 +317,76 @@ export class OneDev {
     const date = new Date(row.commitDate)
     if (Number.isNaN(date.getTime())) throw new ApiError(502, 'invalid_upstream')
     return { sha: commitSha(string(row.hash)), subject: string(row.subject), author: author === null ? '—' : string(author.name), date: date.toISOString() }
+  }
+
+  async projectNames(): Promise<Map<number, string>> {
+    const data = await this.request('projects', new URLSearchParams({ offset: '0', count: '100' }))
+    if (!Array.isArray(data)) throw new ApiError(502, 'invalid_upstream')
+    const names = new Map<number, string>()
+    for (const value of data) {
+      const row = object(value)
+      if (typeof row.id === 'number' && typeof row.name === 'string') names.set(row.id, row.name)
+    }
+    return names
+  }
+  async builds(offset: number, count: number): Promise<Build[]> {
+    const data = await this.request('builds', new URLSearchParams({ offset: String(offset), count: String(count) }))
+    if (!Array.isArray(data)) throw new ApiError(502, 'invalid_upstream')
+    return data.map(value => this.buildFrom(value))
+  }
+  async build(id: number): Promise<Build> {
+    return this.buildFrom(await this.request(`builds/${id}`))
+  }
+  private buildFrom(value: unknown): Build {
+    const row = object(value)
+    const stepsObject = row.stepExecutions === null || row.stepExecutions === undefined ? {} : object(row.stepExecutions)
+    const steps: BuildStep[] = Object.entries(stepsObject).map(([name, raw]) => {
+      const step = object(raw)
+      return {
+        name,
+        status: string(step.status),
+        duration: typeof step.duration === 'number' ? step.duration : null,
+        startedAt: typeof step.startedAt === 'number' ? step.startedAt : null,
+        skipped: step.skipped === true,
+      }
+    })
+    return {
+      id: numberField(row.id, 'id'), number: numberField(row.number, 'number'), projectId: numberField(row.projectId, 'projectId'),
+      jobName: string(row.jobName), refName: typeof row.refName === 'string' ? row.refName : '',
+      commitHash: typeof row.commitHash === 'string' ? row.commitHash : '',
+      status: string(row.status), steps,
+      submitterId: typeof row.submitterId === 'number' ? row.submitterId : null,
+      agentId: typeof row.agentId === 'number' ? row.agentId : null,
+      submitDate: dateField(row.submitDate), runningDate: dateField(row.runningDate), finishDate: dateField(row.finishDate),
+      pendingDuration: typeof row.pendingDuration === 'number' ? row.pendingDuration : null,
+      runningDuration: typeof row.runningDuration === 'number' ? row.runningDuration : null,
+      submitReason: typeof row.submitReason === 'string' ? row.submitReason : null,
+    }
+  }
+  async buildLogs(id: number): Promise<string> {
+    return parseBuildLog(await this.requestBytes(`streaming/build-logs/${id}`, 2 * 1024 * 1024))
+  }
+  private async requestBytes(path: string, maxBytes: number): Promise<Buffer> {
+    const signal = AbortSignal.any([this.signal, AbortSignal.timeout(15_000)])
+    let response: Response
+    try {
+      response = await fetch(`${this.settings.internalBaseUrl}/~api/${path}`, { headers: { accept: 'application/octet-stream', authorization: this.authorization }, signal, redirect: 'error' })
+    } catch (cause) { throw new ApiError(502, signal.aborted ? 'upstream_timeout' : 'upstream_unavailable', { cause }) }
+    if (!response.ok) { await response.body?.cancel(); throw new ApiError(response.status === 401 ? 502 : response.status, response.status === 401 ? 'upstream_credentials' : 'upstream_error') }
+    const reader = response.body?.getReader()
+    if (reader === undefined) return Buffer.alloc(0)
+    const chunks: Uint8Array[] = []
+    let total = 0
+    while (true) {
+      const next = await reader.read()
+      if (next.done) break
+      if (next.value !== undefined) {
+        total += next.value.byteLength
+        if (total > maxBytes) { await reader.cancel(); break }
+        chunks.push(next.value)
+      }
+    }
+    return Buffer.concat(chunks.map(chunk => Buffer.from(chunk)))
   }
 
   async commits(id: number, sha: string): Promise<CommitList> {

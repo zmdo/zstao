@@ -36,7 +36,8 @@
   },
   "dependencies": {
     "@deepseek-ai/cordis": "~4.0.5",
-    "@smp/console-kit": "file:../../packages/console-kit"
+    "@smp/console-kit": "file:../../packages/console-kit",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.18",

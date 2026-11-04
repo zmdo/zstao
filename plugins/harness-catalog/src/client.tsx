@@ -73,7 +73,7 @@ function copyOf(active: string) {
     noMatch: zh ? '没有匹配项' : 'No matches',
     loadFailed: zh ? '读取失败' : 'Could not load',
     import: zh ? '导入 Skill' : 'Import skill',
-    importHint: zh ? '选择 SKILL.md 文件；同名技能不会被覆盖。' : 'Choose a SKILL.md file; existing skill names are not overwritten.',
+    importHint: zh ? '选择 SKILL.md 或包含 SKILL.md/脚本的 zip；同名技能不会被覆盖。' : 'Choose a SKILL.md or a zip containing SKILL.md/scripts; existing skill names are not overwritten.',
     importOk: zh ? '已导入' : 'Imported',
     importFailed: zh ? '导入失败' : 'Import failed',
     chooseFile: zh ? '选择文件' : 'Choose file',
@@ -151,12 +151,12 @@ function SkillsPage(props: { locale: LocaleFace }) {
     setImportError('')
     setImported('')
     try {
-      const content = await file.text()
+      const zip = file.name.toLowerCase().endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed'
       const response = await fetch('/console-api/harness-catalog/skills/import', {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ content }),
+        headers: { 'content-type': zip ? 'application/zip' : 'application/json' },
+        body: zip ? await file.arrayBuffer() : JSON.stringify({ content: await file.text() }),
       })
       const body = await response.json() as { name?: string; detail?: unknown }
       if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`)
@@ -208,7 +208,7 @@ function SkillsPage(props: { locale: LocaleFace }) {
             <span className="secondary">{copy.import}</span>
             <input
               type="file"
-              accept=".md,.markdown,text/markdown"
+              accept=".md,.markdown,.zip,application/zip,application/x-zip-compressed,text/markdown"
               disabled={importing}
               onChange={event => {
                 const file = event.target.files?.[0]

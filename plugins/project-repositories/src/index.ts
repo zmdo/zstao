@@ -35,7 +35,9 @@ export function apply(ctx: HostCtx): void {
     const stop = ctx.tools.register(defineTool({
       name: 'platform_onedev',
       description:
-        'Read and create OneDev projects for CES coding tasks. Use action=list_projects to discover projects; then get_project, list_branches, list_tags, list_commits, get_tree or get_file to inspect code. Use action=create_project for a new project; it grants the CES AI account cesai Code Writer. This tool never deletes projects or changes the AI login key.',
+        'OneDev actions: list_projects, get_project, list_branches, list_tags, list_commits, get_tree, get_file, create_project. ' +
+        'Use action=create_project to create a new project and grant the CES AI account cesai Code Writer; existing projects are returned without changing access. ' +
+        'Use the other actions to discover and inspect projects. This tool never deletes projects or changes the AI login key.',
       parameters: {
         action: {
           type: 'string', required: true,

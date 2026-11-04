@@ -1,14 +1,10 @@
-import { chmod, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, isAbsolute, join, normalize } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import yauzl from 'yauzl'
 import Schema from '@deepseek-ai/schemastery'
-
-interface QueryableUser {
-  active: string
-}
 
 interface SkillSummary {
   name: string
@@ -47,6 +43,7 @@ interface HostContext {
   consoleSession: { read(cookie: string): Promise<unknown> }
   logger: { warn(error: unknown): void }
   effect(run: () => (() => void)): void
+  emit?: (name: string) => void
 }
 
 export interface Config {
@@ -58,6 +55,12 @@ export const Config: Schema<Config> = Schema.object({
 })
 
 const ROOT = '/console-api/harness-catalog'
+const PROVIDERS: Array<{ match: RegExp; name: string; package: string }> = [
+  { match: /^platform_server_/, name: '服务器管理', package: '@smp/console-server-management' },
+  { match: /^platform_cos_/, name: '网络文件管理', package: '@smp/console-cos' },
+  { match: /^platform_domain_/, name: '域名管理', package: '@smp/console-domain-manager' },
+  { match: /^mcp__/, name: 'MCP 工具', package: '@deepseek-ai/dsh-mcp-client' },
+]
 
 export const inject = ['skills', 'tools', 'webServer', 'consoleSession']
 
@@ -66,90 +69,96 @@ export function apply(ctx: HostContext, config: Config): void {
     ? join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'skills')
     : config.skillsRoot.trim()
   if (!isAbsolute(skillsRoot)) throw new Error('Harness skill root must be absolute')
+  const disabledRoot = join(dirname(skillsRoot), 'skills-disabled')
 
   ctx.effect(() => {
-    const stopSkills = ctx.webServer.register({
-      kind: 'exact', path: `${ROOT}/skills`,
-      handler: (request, response) => listSkills(ctx, skillsRoot, request, response),
-    })
-    const stopTools = ctx.webServer.register({
-      kind: 'exact', path: `${ROOT}/tools`,
-      handler: (request, response) => listTools(ctx, request, response),
-    })
-    const stopImport = ctx.webServer.register({
-      kind: 'exact', path: `${ROOT}/skills/import`,
-      handler: (request, response) => importSkill(ctx, skillsRoot, request, response),
-    })
-    return () => { stopSkills(); stopTools(); stopImport() }
+    const stops = [
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills`, handler: (request, response) => listSkills(ctx, skillsRoot, disabledRoot, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/tools`, handler: (request, response) => listTools(ctx, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/inspect`, handler: (request, response) => inspectSkill(ctx, skillsRoot, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/import`, handler: (request, response) => importSkill(ctx, skillsRoot, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/state`, handler: (request, response) => changeState(ctx, skillsRoot, disabledRoot, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/remove`, handler: (request, response) => removeSkill(ctx, skillsRoot, disabledRoot, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/files`, handler: (request, response) => listFiles(ctx, skillsRoot, disabledRoot, request, response) }),
+      ctx.webServer.register({ kind: 'exact', path: `${ROOT}/skills/file`, handler: (request, response) => readFileRoute(ctx, skillsRoot, disabledRoot, request, response) }),
+    ]
+    return () => { for (const stop of stops) stop() }
   })
 }
-
-const PROVIDERS: Array<{ match: RegExp; name: string; package: string }> = [
-  { match: /^platform_server_/, name: '服务器管理', package: '@smp/console-server-management' },
-  { match: /^platform_cos_/, name: '网络文件管理', package: '@smp/console-cos' },
-  { match: /^platform_domain_/, name: '域名管理', package: '@smp/console-domain-manager' },
-  { match: /^mcp__/, name: 'MCP 工具', package: '@deepseek-ai/dsh-mcp-client' },
-]
 
 function toolProvider(name: string): { name: string; package: string } {
   const found = PROVIDERS.find(item => item.match.test(name))
   return found === undefined ? { name: 'Harness 内置', package: '' } : { name: found.name, package: found.package }
 }
 
-interface CatalogSkill extends SkillSummary {}
-
-async function listSkillCatalog(ctx: HostContext, root: string): Promise<CatalogSkill[]> {
-  let skills: CatalogSkill[] = []
-  try { skills = await ctx.skills.list() } catch (cause) { ctx.logger.warn(cause) }
-  const seen = new Set(skills.map(skill => skill.name))
-  try {
-    const entries = await readdir(root, { withFileTypes: true })
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      const file = join(root, entry.name, 'SKILL.md')
-      let content: string
-      try { content = await readFile(file, 'utf8') } catch { continue }
-      const frontmatter = /^---\s*\n([\s\S]*?)\n---\s*\n/.exec(content)?.[1] ?? ''
-      const name = /^name:\s*["']?([^"'\n]+)["']?\s*$/m.exec(frontmatter)?.[1]?.trim() ?? entry.name
-      if (seen.has(name) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) continue
-      seen.add(name)
-      skills.push({
-        name,
-        description: /^description:\s*["']?([^"\n]+)["']?\s*$/m.exec(frontmatter)?.[1]?.trim() ?? '',
-        whenToUse: /^whenToUse:\s*["']?([^"\n]+)["']?\s*$/m.exec(frontmatter)?.[1]?.trim() ?? '',
-        path: file,
-        source: 'custom',
-        provider: 'filesystem',
-        invocation: { modelInvocable: true, userInvocable: true },
-      })
-    }
-  } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') ctx.logger.warn(cause)
-  }
-  return skills.sort((a, b) => a.name.localeCompare(b.name))
+interface CatalogSkill extends SkillSummary {
+  enabled: boolean
+  editable: boolean
 }
 
-async function listSkills(ctx: HostContext, root: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+async function listSkills(ctx: HostContext, root: string, disabledRoot: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
   if (request.method !== 'GET') { send(response, 405, { detail: '需要 GET' }); return }
   try {
-    const skills = await listSkillCatalog(ctx, root)
-    send(response, 200, {
-      skills: skills.map(skill => ({
-        name: skill.name,
-        description: skill.description,
-        whenToUse: skill.whenToUse ?? '',
-        path: skill.path ?? '',
-        source: skill.source,
-        provider: skill.provider,
-        modelInvocable: skill.invocation.modelInvocable,
-        userInvocable: skill.invocation.userInvocable,
-      })),
-    })
+    send(response, 200, { skills: await listSkillCatalog(ctx, root, disabledRoot) })
   } catch (cause) {
     ctx.logger.warn(cause)
     send(response, 500, { detail: '技能列表读取失败' })
   }
+}
+
+async function listSkillCatalog(ctx: HostContext, root: string, disabledRoot: string): Promise<CatalogSkill[]> {
+  let skills: CatalogSkill[] = []
+  try {
+    const discovered = await ctx.skills.list()
+    for (const skill of discovered) {
+      // The registry may retain a just-disabled/deleted custom skill until its
+      // filesystem watcher settles. The directory is authoritative for our own
+      // managed root, so do not keep serving an entry whose file is gone.
+      if (skill.path !== undefined && isUnder(skill.path, root) && !await exists(skill.path)) continue
+      skills.push({
+        ...skill,
+        enabled: true,
+        editable: skill.path !== undefined && isUnder(skill.path, root),
+      })
+    }
+  } catch (cause) { ctx.logger.warn(cause) }
+  const seen = new Set(skills.map(skill => skill.name))
+  await appendDirectory(root, true, seen, skills)
+  await appendDirectory(disabledRoot, false, seen, skills)
+  return skills.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function appendDirectory(root: string, enabled: boolean, seen: Set<string>, out: CatalogSkill[]): Promise<void> {
+  let entries
+  try { entries = await readdir(root, { withFileTypes: true }) } catch { return }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || seen.has(entry.name)) continue
+    const file = join(root, entry.name, 'SKILL.md')
+    let content: string
+    try { content = await readFile(file, 'utf8') } catch { continue }
+    const frontmatter = frontmatterOf(content)
+    const name = frontmatter.name === '' ? entry.name : frontmatter.name
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || seen.has(name)) continue
+    seen.add(name)
+    out.push({
+      name,
+      description: frontmatter.description,
+      whenToUse: frontmatter.whenToUse,
+      path: file,
+      source: 'custom',
+      provider: 'filesystem',
+      invocation: { modelInvocable: true, userInvocable: true },
+      enabled,
+      editable: true,
+    })
+  }
+}
+
+function frontmatterOf(content: string): { name: string; description: string; whenToUse: string } {
+  const block = /^---\s*\n([\s\S]*?)\n---\s*\n/.exec(content)?.[1] ?? ''
+  const value = (key: string) => new RegExp(`^${key}:\\s*["']?([^"'\\n]+)["']?\\s*$`, 'm').exec(block)?.[1]?.trim() ?? ''
+  return { name: value('name'), description: value('description'), whenToUse: value('whenToUse') || value('when-to-use') }
 }
 
 async function listTools(ctx: HostContext, request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -168,70 +177,217 @@ async function listTools(ctx: HostContext, request: IncomingMessage, response: S
   }
 }
 
+interface ZipEntry { name: string; data: Buffer; mode: number | undefined }
+interface SkillPackage { name: string; description: string; whenToUse: string; content: string; entries: ZipEntry[]; base: string }
+
+async function inspectSkill(ctx: HostContext, root: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
+  if (request.method !== 'POST') { send(response, 405, { detail: '需要 POST' }); return }
+  try {
+    const pkg = await readPackage(request)
+    if (await exists(join(root, pkg.name))) {
+      send(response, 200, { valid: false, error: '同名技能已存在' })
+      return
+    }
+    send(response, 200, {
+      valid: true,
+      name: pkg.name,
+      description: pkg.description,
+      whenToUse: pkg.whenToUse,
+      path: join(root, pkg.name),
+      files: pkg.entries.filter(entry => entry.name !== `${pkg.base}SKILL.md`).map(entry => ({
+        path: pkg.base === '' ? entry.name : entry.name.slice(pkg.base.length),
+        size: entry.data.length,
+        executable: entry.mode !== undefined && (entry.mode & 0o111) !== 0,
+      })),
+    })
+  } catch (cause) {
+    send(response, 200, { valid: false, error: cause instanceof Error ? cause.message : String(cause) })
+  }
+}
+
 async function importSkill(ctx: HostContext, root: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
   if (request.method !== 'POST') { send(response, 405, { detail: '需要 POST' }); return }
   try {
-    const type = String(request.headers['content-type'] ?? '')
-    if (type.startsWith('application/zip') || type.startsWith('application/x-zip-compressed')) {
-      await importZip(ctx, root, await readBody(request, 20 * 1024 * 1024), response)
-      return
-    }
-    const body = await readJson(request)
-    const requested = typeof body.name === 'string' ? body.name.trim() : ''
-    const content = typeof body.content === 'string' ? body.content : ''
-    if (content.trim() === '' || content.length > 512 * 1024) throw new Error('技能内容为空或超过 512KB')
-    const frontmatterName = frontmatterNameOf(content)
-    const name = requested === '' ? frontmatterName : requested
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error('技能名称只能使用小写字母、数字和连字符')
-    if (frontmatterName !== '' && frontmatterName !== name) throw new Error('技能名称与 SKILL.md frontmatter 不一致')
-    const directory = join(root, name)
+    const pkg = await readPackage(request)
+    const directory = join(root, pkg.name)
     await mkdir(root, { recursive: true })
+    if (await exists(directory)) { send(response, 409, { detail: '同名技能已存在' }); return }
+    const staging = join(root, `.import-${randomUUID()}`)
     try {
-      await mkdir(directory)
-    } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code === 'EEXIST') {
-        send(response, 409, { detail: '同名技能已存在' })
-        return
+      await mkdir(staging, { recursive: true })
+      for (const entry of pkg.entries) {
+        if (entry.name === `${pkg.base}SKILL.md`) continue
+        if (pkg.base !== '' && !entry.name.startsWith(pkg.base)) throw new Error('zip 包含 SKILL.md 目录之外的文件')
+        const rel = pkg.base === '' ? entry.name : entry.name.slice(pkg.base.length)
+        if (rel === '') continue
+        const destination = join(staging, rel)
+        await mkdir(dirname(destination), { recursive: true })
+        await writeFile(destination, entry.data)
+        await chmod(destination, entry.mode !== undefined && (entry.mode & 0o111) !== 0 ? 0o755 : 0o644)
       }
-      throw cause
+      await writeFile(join(staging, 'SKILL.md'), pkg.content, { encoding: 'utf8', mode: 0o644 })
+      await chmod(join(staging, 'SKILL.md'), 0o644)
+      await rename(staging, directory)
+      ctx.emit?.('skills/change')
+      send(response, 201, { name: pkg.name, path: join(directory, 'SKILL.md'), files: pkg.entries.length })
+    } finally {
+      await rm(staging, { recursive: true, force: true }).catch(() => {})
     }
-    await writeFile(join(directory, 'SKILL.md'), content, { encoding: 'utf8', mode: 0o644 })
-    const emit = (ctx as HostContext & { emit?: (name: string) => void }).emit
-    emit?.call(ctx, 'skills/change')
-    send(response, 201, { name, path: join(directory, 'SKILL.md') })
   } catch (cause) {
     send(response, 400, { detail: cause instanceof Error ? cause.message : String(cause) })
   }
 }
 
-function frontmatterNameOf(content: string): string {
-  return /^---[\s\S]*?^name:\s*["']?([^"'\n]+)["']?\s*$/m.exec(content)?.[1]?.trim() ?? ''
+async function changeState(ctx: HostContext, root: string, disabledRoot: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
+  if (request.method !== 'POST') { send(response, 405, { detail: '需要 POST' }); return }
+  try {
+    const body = await readJson(request)
+    const name = nameField(body)
+    const enabled = body.enabled === true
+    const source = enabled ? disabledRoot : root
+    const target = enabled ? root : disabledRoot
+    const from = join(source, name)
+    const to = join(target, name)
+    if (!await exists(from)) throw new Error('技能不存在')
+    if (await exists(to)) throw new Error('目标位置已有同名技能')
+    await mkdir(target, { recursive: true })
+    await rename(from, to)
+    ctx.emit?.('skills/change')
+    send(response, 200, { ok: true, enabled })
+  } catch (cause) { send(response, 400, { detail: cause instanceof Error ? cause.message : String(cause) }) }
 }
 
-interface ZipEntry {
-  name: string
-  data: Buffer
-  mode: number | undefined
+async function removeSkill(ctx: HostContext, root: string, disabledRoot: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
+  if (request.method !== 'DELETE') { send(response, 405, { detail: '需要 DELETE' }); return }
+  try {
+    const url = new URL(request.url ?? '/', 'http://localhost')
+    const name = nameField({ name: url.searchParams.get('name') ?? '' })
+    let removed = false
+    for (const base of [root, disabledRoot]) {
+      const directory = join(base, name)
+      if (await exists(directory)) { await rm(directory, { recursive: true, force: true }); removed = true }
+    }
+    if (!removed) throw new Error('技能不存在')
+    ctx.emit?.('skills/change')
+    send(response, 200, { ok: true })
+  } catch (cause) { send(response, 400, { detail: cause instanceof Error ? cause.message : String(cause) }) }
 }
 
-function safeZipName(raw: string): string {
-  const name = raw.replace(/\\/g, '/').replace(/^\/+/, '')
-  if (name === '' || name.endsWith('/')) throw new Error('zip 包含空文件名')
-  const normalized = normalize(name).replace(/\\/g, '/')
-  if (normalized.startsWith('../') || normalized === '..' || normalized.includes('/../') || isAbsolute(name)) throw new Error('zip 包含不安全的路径')
-  return normalized
+async function listFiles(ctx: HostContext, root: string, disabledRoot: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
+  if (request.method !== 'GET') { send(response, 405, { detail: '需要 GET' }); return }
+  try {
+    const url = new URL(request.url ?? '/', 'http://localhost')
+    const base = await skillDirectory(root, disabledRoot, url.searchParams.get('name') ?? '')
+    const target = safeTarget(base, url.searchParams.get('path') ?? '')
+    const info = await stat(target)
+    if (!info.isDirectory()) throw new Error('不是目录')
+    const entries = await readdir(target, { withFileTypes: true })
+    const items = []
+    for (const entry of entries) {
+      if (entry.name === '.' || entry.name === '..') continue
+      const full = join(target, entry.name)
+      const entryInfo = await stat(full)
+      items.push({ name: entry.name, path: relative(base, full).split(sep).join('/'), type: entryInfo.isDirectory() ? 'directory' : 'file', size: entryInfo.isFile() ? entryInfo.size : null })
+    }
+    items.sort((a, b) => a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'directory' ? -1 : 1)
+    send(response, 200, { path: relative(base, target).split(sep).join('/'), entries: items })
+  } catch (cause) { send(response, 400, { detail: cause instanceof Error ? cause.message : String(cause) }) }
+}
+
+async function readFileRoute(ctx: HostContext, root: string, disabledRoot: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  if (!await authorized(ctx, request)) { send(response, 401, { detail: '未登录' }); return }
+  if (request.method !== 'GET') { send(response, 405, { detail: '需要 GET' }); return }
+  try {
+    const url = new URL(request.url ?? '/', 'http://localhost')
+    const base = await skillDirectory(root, disabledRoot, url.searchParams.get('name') ?? '')
+    const target = safeTarget(base, url.searchParams.get('path') ?? '')
+    const info = await stat(target)
+    if (!info.isFile()) throw new Error('不是文件')
+    if (info.size > 200 * 1024) throw new Error('文件超过 200KB，暂不预览')
+    const data = await readFile(target)
+    const binary = data.includes(0)
+    send(response, 200, {
+      path: relative(base, target).split(sep).join('/'),
+      binary,
+      size: info.size,
+      content: binary ? '' : data.toString('utf8'),
+    })
+  } catch (cause) { send(response, 400, { detail: cause instanceof Error ? cause.message : String(cause) }) }
+}
+
+function nameField(body: Record<string, unknown>): string {
+  const name = typeof body.name === 'string' ? body.name.trim() : ''
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error('技能名称不合法')
+  return name
+}
+
+async function skillDirectory(root: string, disabledRoot: string, name: string): Promise<string> {
+  const valid = nameField({ name })
+  for (const base of [root, disabledRoot]) {
+    const directory = join(base, valid)
+    if (await exists(directory)) return directory
+  }
+  throw new Error('技能不存在')
+}
+
+function safeTarget(base: string, path: string): string {
+  const target = resolve(base, path)
+  if (target !== base && !target.startsWith(`${base}${sep}`)) throw new Error('路径越界')
+  return target
+}
+
+function isUnder(path: string, root: string): boolean {
+  const parent = `${resolve(root)}${sep}`
+  return resolve(path).startsWith(parent)
+}
+
+async function readPackage(request: IncomingMessage): Promise<SkillPackage> {
+  const type = String(request.headers['content-type'] ?? '')
+  if (type.startsWith('application/zip') || type.startsWith('application/x-zip-compressed')) {
+    const entries = await readZip(await readBody(request, 20 * 1024 * 1024))
+    return packageFromZip(entries)
+  }
+  const body = await readJson(request)
+  const content = typeof body.content === 'string' ? body.content : ''
+  if (content.trim() === '' || content.length > 512 * 1024) throw new Error('技能内容为空或超过 512KB')
+  const fm = frontmatterOf(content)
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fm.name)) throw new Error('技能名称只能使用小写字母、数字和连字符')
+  return { name: fm.name, description: fm.description, whenToUse: fm.whenToUse, content, entries: [], base: '' }
+}
+
+function packageFromZip(entries: ZipEntry[]): SkillPackage {
+  if (entries.length === 0) throw new Error('zip 为空')
+  const candidates = entries.filter(entry => entry.name.split('/').pop() === 'SKILL.md')
+  if (candidates.length === 0) throw new Error('zip 中没有 SKILL.md')
+  const rootCandidate = candidates.find(entry => entry.name === 'SKILL.md')
+  const candidate = rootCandidate ?? candidates.sort((a, b) => a.name.length - b.name.length)[0]
+  if (candidate === undefined) throw new Error('zip 中没有 SKILL.md')
+  const base = candidate.name === 'SKILL.md' ? '' : candidate.name.slice(0, candidate.name.length - 'SKILL.md'.length)
+  if (base !== '' && !base.endsWith('/')) throw new Error('zip 目录结构无效')
+  const content = candidate.data.toString('utf8')
+  const fm = frontmatterOf(content)
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fm.name)) throw new Error('SKILL.md frontmatter 缺少合法 name')
+  for (const entry of entries) {
+    if (base !== '' && !entry.name.startsWith(base) && entry !== candidate) throw new Error('zip 包含 SKILL.md 目录之外的文件')
+  }
+  return { name: fm.name, description: fm.description, whenToUse: fm.whenToUse, content, entries, base }
 }
 
 async function readZip(buffer: Buffer): Promise<ZipEntry[]> {
-  return await new Promise((resolve, reject) => {
+  if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) throw new Error('不是有效的 zip')
+  return await new Promise((resolvePromise, reject) => {
     yauzl.fromBuffer(buffer, { lazyEntries: true, decodeStrings: true, validateEntrySizes: true }, (error: Error | null, zip: any) => {
       if (error !== null || zip === undefined) { reject(error ?? new Error('zip 读取失败')); return }
       const entries: ZipEntry[] = []
       let total = 0
       const fail = (cause: unknown) => { zip.close(); reject(cause) }
       zip.on('error', fail)
-      zip.on('end', () => resolve(entries))
+      zip.on('end', () => resolvePromise(entries))
       zip.on('entry', (entry: any) => {
         try {
           if (entry.isEncrypted === true) throw new Error('不支持加密 zip')
@@ -251,10 +407,7 @@ async function readZip(buffer: Buffer): Promise<ZipEntry[]> {
             const chunks: Buffer[] = []
             stream.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)))
             stream.on('error', fail)
-            stream.on('end', () => {
-              entries.push({ name, data: Buffer.concat(chunks), mode })
-              zip.readEntry()
-            })
+            stream.on('end', () => { entries.push({ name, data: Buffer.concat(chunks), mode }); zip.readEntry() })
           })
         } catch (cause) { fail(cause) }
       })
@@ -263,55 +416,16 @@ async function readZip(buffer: Buffer): Promise<ZipEntry[]> {
   })
 }
 
-async function importZip(ctx: HostContext, root: string, buffer: Buffer, response: ServerResponse): Promise<void> {
-  if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) throw new Error('不是有效的 zip')
-  const entries = await readZip(buffer)
-  if (entries.length === 0) throw new Error('zip 为空')
-  const candidates = entries.filter(entry => entry.name.split('/').pop() === 'SKILL.md')
-  if (candidates.length === 0) throw new Error('zip 中没有 SKILL.md')
-  const rootCandidate = candidates.find(entry => entry.name === 'SKILL.md')
-  const candidate = rootCandidate ?? candidates.sort((a, b) => a.name.length - b.name.length)[0]
-  if (candidate === undefined) throw new Error('zip 中没有 SKILL.md')
-  const base = candidate.name === 'SKILL.md' ? '' : candidate.name.slice(0, candidate.name.length - 'SKILL.md'.length)
-  if (base !== '' && !base.endsWith('/')) throw new Error('zip 目录结构无效')
-  const content = candidate.data.toString('utf8')
-  const name = frontmatterNameOf(content)
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error('技能名称只能使用小写字母、数字和连字符')
-  const directory = join(root, name)
-  const staging = join(root, `.import-${randomUUID()}`)
-  await mkdir(root, { recursive: true })
-  try {
-    await mkdir(staging, { recursive: true })
-    for (const entry of entries) {
-      if (entry === candidate) continue
-      if (base !== '' && !entry.name.startsWith(base)) throw new Error('zip 包含 SKILL.md 目录之外的文件')
-      const relative = base === '' ? entry.name : entry.name.slice(base.length)
-      if (relative === '') continue
-      const destination = join(staging, relative)
-      await mkdir(dirname(destination), { recursive: true })
-      await writeFile(destination, entry.data)
-      const executable = entry.mode !== undefined && (entry.mode & 0o111) !== 0
-      await chmod(destination, executable ? 0o755 : 0o644)
-    }
-    await writeFile(join(staging, 'SKILL.md'), content)
-    await chmod(join(staging, 'SKILL.md'), 0o644)
-    try {
-      await mkdir(directory)
-    } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code === 'EEXIST') {
-        send(response, 409, { detail: '同名技能已存在' })
-        return
-      }
-      throw cause
-    }
-    await rm(directory, { recursive: true, force: true })
-    await rename(staging, directory)
-    const emit = (ctx as HostContext & { emit?: (name: string) => void }).emit
-    emit?.call(ctx, 'skills/change')
-    send(response, 201, { name, path: join(directory, 'SKILL.md'), files: entries.length })
-  } finally {
-    await rm(staging, { recursive: true, force: true }).catch(() => {})
-  }
+function safeZipName(raw: string): string {
+  const name = raw.replace(/\\/g, '/').replace(/^\/+/, '')
+  if (name === '' || name.endsWith('/')) throw new Error('zip 包含空文件名')
+  const parts = name.split('/')
+  if (parts.some(part => part === '' || part === '.' || part === '..')) throw new Error('zip 包含不安全的路径')
+  return parts.join('/')
+}
+
+async function exists(path: string): Promise<boolean> {
+  try { await stat(path); return true } catch { return false }
 }
 
 async function authorized(ctx: HostContext, request: IncomingMessage): Promise<boolean> {

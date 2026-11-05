@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ApiError, OneDev, commitSha, decryptPassword, imageType, preview, projectId, repositoryPath } from './onedev.ts'
+import { tcrRepositories, tcrTags, type TcrSettings } from './tcr.ts'
 import type { Secrets } from './onedev.ts'
 import { API, DOWNLOAD_BYTES } from './shared.ts'
 
@@ -188,6 +189,75 @@ export function apply(ctx: HostCtx): void {
   })
 }
 
+interface ImageRegistrySettings {
+  registry: string
+  namespace: string
+  region: string
+  secretIdCiphertext: string
+  secretKeyCiphertext: string
+  username: string
+  passwordCiphertext: string
+  updatedAt: string | null
+}
+
+const IMAGE_REGISTRY_DEFAULT = 'ccr.ccs.tencentyun.com'
+const TCR_REGION = 'ap-beijing'
+
+async function readImageSettings(file: string): Promise<ImageRegistrySettings> {
+  try {
+    const value: unknown = JSON.parse(await readFile(file, 'utf8'))
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('invalid')
+    const row = value as Record<string, unknown>
+    return {
+      registry: typeof row.registry === 'string' ? row.registry : IMAGE_REGISTRY_DEFAULT,
+      namespace: typeof row.namespace === 'string' ? row.namespace : '',
+      region: typeof row.region === 'string' ? row.region : TCR_REGION,
+      secretIdCiphertext: typeof row.secretIdCiphertext === 'string' ? row.secretIdCiphertext : '',
+      secretKeyCiphertext: typeof row.secretKeyCiphertext === 'string' ? row.secretKeyCiphertext : '',
+      username: typeof row.username === 'string' ? row.username : '',
+      passwordCiphertext: typeof row.passwordCiphertext === 'string' ? row.passwordCiphertext : '',
+      updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : null,
+    }
+  } catch (cause) {
+    if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') {
+      return { registry: IMAGE_REGISTRY_DEFAULT, namespace: '', region: TCR_REGION, secretIdCiphertext: '', secretKeyCiphertext: '', username: '', passwordCiphertext: '', updatedAt: null }
+    }
+    throw new ApiError(500, 'image_registry_settings_unavailable', { cause })
+  }
+}
+
+function imageRegistryPublic(settings: ImageRegistrySettings): Record<string, unknown> {
+  return {
+    registry: settings.registry,
+    namespace: settings.namespace,
+    region: settings.region,
+    username: settings.username,
+    configured: settings.namespace !== '' && settings.secretIdCiphertext !== '' && settings.secretKeyCiphertext !== '',
+    secretId: settings.secretIdCiphertext === '' ? '' : '已配置',
+    secretKey: settings.secretKeyCiphertext === '' ? '' : '已配置',
+    password: settings.passwordCiphertext === '' ? '' : '已配置',
+    updatedAt: settings.updatedAt,
+  }
+}
+
+function tcrSettings(settings: ImageRegistrySettings, secrets: { decrypt(value: string): string }): TcrSettings {
+  if (settings.namespace === '' || settings.secretIdCiphertext === '' || settings.secretKeyCiphertext === '') throw new ApiError(409, 'image_registry_not_configured')
+  return {
+    registry: settings.registry,
+    namespace: settings.namespace,
+    region: settings.region,
+    secretId: secrets.decrypt(settings.secretIdCiphertext),
+    secretKey: secrets.decrypt(settings.secretKeyCiphertext),
+  }
+}
+
+async function writeImageSettings(file: string, settings: ImageRegistrySettings): Promise<void> {
+  await mkdir(dirname(file), { recursive: true })
+  const temporary = join(dirname(file), `.image-registry-${randomUUID()}.json`)
+  await writeFile(temporary, `${JSON.stringify(settings, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
+  await rename(temporary, file)
+}
+
 async function readSettings(file: string): Promise<Settings> {
   let content: string
   try { content = await readFile(file, 'utf8') } catch (cause) {
@@ -258,6 +328,72 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
       reveal()
       const settings = await readSettings(file)
       send(response, 200, { password: decryptPassword(settings, ctx.secrets) })
+      return
+    }
+    if (path === '/image-registry/settings') {
+      const settings = await readImageSettings(join(dirname(file), 'image-registry.json'))
+      if (request.method === 'GET') { send(response, 200, imageRegistryPublic(settings)); return }
+      if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed')
+      sameOriginJson(request)
+      const body = await readJson(request)
+      const registry = typeof body.registry === 'string' ? body.registry.trim().replace(/^https?:\/\//, '') : ''
+      const namespace = typeof body.namespace === 'string' ? body.namespace.trim() : ''
+      if (!/^[a-z0-9.-]+(?::\d+)?$/i.test(registry)) throw new ApiError(400, 'invalid_registry')
+      if (!/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(namespace)) throw new ApiError(400, 'invalid_namespace')
+      const secretId = typeof body.secretId === 'string' ? body.secretId.trim() : ''
+      const secretKey = typeof body.secretKey === 'string' ? body.secretKey : ''
+      const secretIdCiphertext = secretId === '' ? settings.secretIdCiphertext : ctx.secrets.encrypt(secretId)
+      const secretKeyCiphertext = secretKey === '' ? settings.secretKeyCiphertext : ctx.secrets.encrypt(secretKey)
+      if (secretIdCiphertext === '' || secretKeyCiphertext === '') throw new ApiError(400, 'image_registry_credentials_required')
+      const username = typeof body.username === 'string' ? body.username.trim() : ''
+      const password = typeof body.password === 'string' ? body.password : ''
+      const next: ImageRegistrySettings = {
+        registry, namespace, region: TCR_REGION,
+        secretIdCiphertext, secretKeyCiphertext, username,
+        passwordCiphertext: password === '' ? settings.passwordCiphertext : ctx.secrets.encrypt(password),
+        updatedAt: new Date().toISOString(),
+      }
+      const probe = tcrSettings(next, ctx.secrets)
+      await tcrRepositories(probe, 0, 1, signal)
+      await writeImageSettings(join(dirname(file), 'image-registry.json'), next)
+      send(response, 200, imageRegistryPublic(next))
+      return
+    }
+    if (path === '/image-registry/test') {
+      if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed')
+      sameOriginJson(request)
+      const base = await readImageSettings(join(dirname(file), 'image-registry.json'))
+      const body = await readJson(request)
+      const registry = typeof body.registry === 'string' && body.registry.trim() !== '' ? body.registry.trim().replace(/^https?:\/\//, '') : base.registry
+      const namespace = typeof body.namespace === 'string' && body.namespace.trim() !== '' ? body.namespace.trim() : base.namespace
+      const secretId = typeof body.secretId === 'string' && body.secretId.trim() !== '' ? body.secretId.trim() : ctx.secrets.decrypt(base.secretIdCiphertext)
+      const secretKey = typeof body.secretKey === 'string' && body.secretKey !== '' ? body.secretKey : ctx.secrets.decrypt(base.secretKeyCiphertext)
+      if (namespace === '' || secretId === '' || secretKey === '') throw new ApiError(409, 'image_registry_not_configured')
+      const result = await tcrRepositories({ registry, namespace, region: TCR_REGION, secretId, secretKey }, 0, 1, signal)
+      send(response, 200, { ok: true, repositoryCount: result.total, server: result.server })
+      return
+    }
+    if (path === '/image-registry/repositories') {
+      if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed')
+      const rawOffset = url.searchParams.get('offset') ?? '0'
+      const rawLimit = url.searchParams.get('limit') ?? '20'
+      if (!/^\d+$/.test(rawOffset) || !Number.isSafeInteger(Number(rawOffset)) || Number(rawOffset) > 1_000_000) throw new ApiError(400, 'invalid_offset')
+      if (!/^\d+$/.test(rawLimit) || !Number.isSafeInteger(Number(rawLimit)) || Number(rawLimit) < 1 || Number(rawLimit) > 100) throw new ApiError(400, 'invalid_limit')
+      const settings = tcrSettings(await readImageSettings(join(dirname(file), 'image-registry.json')), ctx.secrets)
+      const result = await tcrRepositories(settings, Number(rawOffset), Number(rawLimit), signal)
+      send(response, 200, result)
+      return
+    }
+    const tagMatch = /^\/image-registry\/repositories\/([^/]+)\/tags$/.exec(path)
+    if (tagMatch) {
+      if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed')
+      const name = decodeURIComponent(tagMatch[1])
+      if (!/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i.test(name)) throw new ApiError(400, 'invalid_repository')
+      const rawOffset = url.searchParams.get('offset') ?? '0'
+      const rawLimit = url.searchParams.get('limit') ?? '50'
+      if (!/^\d+$/.test(rawOffset) || !/^\d+$/.test(rawLimit)) throw new ApiError(400, 'invalid_pagination')
+      const settings = tcrSettings(await readImageSettings(join(dirname(file), 'image-registry.json')), ctx.secrets)
+      send(response, 200, await tcrTags(settings, name, Number(rawOffset), Math.min(100, Math.max(1, Number(rawLimit))), signal))
       return
     }
     if (path === '/test') {

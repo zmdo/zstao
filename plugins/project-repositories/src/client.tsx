@@ -4,6 +4,8 @@ import { pageLabel } from './page-label.ts'
 import styles from './pages/project-repositories.css'
 import { CodeRepositoriesPage } from './repository-browser.tsx'
 import { PipelinesPage } from './pipelines.tsx'
+import { ImageRegistryPage } from './image-registry.tsx'
+import { ImageRegistrySettings } from './image-registry-settings.tsx'
 import { SavedPassword } from './password-view.tsx'
 import { errorText, json, useLanguage } from './client-api.ts'
 
@@ -185,6 +187,7 @@ function ProjectSettingsPage(props: PageProps) {
       <dl className="smp-repo-ai-identity"><dt>{copy.aiUsername}</dt><dd><code>{ai.username}</code></dd><dt>{copy.aiEmail}</dt><dd><code>{ai.email}</code></dd><dt>{copy.aiPublicKey}</dt><dd><code className="smp-repo-public-key">{ai.publicKey}</code></dd><dt>{copy.aiPrivateKey}</dt><dd><code>{ai.privateKeyPath}</code></dd></dl>
       <small>{copy.aiReadOnly}</small>
     </Panel>}
+    <ImageRegistrySettings locale={props.locale} />
     </>
   )
 }
@@ -215,7 +218,7 @@ export function apply(ctx: ClientCtx): void {
     label: pageLabel(() => zh() ? '项目镜像仓库' : 'Image registry', { group: GROUP, groupLabel: projectGroup, navigation: 'sidebar', icon: 'code' }),
     order: 5,
     inject: () => ({ locale: ctx.locale }),
-  }, (props: PageProps) => <PlaceholderPage {...props} title={zh() ? '项目镜像仓库' : 'Image registry'} hint={zh() ? '项目镜像仓库尚未接入，后续完成设计后再开放。' : 'The project image registry is not connected yet.'} />))
+  }, ImageRegistryPage))
   ctx.slots.inject('console.page', () => ctx.slots.register({
     name: 'console.page', key: PIPELINE_PAGE,
     label: pageLabel(() => zh() ? '部署流水线' : 'Deploy pipelines', { group: GROUP, groupLabel: projectGroup, navigation: 'sidebar', icon: 'code' }),

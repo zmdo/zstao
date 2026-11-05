@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Panel } from '@smp/console-kit'
+import { IconChevronLeftOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Build } from './shared.ts'
 import { errorText, json, useLanguage } from './client-api.ts'
 
@@ -141,10 +142,10 @@ export function PipelinesPage(props: PageProps): JSX.Element {
   if (selected !== null) {
     return (
       <Panel className="smp-list-panel smp-pipeline-detail" title={
-        <div className="smp-pipeline-titlebar">
-          <button type="button" className="secondary smp-pipeline-back" onClick={back}>← {zh ? '返回流水线列表' : 'Back to pipelines'}</button>
-          <span>{zh ? '流水线详情' : 'Pipeline details'}</span>
-        </div>
+        <span className="smp-pipeline-titlebar">
+          <button type="button" className="smp-repo-back" aria-label={zh ? '返回流水线列表' : 'Back to pipelines'} title={zh ? '返回流水线列表' : 'Back to pipelines'} onClick={back}><IconChevronLeftOutlineRegular /></button>
+          <strong>{zh ? '流水线详情' : 'Pipeline details'}</strong>
+        </span>
       }>
         {detailLoading && <p className="muted">{zh ? '正在读取…' : 'Loading…'}</p>}
         {error !== '' && <p className="banner error">{error}</p>}

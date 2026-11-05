@@ -231,3 +231,14 @@ body[data-ds-dark-theme] .smp-console table.smp-plugins tbody tr.smp-pipeline-ro
 .smp-image-address-line input { flex: 1; min-width: 0; font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .smp-image-address-panel small { display: block; margin-top: 8px; color: var(--repo-success); }
 .smp-image-address-head { display: flex; justify-content: space-between; align-items: center; }
+.smp-image-address-cell { max-width: 420px; }
+.smp-image-address-value { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
+.smp-image-address-value code { display: inline-block; max-width: 330px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.smp-image-address-value button { flex: none; }
+.smp-danger-button { color: var(--dsw-alias-state-error-primary) !important; }
+.smp-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgb(15 23 42 / 42%); }
+.smp-modal { width: min(460px, 100%); padding: 18px; border: 1px solid var(--repo-line); border-radius: 7px; background: var(--dsw-alias-bg-layer-1); box-shadow: 0 18px 50px rgb(0 0 0 / 24%); }
+.smp-modal h3 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.smp-modal p { margin: 0 0 12px; color: var(--repo-muted); font-size: 12px; line-height: 1.6; }
+.smp-modal-target { display: block; padding: 8px; border: 1px solid var(--repo-line); border-radius: 4px; background: var(--dsw-alias-bg-layer-2); overflow-wrap: anywhere; font-size: 11px; }
+.smp-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

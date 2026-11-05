@@ -123,6 +123,10 @@ export async function tcrRepositories(settings: TcrSettings, offset: number, lim
   return { repositories, total: typeof row.TotalCount === 'number' ? row.TotalCount : repositories.length, server: text(row.Server) || settings.registry }
 }
 
+export async function tcrDeleteTag(settings: TcrSettings, repository: string, tag: string, signal: AbortSignal): Promise<void> {
+  await request(settings, 'DeleteImagePersonal', { RepoName: repository, Tag: tag }, signal)
+}
+
 export async function tcrTags(settings: TcrSettings, repository: string, offset: number, limit: number, signal: AbortSignal): Promise<{ tags: TcrTag[]; total: number }> {
   const result = await request(settings, 'DescribeImagePersonal', { RepoName: repository, Offset: offset, Limit: limit }, signal)
   const data = result.Data

@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { ApiError, OneDev, commitSha, decryptPassword, imageType, preview, projectId, repositoryPath } from './onedev.ts'
-import { tcrRepositories, tcrTags, type TcrSettings } from './tcr.ts'
+import { tcrDeleteTag, tcrRepositories, tcrTags, type TcrSettings } from './tcr.ts'
 import type { Secrets } from './onedev.ts'
 import { API, DOWNLOAD_BYTES } from './shared.ts'
 
@@ -383,6 +383,20 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
       const repo = (url.searchParams.get('repo') ?? '').trim()
       const result = await tcrRepositories(settings, Number(rawOffset), Number(rawLimit), signal, repo)
       send(response, 200, result)
+      return
+    }
+    const deleteMatch = /^\/image-registry\/repositories\/([^/]+)\/tags\/([^/]+)\/delete$/.exec(path)
+    if (deleteMatch) {
+      if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed')
+      sameOriginJson(request)
+      await readJson(request)
+      const name = decodeURIComponent(deleteMatch[1])
+      const tag = decodeURIComponent(deleteMatch[2])
+      if (!/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i.test(name)) throw new ApiError(400, 'invalid_repository')
+      if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tag)) throw new ApiError(400, 'invalid_tag')
+      const settings = tcrSettings(await readImageSettings(join(dirname(file), 'image-registry.json')), ctx.secrets)
+      await tcrDeleteTag(settings, name, tag, signal)
+      send(response, 200, { ok: true })
       return
     }
     const tagMatch = /^\/image-registry\/repositories\/([^/]+)\/tags$/.exec(path)

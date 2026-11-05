@@ -1,0 +1,25 @@
+{
+  "name": "@smp/console-application-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "应用服务器类型定义：Docker Engine 与 Docker Compose",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": ["lib/index.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "engines": { "dsh": "0.2.1-rc.5" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "scripts": {
+    "build": "node ../../scripts/build-plugin.mjs",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@smp/console-server-management": "file:../server-management"
+  }
+}

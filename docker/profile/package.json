@@ -22,7 +22,8 @@
     "@smp/console-dashboard": "file:/app/plugins/dashboard",
     "@smp/console-model-billing": "file:/app/plugins/model-billing",
     "@smp/console-harness-catalog": "file:/app/plugins/harness-catalog",
-    "@smp/console-project-repositories": "file:/app/plugins/project-repositories"
+    "@smp/console-project-repositories": "file:/app/plugins/project-repositories",
+    "@smp/console-application-server": "file:/app/plugins/application-server"
   },
   "dsh": {
     "profile": {
@@ -30,6 +31,7 @@
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
         "@smp/console-container-runtime",
+        "@smp/console-application-server",
         "@smp/console-database",
         "@smp/console-domain-manager",
         "@smp/console-encryption-key",

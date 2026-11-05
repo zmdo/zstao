@@ -1,0 +1,3 @@
+- insert:
+    - id: smp-application-server
+      name: '@smp/console-application-server'

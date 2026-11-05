@@ -69,6 +69,7 @@ export function PipelinesPage(props: PageProps): JSX.Element {
   const zh = useLanguage(props.locale)
   const [rows, setRows] = useState<BuildRow[]>([])
   const [offset, setOffset] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
   const [nextOffset, setNextOffset] = useState<number | null>(null)
   const [selected, setSelected] = useState<number | null>(() => hashBuild())
   const [build, setBuild] = useState<BuildRow | null>(null)
@@ -87,12 +88,12 @@ export function PipelinesPage(props: PageProps): JSX.Element {
     let stopped = false
     setLoading(true)
     setError('')
-    json<{ builds: BuildRow[]; nextOffset: number | null }>(`/pipelines?offset=${offset}&count=50`)
+    json<{ builds: BuildRow[]; nextOffset: number | null }>(`/pipelines?offset=${offset}&count=${pageSize}`)
       .then(value => { if (!stopped) { setRows(value.builds); setNextOffset(value.nextOffset) } })
       .catch(cause => { if (!stopped) setError(errorText(cause, zh)) })
       .finally(() => { if (!stopped) setLoading(false) })
     return () => { stopped = true }
-  }, [offset, zh, refresh])
+  }, [offset, pageSize, zh, refresh])
 
   useEffect(() => {
     const onHash = () => setSelected(hashBuild())
@@ -186,7 +187,7 @@ export function PipelinesPage(props: PageProps): JSX.Element {
     )
   }
 
-  const page = Math.floor(offset / 50) + 1
+  const page = Math.floor(offset / pageSize) + 1
   return (
     <Panel className="smp-list-panel" title={zh ? '部署流水线' : 'Deploy pipelines'} extra={
       <div className="row smp-pipeline-toolbar">
@@ -201,8 +202,8 @@ export function PipelinesPage(props: PageProps): JSX.Element {
       {loading && <p className="muted">{zh ? '正在读取…' : 'Loading…'}</p>}
       {error !== '' && <p className="banner error">{error}</p>}
       {!loading && error === '' && visible.length === 0 && <p className="empty">{rows.length === 0 ? (zh ? '还没有流水线运行。' : 'No pipeline runs yet.') : (zh ? '没有匹配的流水线。' : 'No matching pipelines.')}</p>}
-      {visible.length > 0 && <div className="table-wrap smp-list-scroll"><table className="smp-plugins smp-table"><thead><tr><th>{zh ? '状态' : 'Status'}</th><th>{zh ? '项目' : 'Project'}</th><th>Job</th><th>{zh ? '分支 / Tag' : 'Ref'}</th><th>Commit</th><th>{zh ? '触发' : 'Trigger'}</th><th>{zh ? '时间' : 'Started'}</th><th>{zh ? '耗时' : 'Duration'}</th></tr></thead><tbody>{visible.map(row => <tr key={row.id} className="smp-plugin-row smp-pipeline-row" role="button" tabIndex={0} onClick={() => open(row.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(row.id) } }}><td><span className={`pill ${PILL_TONE[statusOf(row.status, zh).tone] ?? 'offline'}`}>{statusOf(row.status, zh).text}</span></td><td>{row.projectName}</td><td><code>{row.jobName}</code></td><td><code>{refLabel(row.refName) || '—'}</code></td><td><code>{shortSha(row.commitHash)}</code></td><td>{row.submitReason ?? '—'}</td><td>{dateTime(row.runningDate ?? row.submitDate, zh)}</td><td>{duration(row.runningDuration)}</td></tr>)}</tbody></table></div>}
-      {visible.length > 0 && <div className="smp-list-pager"><span className="muted">{zh ? `共 ${rows.length} 项` : `${rows.length} items`}</span><div className="row"><button type="button" className="secondary" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - 50))}>{zh ? '上一页' : 'Previous'}</button><span>{zh ? `第 ${page} 页` : `Page ${page}`}</span><button type="button" className="secondary" disabled={nextOffset === null || loading} onClick={() => setOffset(nextOffset ?? offset)}>{zh ? '下一页' : 'Next'}</button></div></div>}
+      {visible.length > 0 && <div className="table-wrap smp-list-scroll"><table className="smp-plugins smp-table"><thead><tr><th>{zh ? '状态' : 'Status'}</th><th>{zh ? '项目' : 'Project'}</th><th>Job</th><th>{zh ? '分支 / Tag' : 'Ref'}</th><th>Commit</th><th>{zh ? '触发' : 'Trigger'}</th><th>{zh ? '时间' : 'Started'}</th><th>{zh ? '耗时' : 'Duration'}</th></tr></thead><tbody>{visible.map(row => <tr key={row.id} className="smp-plugin-row smp-pipeline-row" role="button" tabIndex={0} onClick={() => open(row.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(row.id) } }}><td><span className={`pill ${PILL_TONE[statusOf(row.status, zh).tone] ?? 'offline'}`}>{statusOf(row.status, zh).text}</span></td><td>{row.projectName}</td><td>{row.jobName}</td><td>{refLabel(row.refName) || '—'}</td><td>{shortSha(row.commitHash)}</td><td>{row.submitReason ?? '—'}</td><td>{dateTime(row.runningDate ?? row.submitDate, zh)}</td><td>{duration(row.runningDuration)}</td></tr>)}</tbody></table></div>}
+      {visible.length > 0 && <div className="smp-list-pager"><span className="muted">{zh ? `共 ${rows.length} 项` : `${rows.length} items`}</span><div className="row"><label>{zh ? '每页' : 'Per page'}<select className="smp-page-size" value={pageSize} onChange={event => { const next = Number(event.target.value); setPageSize(next); setOffset(0) }}><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label><button type="button" className="secondary" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - pageSize))}>{zh ? '上一页' : 'Previous'}</button><span>{zh ? `第 ${page} 页` : `Page ${page}`}</span><button type="button" className="secondary" disabled={nextOffset === null || loading} onClick={() => setOffset(nextOffset ?? offset)}>{zh ? '下一页' : 'Next'}</button></div></div>}
     </Panel>
   )
 }

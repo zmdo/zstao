@@ -199,3 +199,6 @@ body[data-ds-dark-theme] .smp-console table.smp-plugins tbody tr.smp-pipeline-ro
 .smp-pipeline-logs-head h3 { margin: 0; }
 .smp-pipeline-logs pre { max-height: 520px; margin: 0; }
 @media (max-width: 760px) { .smp-pipeline-body { grid-template-columns: minmax(0, 1fr); } .smp-pipeline-steps { border-right: 0; border-bottom: 1px solid var(--repo-line); padding: 12px 0; } .smp-pipeline-logs { padding: 12px 0 0; } }
+.smp-console select.smp-page-size { width: auto; }
+.smp-list-pager label { display: flex; align-items: center; gap: 6px; }
+.smp-pipeline-info-bar { background: var(--dsw-alias-bg-layer-2); margin: 0 -16px; padding: 14px 16px; }

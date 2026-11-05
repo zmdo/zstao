@@ -29,7 +29,7 @@ export function apply(ctx: HostCtx): void {
       'CES has a configured OneDev Git service for new projects. When the user asks to create or write a new project, first call platform_onedev with action=create_project and a lowercase project slug and a short description; do not create only local files for a new project. ' +
       'An existing project is returned by platform_onedev. After creation, use normal git commands with the CES AI identity: username cesai, email cesai@dianzinao.cn. ' +
       'The SSH key is at /dsh-home/keys/cesai and the OneDev SSH remote is ssh://git@10.2.8.9:2222/<project>.git. ' +
-      'For pipeline status, use platform_onedev action=list_builds or get_build. Never delete a OneDev project or change the OneDev login key.',
+      'For pipeline status, use platform_onedev action=list_builds or get_build. For TCR image repositories, use platform_image_registry actions list_repositories, list_tags or get_tag. Never delete a OneDev project or change the OneDev login key.',
   }))
 
   ctx.effect(() => {
@@ -162,6 +162,67 @@ export function apply(ctx: HostCtx): void {
     }))
     return stop
   })
+
+  ctx.effect(() => ctx.tools.register(defineTool({
+    name: 'platform_image_registry',
+    description:
+      'Read the CES image registry backed by Tencent Cloud TCR. ' +
+      'Use action=list_repositories to discover repositories, action=list_tags to list tags of a repository, and action=get_tag to resolve one tag to its tag and digest image addresses. ' +
+      'This tool is read-only; it never deletes repositories or images.',
+    parameters: {
+      action: { type: 'string', required: true, enum: ['list_repositories', 'list_tags', 'get_tag'], description: 'Operation to perform.' },
+      repository: { type: 'string', description: 'Repository name such as zstao/ces-integration. Required for list_tags and get_tag; optional search for list_repositories.' },
+      tag: { type: 'string', description: 'Image tag for get_tag.' },
+      offset: { type: 'integer', description: 'Pagination offset. Defaults to 0.' },
+      count: { type: 'integer', description: 'Maximum entries, 1-100. Defaults to 20.' },
+    },
+    output: { schema: { type: 'string' as const }, render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }] },
+    timeoutMs: 30_000,
+    async execute(args: { action: string; repository?: string; tag?: string; offset?: number; count?: number }, exec: { signal: AbortSignal }) {
+      const offset = args.offset ?? 0
+      const count = Math.min(100, Math.max(1, args.count ?? 20))
+      if (!Number.isSafeInteger(offset) || offset < 0) throw new ApiError(400, 'invalid_offset')
+      const repository = (args.repository ?? '').trim()
+      const settings = tcrSettings(await readImageSettings(join(dirname(file), 'image-registry.json')), ctx.secrets)
+      if (args.action === 'list_repositories') {
+        const result = await tcrRepositories(settings, offset, count, exec.signal, repository)
+        return JSON.stringify({
+          registry: result.server, namespace: settings.namespace, total: result.total,
+          repositories: result.repositories.map(repo => ({
+            name: repo.name, tagCount: repo.tagCount, public: repo.public, pullCount: repo.pullCount,
+            creationTime: repo.creationTime, updateTime: repo.updateTime, description: repo.description,
+          })),
+        })
+      }
+      if (!/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i.test(repository)) throw new ApiError(400, 'invalid_repository')
+      if (args.action === 'list_tags') {
+        const result = await tcrTags(settings, repository, offset, count, exec.signal)
+        return JSON.stringify({
+          registry: settings.registry, repository, total: result.total,
+          tags: result.tags.map(tag => ({
+            name: tag.name, digest: tag.digest, size: tag.size, os: tag.os, architecture: tag.architecture,
+            created: tag.created, pushed: tag.pushed,
+            address: `${settings.registry}/${repository}:${tag.name}`,
+            digestAddress: `${settings.registry}/${repository}@${tag.digest}`,
+          })),
+        })
+      }
+      if (args.action === 'get_tag') {
+        const tagName = (args.tag ?? '').trim()
+        if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tagName)) throw new ApiError(400, 'invalid_tag')
+        const result = await tcrTags(settings, repository, 0, 100, exec.signal)
+        const tag = result.tags.find(value => value.name === tagName)
+        if (tag === undefined) throw new ApiError(404, 'tag_not_found')
+        return JSON.stringify({
+          registry: settings.registry, repository, tag: tag.name, digest: tag.digest, size: tag.size,
+          os: tag.os, architecture: tag.architecture, pushed: tag.pushed,
+          address: `${settings.registry}/${repository}:${tag.name}`,
+          digestAddress: `${settings.registry}/${repository}@${tag.digest}`,
+        })
+      }
+      throw new ApiError(400, 'unknown_action')
+    },
+  })))
 
   ctx.effect(() => {
     const shutdown = new AbortController()

@@ -380,7 +380,8 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
       if (!/^\d+$/.test(rawOffset) || !Number.isSafeInteger(Number(rawOffset)) || Number(rawOffset) > 1_000_000) throw new ApiError(400, 'invalid_offset')
       if (!/^\d+$/.test(rawLimit) || !Number.isSafeInteger(Number(rawLimit)) || Number(rawLimit) < 1 || Number(rawLimit) > 100) throw new ApiError(400, 'invalid_limit')
       const settings = tcrSettings(await readImageSettings(join(dirname(file), 'image-registry.json')), ctx.secrets)
-      const result = await tcrRepositories(settings, Number(rawOffset), Number(rawLimit), signal)
+      const repo = (url.searchParams.get('repo') ?? '').trim()
+      const result = await tcrRepositories(settings, Number(rawOffset), Number(rawLimit), signal, repo)
       send(response, 200, result)
       return
     }

@@ -100,8 +100,10 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
-export async function tcrRepositories(settings: TcrSettings, offset: number, limit: number, signal: AbortSignal): Promise<{ repositories: TcrRepository[]; total: number; server: string }> {
-  const result = await request(settings, 'DescribeRepositoryFilterPersonal', { Namespace: settings.namespace, Offset: offset, Limit: limit }, signal)
+export async function tcrRepositories(settings: TcrSettings, offset: number, limit: number, signal: AbortSignal, repoName = ''): Promise<{ repositories: TcrRepository[]; total: number; server: string }> {
+  const payload: Record<string, unknown> = { Namespace: settings.namespace, Offset: offset, Limit: limit }
+  if (repoName !== '') payload.RepoName = repoName
+  const result = await request(settings, 'DescribeRepositoryFilterPersonal', payload, signal)
   const data = result.Data
   if (typeof data !== 'object' || data === null || Array.isArray(data)) throw new ApiError(502, 'tcr_invalid_response')
   const row = data as Record<string, unknown>

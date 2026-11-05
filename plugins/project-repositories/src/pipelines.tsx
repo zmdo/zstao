@@ -190,15 +190,17 @@ export function PipelinesPage(props: PageProps): JSX.Element {
   const page = Math.floor(offset / pageSize) + 1
   return (
     <Panel className="smp-list-panel" title={zh ? '部署流水线' : 'Deploy pipelines'} extra={
-      <div className="row smp-pipeline-toolbar">
-        <input className="search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={zh ? '搜索项目、Job、Commit' : 'Search project, job, commit'} />
+      <div className="row smp-plugins-head-extra">
+        <select className="smp-status-filter" aria-label={zh ? '状态' : 'Status'} value={status} onChange={event => setStatus(event.target.value)}><option value="">{zh ? '全部' : 'All'}</option>{Object.entries(STATUS_TEXT).map(([key, value]) => <option key={key} value={key}>{zh ? value.zh : value.en}</option>)}</select>
+        <input className="search" type="search" aria-label={zh ? '搜索流水线' : 'Search pipelines'} value={query} onChange={event => setQuery(event.target.value)} placeholder={zh ? '搜索项目、Job、Commit' : 'Search project, job, commit'} />
+      </div>
+    }>
+      <div className="smp-pipeline-filters">
         <select value={project} onChange={event => setProject(event.target.value)}><option value="">{zh ? '全部项目' : 'All projects'}</option>{projects.map(value => <option key={value}>{value}</option>)}</select>
         <select value={job} onChange={event => setJob(event.target.value)}><option value="">{zh ? '全部 Job' : 'All jobs'}</option>{jobs.map(value => <option key={value}>{value}</option>)}</select>
-        <select className="smp-status-filter" value={status} onChange={event => setStatus(event.target.value)}><option value="">{zh ? '全部状态' : 'All statuses'}</option>{Object.entries(STATUS_TEXT).map(([key, value]) => <option key={key} value={key}>{zh ? value.zh : value.en}</option>)}</select>
         <input value={branch} onChange={event => setBranch(event.target.value)} placeholder={zh ? '分支 / Tag' : 'Branch / tag'} />
         <button type="button" className="secondary" onClick={() => setRefresh(value => value + 1)}>{zh ? '刷新' : 'Refresh'}</button>
       </div>
-    }>
       {loading && <p className="muted">{zh ? '正在读取…' : 'Loading…'}</p>}
       {error !== '' && <p className="banner error">{error}</p>}
       {!loading && error === '' && visible.length === 0 && <p className="empty">{rows.length === 0 ? (zh ? '还没有流水线运行。' : 'No pipeline runs yet.') : (zh ? '没有匹配的流水线。' : 'No matching pipelines.')}</p>}

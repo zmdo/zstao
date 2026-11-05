@@ -137,16 +137,11 @@
 .smp-repo-ai-panel small { display: block; margin-top: 9px; color: var(--repo-muted); }
 .smp-repo-public-key { user-select: all; font-size: 11px; }
 
-.smp-pipeline-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
-.smp-pipeline-toolbar input, .smp-pipeline-toolbar select { min-width: 130px; height: 30px; border: 1px solid var(--repo-line); border-radius: 5px; background: var(--repo-input); color: var(--repo-text); padding: 0 8px; font: inherit; font-size: 12px; }
-.smp-pipeline-toolbar input:first-child { flex: 1 1 220px; }
-.smp-pipeline-table { overflow: auto; border: 1px solid var(--repo-line); border-radius: 6px; }
-.smp-pipeline-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.smp-pipeline-table th { text-align: left; font-weight: 500; color: var(--repo-muted); border-bottom: 1px solid var(--repo-line); padding: 9px 10px; white-space: nowrap; }
-.smp-pipeline-table td { padding: 9px 10px; border-bottom: 1px solid var(--repo-line); white-space: nowrap; }
-.smp-pipeline-table tr:last-child td { border-bottom: 0; }
-.smp-pipeline-table tbody tr { cursor: pointer; }
-.smp-pipeline-table tbody tr:hover { background: var(--repo-hover); }
+.smp-pipeline-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
+.smp-pipeline-toolbar .search { width: 190px; }
+.smp-pipeline-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.smp-pipeline-filters select, .smp-pipeline-filters input { height: 30px; border: 1px solid var(--repo-line); border-radius: 5px; background: var(--repo-input); color: var(--repo-text); padding: 0 8px; font: inherit; font-size: 12px; }
+.smp-pipeline-row { cursor: pointer; }
 .smp-build-status { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
 .smp-build-status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .smp-build-status.success { color: var(--repo-success); }

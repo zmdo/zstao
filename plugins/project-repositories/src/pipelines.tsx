@@ -24,6 +24,8 @@ function statusOf(status: string, zh: boolean): { text: string; tone: string } {
   const item = STATUS_TEXT[status] ?? { zh: status, en: status, tone: 'neutral' }
   return { text: zh ? item.zh : item.en, tone: item.tone }
 }
+const PILL_TONE: Record<string, string> = { success: 'succeeded', failure: 'failed', running: 'running', queued: 'queued', neutral: 'offline' }
+
 function duration(milliseconds: number | null): string {
   if (milliseconds === null || milliseconds < 0) return '—'
   if (milliseconds < 1000) return `${milliseconds}ms`
@@ -172,21 +174,25 @@ export function PipelinesPage(props: PageProps): JSX.Element {
     )
   }
 
+  const page = Math.floor(offset / 50) + 1
   return (
-    <Panel className="smp-list-panel" title={zh ? '部署流水线' : 'Deploy pipelines'}>
-      <div className="smp-pipeline-toolbar">
-        <input value={query} onChange={event => setQuery(event.target.value)} placeholder={zh ? '搜索项目、Job、Commit' : 'Search project, job, commit'} />
-        <select value={project} onChange={event => setProject(event.target.value)}><option value="">{zh ? '全部项目' : 'All projects'}</option>{projects.map(value => <option key={value}>{value}</option>)}</select>
-        <select value={job} onChange={event => setJob(event.target.value)}><option value="">{zh ? '全部 Job' : 'All jobs'}</option>{jobs.map(value => <option key={value}>{value}</option>)}</select>
-        <select value={status} onChange={event => setStatus(event.target.value)}><option value="">{zh ? '全部状态' : 'All statuses'}</option>{Object.entries(STATUS_TEXT).map(([key, value]) => <option key={key} value={key}>{zh ? value.zh : value.en}</option>)}</select>
-        <input value={branch} onChange={event => setBranch(event.target.value)} placeholder={zh ? '分支 / Tag' : 'Branch / tag'} />
+    <Panel className="smp-list-panel" title={zh ? '部署流水线' : 'Deploy pipelines'} extra={
+      <div className="row smp-pipeline-toolbar">
+        <input className="search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={zh ? '搜索项目、Job、Commit' : 'Search project, job, commit'} />
+        <select className="smp-status-filter" value={status} onChange={event => setStatus(event.target.value)}><option value="">{zh ? '全部状态' : 'All statuses'}</option>{Object.entries(STATUS_TEXT).map(([key, value]) => <option key={key} value={key}>{zh ? value.zh : value.en}</option>)}</select>
         <button type="button" className="secondary" onClick={() => setRefresh(value => value + 1)}>{zh ? '刷新' : 'Refresh'}</button>
       </div>
-      {loading && <p className="smp-project-muted">{zh ? '正在读取…' : 'Loading…'}</p>}
-      {error !== '' && <p className="smp-project-notice error">{error}</p>}
-      {!loading && error === '' && visible.length === 0 && <p className="smp-project-muted">{rows.length === 0 ? (zh ? '还没有流水线运行。' : 'No pipeline runs yet.') : (zh ? '没有匹配的流水线。' : 'No matching pipelines.')}</p>}
-      {visible.length > 0 && <div className="smp-pipeline-table"><table><thead><tr><th>{zh ? '状态' : 'Status'}</th><th>{zh ? '项目' : 'Project'}</th><th>Job</th><th>{zh ? '分支 / Tag' : 'Ref'}</th><th>Commit</th><th>{zh ? '触发' : 'Trigger'}</th><th>{zh ? '时间' : 'Started'}</th><th>{zh ? '耗时' : 'Duration'}</th></tr></thead><tbody>{visible.map(row => <tr key={row.id} onClick={() => open(row.id)} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter') open(row.id) }}><td><span className={`smp-build-status ${statusOf(row.status, zh).tone}`}><i />{statusOf(row.status, zh).text}</span></td><td>{row.projectName}</td><td><code>{row.jobName}</code></td><td><code>{refLabel(row.refName) || '—'}</code></td><td><code>{shortSha(row.commitHash)}</code></td><td>{row.submitReason ?? '—'}</td><td>{dateTime(row.runningDate ?? row.submitDate, zh)}</td><td>{duration(row.runningDuration)}</td></tr>)}</tbody></table></div>}
-      <div className="smp-pipeline-pager"><button type="button" className="secondary" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - 50))}>{zh ? '上一页' : 'Previous'}</button><span>{zh ? `第 ${offset + 1} 项起` : `From ${offset + 1}`}</span><button type="button" className="secondary" disabled={nextOffset === null || loading} onClick={() => setOffset(nextOffset ?? offset)}>{zh ? '下一页' : 'Next'}</button></div>
+    }>
+      <div className="smp-pipeline-filters">
+        <select value={project} onChange={event => setProject(event.target.value)}><option value="">{zh ? '全部项目' : 'All projects'}</option>{projects.map(value => <option key={value}>{value}</option>)}</select>
+        <select value={job} onChange={event => setJob(event.target.value)}><option value="">{zh ? '全部 Job' : 'All jobs'}</option>{jobs.map(value => <option key={value}>{value}</option>)}</select>
+        <input value={branch} onChange={event => setBranch(event.target.value)} placeholder={zh ? '分支 / Tag' : 'Branch / tag'} />
+      </div>
+      {loading && <p className="muted">{zh ? '正在读取…' : 'Loading…'}</p>}
+      {error !== '' && <p className="banner error">{error}</p>}
+      {!loading && error === '' && visible.length === 0 && <p className="empty">{rows.length === 0 ? (zh ? '还没有流水线运行。' : 'No pipeline runs yet.') : (zh ? '没有匹配的流水线。' : 'No matching pipelines.')}</p>}
+      {visible.length > 0 && <div className="table-wrap smp-list-scroll"><table className="smp-table"><thead><tr><th>{zh ? '状态' : 'Status'}</th><th>{zh ? '项目' : 'Project'}</th><th>Job</th><th>{zh ? '分支 / Tag' : 'Ref'}</th><th>Commit</th><th>{zh ? '触发' : 'Trigger'}</th><th>{zh ? '时间' : 'Started'}</th><th>{zh ? '耗时' : 'Duration'}</th></tr></thead><tbody>{visible.map(row => <tr key={row.id} className="smp-pipeline-row" role="button" tabIndex={0} onClick={() => open(row.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(row.id) } }}><td><span className={`pill ${PILL_TONE[statusOf(row.status, zh).tone] ?? 'offline'}`}>{statusOf(row.status, zh).text}</span></td><td>{row.projectName}</td><td><code>{row.jobName}</code></td><td><code>{refLabel(row.refName) || '—'}</code></td><td><code>{shortSha(row.commitHash)}</code></td><td>{row.submitReason ?? '—'}</td><td>{dateTime(row.runningDate ?? row.submitDate, zh)}</td><td>{duration(row.runningDuration)}</td></tr>)}</tbody></table></div>}
+      {visible.length > 0 && <div className="smp-list-pager"><span className="muted">{zh ? `共 ${rows.length} 项` : `${rows.length} items`}</span><div className="row"><button type="button" className="secondary" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - 50))}>{zh ? '上一页' : 'Previous'}</button><span>{zh ? `第 ${page} 页` : `Page ${page}`}</span><button type="button" className="secondary" disabled={nextOffset === null || loading} onClick={() => setOffset(nextOffset ?? offset)}>{zh ? '下一页' : 'Next'}</button></div></div>}
     </Panel>
   )
 }

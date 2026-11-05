@@ -242,3 +242,10 @@ body[data-ds-dark-theme] .smp-console table.smp-plugins tbody tr.smp-pipeline-ro
 .smp-modal p { margin: 0 0 12px; color: var(--repo-muted); font-size: 12px; line-height: 1.6; }
 .smp-modal-target { display: block; padding: 8px; border: 1px solid var(--repo-line); border-radius: 4px; background: var(--dsw-alias-bg-layer-2); overflow-wrap: anywhere; font-size: 11px; }
 .smp-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.smp-image-registry-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-image-registry-table .smp-image-address-cell { max-width: 360px; }
+.smp-image-address-value { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.smp-image-address-value code { display: block; min-width: 0; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smp-image-address-value button.copy { width: 24px; height: 24px; flex: none; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--repo-muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.smp-image-address-value button.copy:hover { background: var(--repo-hover); color: var(--dsw-alias-label-primary); }
+.smp-image-address-value button.copy svg { width: 14px; height: 14px; }

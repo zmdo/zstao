@@ -103,3 +103,28 @@ test('default branch is a raw string even with JSON content type, including JSON
     assert.equal((await client.repository(1)).defaultBranch, 'null')
   } finally { globalThis.fetch = original }
 })
+
+test('build list, detail and log frames are parsed', async () => {
+  const original = globalThis.fetch
+  const build = {
+    id: 2, number: 7, projectId: 1, jobName: 'build', refName: 'refs/heads/main', commitHash: sha,
+    status: 'SUCCESSFUL', stepExecutions: { 'step-0': { status: 'SUCCESSFUL', duration: 45, startedAt: 1, skipped: false, stepIndex: 1, stepCount: 1 } },
+    submitterId: 2, agentId: null, submitDate: '2026-11-04T10:00:00Z', runningDate: '2026-11-04T10:00:01Z', finishDate: '2026-11-04T10:00:02Z',
+    pendingDuration: 80, runningDuration: 1000, submitReason: 'Branch update',
+  }
+  const frame = JSON.stringify({ date: '2026-11-04T10:00:01Z', messages: [{ text: 'hello from build' }, { text: 'second line' }] })
+  globalThis.fetch = async input => {
+    const url = new URL(String(input))
+    if (url.pathname.endsWith('/streaming/build-logs/2')) return new Response(Buffer.concat([Buffer.from([0, 0, 0, frame.length]), Buffer.from(frame)]), { headers: { 'content-type': 'application/octet-stream' } })
+    if (url.pathname.endsWith('/builds/2')) return Response.json(build)
+    return Response.json([build])
+  }
+  try {
+    const client = new OneDev({ internalBaseUrl: 'https://internal', externalBaseUrl: 'https://public', username: 'u', passwordCiphertext: 'c' }, { encrypt: v => v, decrypt: () => 'secret' }, new AbortController().signal)
+    const list = await client.builds(0, 20)
+    assert.equal(list[0].jobName, 'build'); assert.equal(list[0].steps[0].name, 'step-0'); assert.equal(list[0].runningDuration, 1000)
+    const detail = await client.build(2)
+    assert.equal(detail.number, 7); assert.equal(detail.status, 'SUCCESSFUL'); assert.equal(detail.steps[0].duration, 45)
+    assert.equal(await client.buildLogs(2), 'hello from build\nsecond line')
+  } finally { globalThis.fetch = original }
+})

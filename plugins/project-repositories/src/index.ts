@@ -28,31 +28,35 @@ export function apply(ctx: HostCtx): void {
       'CES has a configured OneDev Git service for new projects. When the user asks to create or write a new project, first call platform_onedev with action=create_project and a lowercase project slug and a short description; do not create only local files for a new project. ' +
       'An existing project is returned by platform_onedev. After creation, use normal git commands with the CES AI identity: username cesai, email cesai@dianzinao.cn. ' +
       'The SSH key is at /dsh-home/keys/cesai and the OneDev SSH remote is ssh://git@10.2.8.9:2222/<project>.git. ' +
-      'Never delete a OneDev project or change the OneDev login key.',
+      'For pipeline status, use platform_onedev action=list_builds or get_build. Never delete a OneDev project or change the OneDev login key.',
   }))
 
   ctx.effect(() => {
     const stop = ctx.tools.register(defineTool({
       name: 'platform_onedev',
       description:
-        'OneDev actions: list_projects, get_project, list_branches, list_tags, list_commits, get_tree, get_file, create_project. ' +
-        'Use action=create_project to create a new project and grant the CES AI account cesai Code Writer; existing projects are returned without changing access. ' +
+        'OneDev actions: list_projects, get_project, list_branches, list_tags, list_commits, get_tree, get_file, list_builds, get_build, get_build_logs, create_project. ' +
+        'Use list_builds/get_build/get_build_logs to inspect pipeline runs and logs. Use action=create_project to create a new project and grant the CES AI account cesai Code Writer; existing projects are returned without changing access. ' +
         'Use the other actions to discover and inspect projects. This tool never deletes projects or changes the AI login key.',
       parameters: {
         action: {
           type: 'string', required: true,
-          enum: ['list_projects', 'get_project', 'list_branches', 'list_tags', 'list_commits', 'get_tree', 'get_file', 'create_project'],
+          enum: ['list_projects', 'get_project', 'list_branches', 'list_tags', 'list_commits', 'get_tree', 'get_file', 'list_builds', 'get_build', 'get_build_logs', 'create_project'],
           description: 'Operation to perform.',
         },
-        project: { type: 'string', description: 'OneDev project name, required except for list_projects.' },
+        project: { type: 'string', description: 'OneDev project name. Required for repository actions; optional for list_builds.' },
         ref: { type: 'string', description: 'Branch or tag name. Defaults to the default branch for code reads.' },
         path: { type: 'string', description: 'Repository path for get_tree or get_file.' },
         query: { type: 'string', description: 'Optional case-insensitive project search for list_projects.' },
         description: { type: 'string', description: 'Project description for create_project.' },
+        buildId: { type: 'integer', description: 'OneDev build id for get_build or get_build_logs.' },
+        status: { type: 'string', enum: ['WAITING', 'PENDING', 'RUNNING', 'FAILED', 'CANCELLED', 'TIMED_OUT', 'SUCCESSFUL'], description: 'Optional build status filter for list_builds.' },
+        job: { type: 'string', description: 'Optional job name filter for list_builds.' },
+        count: { type: 'integer', description: 'Maximum builds to return for list_builds, 1-100. Defaults to 20.' },
       },
       output: { schema: { type: 'string' as const }, render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }] },
       timeoutMs: 60_000,
-      async execute(args: { action: string; project?: string; ref?: string; path?: string; query?: string; description?: string }, exec: { signal: AbortSignal }) {
+      async execute(args: { action: string; project?: string; ref?: string; path?: string; query?: string; description?: string; buildId?: number; status?: string; job?: string; count?: number }, exec: { signal: AbortSignal }) {
         const action = args.action
         const name = (args.project ?? '').trim()
         const settings = await readSettings(file)
@@ -67,6 +71,37 @@ export function apply(ctx: HostCtx): void {
               webUrl: project.webUrl, lastUpdated: project.lastUpdated, codeManagement: project.codeManagement,
             })),
           })
+        }
+        if (action === 'list_builds') {
+          const projectNames = await one.projectNames()
+          let projectId: number | null = null
+          if (name !== '') {
+            const found = [...projectNames.entries()].find(([, projectName]) => projectName === name)
+            if (found === undefined) throw new ApiError(404, 'project_not_found')
+            projectId = found[0]
+          }
+          const count = Math.min(100, Math.max(1, args.count ?? 20))
+          const builds = await one.builds(0, 100)
+          const filtered = builds.filter(build =>
+            (projectId === null || build.projectId === projectId) &&
+            (args.status === undefined || args.status === '' || build.status === args.status) &&
+            (args.job === undefined || args.job === '' || build.jobName === args.job),
+          ).slice(0, count)
+          return JSON.stringify({
+            builds: filtered.map(build => ({
+              id: build.id, number: build.number, projectName: projectNames.get(build.projectId) ?? `#${build.projectId}`,
+              jobName: build.jobName, refName: build.refName, commitHash: build.commitHash, status: build.status,
+              submitReason: build.submitReason, submitDate: build.submitDate, finishDate: build.finishDate,
+              durationMs: build.runningDuration, steps: build.steps,
+            })),
+          })
+        }
+        if (action === 'get_build' || action === 'get_build_logs') {
+          const id = args.buildId
+          if (id === undefined || !Number.isSafeInteger(id) || id < 1) throw new ApiError(400, 'invalid_build_id')
+          if (action === 'get_build_logs') return JSON.stringify({ buildId: id, text: await one.buildLogs(id) })
+          const [build, projectNames] = await Promise.all([one.build(id), one.projectNames()])
+          return JSON.stringify({ ...build, projectName: projectNames.get(build.projectId) ?? `#${build.projectId}` })
         }
         if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) throw new ApiError(400, 'invalid_project_name')
         if (action === 'create_project') {

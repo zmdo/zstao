@@ -73,7 +73,6 @@ export function PipelinesPage(props: PageProps): JSX.Element {
   const [selected, setSelected] = useState<number | null>(() => hashBuild())
   const [build, setBuild] = useState<BuildRow | null>(null)
   const [logs, setLogs] = useState('')
-  const [logsOpen, setLogsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
@@ -114,13 +113,13 @@ export function PipelinesPage(props: PageProps): JSX.Element {
   }, [selected, zh])
 
   useEffect(() => {
-    if (build === null || !logsOpen) return
+    if (build === null) return
     let stopped = false
     json<{ text: string }>(`/pipelines/${build.id}/logs`)
       .then(value => { if (!stopped) setLogs(value.text) })
       .catch(cause => { if (!stopped) setError(errorText(cause, zh)) })
     return () => { stopped = true }
-  }, [build, logsOpen, zh])
+  }, [build?.id, zh])
 
   useEffect(() => {
     if (build === null || !['WAITING', 'PENDING', 'RUNNING'].includes(build.status)) return
@@ -149,26 +148,39 @@ export function PipelinesPage(props: PageProps): JSX.Element {
 
   if (selected !== null) {
     return (
-      <Panel className="smp-list-panel smp-pipeline-detail" title={zh ? '流水线详情' : 'Pipeline details'}>
-        <button type="button" className="smp-pipeline-back" onClick={back}>← {zh ? '返回流水线列表' : 'Back to pipelines'}</button>
-        {detailLoading && <p className="smp-project-muted">{zh ? '正在读取…' : 'Loading…'}</p>}
-        {error !== '' && <p className="smp-project-notice error">{error}</p>}
+      <Panel className="smp-list-panel smp-pipeline-detail" title={
+        <div className="smp-pipeline-titlebar">
+          <button type="button" className="secondary smp-pipeline-back" onClick={back}>← {zh ? '返回流水线列表' : 'Back to pipelines'}</button>
+          <span>{zh ? '流水线详情' : 'Pipeline details'}</span>
+        </div>
+      }>
+        {detailLoading && <p className="muted">{zh ? '正在读取…' : 'Loading…'}</p>}
+        {error !== '' && <p className="banner error">{error}</p>}
         {build !== null && <>
-          <header className="smp-pipeline-header">
-            <div><span className={`smp-build-status ${statusOf(build.status, zh).tone}`}><i />{statusOf(build.status, zh).text}</span><h2>{build.projectName} / {build.jobName} <span>#{build.number}</span></h2></div>
-            <div className="smp-pipeline-duration">{duration(build.runningDuration)}</div>
-          </header>
-          <dl className="smp-pipeline-meta">
-            <dt>{zh ? '项目' : 'Project'}</dt><dd>{build.projectName}</dd>
-            <dt>{zh ? '分支 / Tag' : 'Ref'}</dt><dd><code>{refLabel(build.refName) || '—'}</code></dd>
-            <dt>Commit</dt><dd><code>{shortSha(build.commitHash) || '—'}</code></dd>
-            <dt>{zh ? '触发' : 'Trigger'}</dt><dd>{build.submitReason ?? '—'}</dd>
-            <dt>{zh ? '提交时间' : 'Submitted'}</dt><dd>{dateTime(build.submitDate, zh)}</dd>
-            <dt>{zh ? '结束时间' : 'Finished'}</dt><dd>{dateTime(build.finishDate, zh)}</dd>
-            <dt>Agent</dt><dd>{build.agentId === null ? '—' : `#${build.agentId}`}</dd>
-          </dl>
-          <section className="smp-pipeline-steps"><h3>{zh ? '运行步骤' : 'Steps'}</h3>{build.steps.length === 0 ? <p className="smp-project-muted">{zh ? '暂无步骤信息' : 'No step information'}</p> : <ol>{build.steps.map(step => <li key={step.name}><span className={`smp-step-dot ${statusOf(step.status === 'RUNNING' ? 'RUNNING' : step.status === 'FAILED' ? 'FAILED' : step.status === 'SUCCESSFUL' ? 'SUCCESSFUL' : 'CANCELLED', zh).tone}`} /> <strong>{stepLabel(step.name)}</strong> <span className="smp-project-muted">{step.status.toLowerCase()} · {duration(step.duration)}</span></li>)}</ol>}</section>
-          <section className="smp-pipeline-logs"><div className="smp-pipeline-logs-head"><h3>{zh ? '日志' : 'Logs'}</h3><button type="button" className="secondary" onClick={() => setLogsOpen(value => !value)}>{logsOpen ? (zh ? '收起' : 'Hide') : (zh ? '查看日志' : 'Show logs')}</button></div>{logsOpen && <pre>{logs || (zh ? '正在读取日志…' : 'Loading logs…')}</pre>}</section>
+          <div className="smp-pipeline-info-bar">
+            <div className="smp-pipeline-summary">
+              <span className={`pill ${PILL_TONE[statusOf(build.status, zh).tone] ?? 'offline'}`}>{statusOf(build.status, zh).text}</span>
+              <strong>{build.projectName} / {build.jobName} <span>#{build.number}</span></strong>
+            </div>
+            <div className="smp-pipeline-facts">
+              <div className="smp-pipeline-fact"><span>{zh ? '分支 / Tag' : 'Ref'}</span><strong>{refLabel(build.refName) || '—'}</strong></div>
+              <div className="smp-pipeline-fact"><span>Commit</span><strong className="mono">{shortSha(build.commitHash) || '—'}</strong></div>
+              <div className="smp-pipeline-fact"><span>{zh ? '触发' : 'Trigger'}</span><strong>{build.submitReason ?? '—'}</strong></div>
+              <div className="smp-pipeline-fact"><span>{zh ? '开始时间' : 'Started'}</span><strong>{dateTime(build.runningDate ?? build.submitDate, zh)}</strong></div>
+              <div className="smp-pipeline-fact"><span>{zh ? '耗时' : 'Duration'}</span><strong>{duration(build.runningDuration)}</strong></div>
+              <div className="smp-pipeline-fact"><span>Agent</span><strong>{build.agentId === null ? '—' : `#${build.agentId}`}</strong></div>
+            </div>
+          </div>
+          <div className="smp-pipeline-body">
+            <aside className="smp-pipeline-steps">
+              <h3>{zh ? '运行步骤' : 'Steps'}</h3>
+              {build.steps.length === 0 ? <p className="muted">{zh ? '暂无步骤信息' : 'No step information'}</p> : <ol>{build.steps.map(step => <li key={step.name}><span className={`smp-step-dot ${statusOf(step.status === 'RUNNING' ? 'RUNNING' : step.status === 'FAILED' ? 'FAILED' : step.status === 'SUCCESSFUL' ? 'SUCCESSFUL' : 'CANCELLED', zh).tone}`} /> <div><strong>{stepLabel(step.name)}</strong><span className="muted">{step.status.toLowerCase()} · {duration(step.duration)}</span></div></li>)}</ol>}
+            </aside>
+            <section className="smp-pipeline-logs">
+              <div className="smp-pipeline-logs-head"><h3>{zh ? '日志' : 'Logs'}</h3></div>
+              <pre>{logs || (zh ? '正在读取日志…' : 'Loading logs…')}</pre>
+            </section>
+          </div>
         </>}
       </Panel>
     )
@@ -179,19 +191,17 @@ export function PipelinesPage(props: PageProps): JSX.Element {
     <Panel className="smp-list-panel" title={zh ? '部署流水线' : 'Deploy pipelines'} extra={
       <div className="row smp-pipeline-toolbar">
         <input className="search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={zh ? '搜索项目、Job、Commit' : 'Search project, job, commit'} />
+        <select value={project} onChange={event => setProject(event.target.value)}><option value="">{zh ? '全部项目' : 'All projects'}</option>{projects.map(value => <option key={value}>{value}</option>)}</select>
+        <select value={job} onChange={event => setJob(event.target.value)}><option value="">{zh ? '全部 Job' : 'All jobs'}</option>{jobs.map(value => <option key={value}>{value}</option>)}</select>
         <select className="smp-status-filter" value={status} onChange={event => setStatus(event.target.value)}><option value="">{zh ? '全部状态' : 'All statuses'}</option>{Object.entries(STATUS_TEXT).map(([key, value]) => <option key={key} value={key}>{zh ? value.zh : value.en}</option>)}</select>
+        <input value={branch} onChange={event => setBranch(event.target.value)} placeholder={zh ? '分支 / Tag' : 'Branch / tag'} />
         <button type="button" className="secondary" onClick={() => setRefresh(value => value + 1)}>{zh ? '刷新' : 'Refresh'}</button>
       </div>
     }>
-      <div className="smp-pipeline-filters">
-        <select value={project} onChange={event => setProject(event.target.value)}><option value="">{zh ? '全部项目' : 'All projects'}</option>{projects.map(value => <option key={value}>{value}</option>)}</select>
-        <select value={job} onChange={event => setJob(event.target.value)}><option value="">{zh ? '全部 Job' : 'All jobs'}</option>{jobs.map(value => <option key={value}>{value}</option>)}</select>
-        <input value={branch} onChange={event => setBranch(event.target.value)} placeholder={zh ? '分支 / Tag' : 'Branch / tag'} />
-      </div>
       {loading && <p className="muted">{zh ? '正在读取…' : 'Loading…'}</p>}
       {error !== '' && <p className="banner error">{error}</p>}
       {!loading && error === '' && visible.length === 0 && <p className="empty">{rows.length === 0 ? (zh ? '还没有流水线运行。' : 'No pipeline runs yet.') : (zh ? '没有匹配的流水线。' : 'No matching pipelines.')}</p>}
-      {visible.length > 0 && <div className="table-wrap smp-list-scroll"><table className="smp-table"><thead><tr><th>{zh ? '状态' : 'Status'}</th><th>{zh ? '项目' : 'Project'}</th><th>Job</th><th>{zh ? '分支 / Tag' : 'Ref'}</th><th>Commit</th><th>{zh ? '触发' : 'Trigger'}</th><th>{zh ? '时间' : 'Started'}</th><th>{zh ? '耗时' : 'Duration'}</th></tr></thead><tbody>{visible.map(row => <tr key={row.id} className="smp-pipeline-row" role="button" tabIndex={0} onClick={() => open(row.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(row.id) } }}><td><span className={`pill ${PILL_TONE[statusOf(row.status, zh).tone] ?? 'offline'}`}>{statusOf(row.status, zh).text}</span></td><td>{row.projectName}</td><td><code>{row.jobName}</code></td><td><code>{refLabel(row.refName) || '—'}</code></td><td><code>{shortSha(row.commitHash)}</code></td><td>{row.submitReason ?? '—'}</td><td>{dateTime(row.runningDate ?? row.submitDate, zh)}</td><td>{duration(row.runningDuration)}</td></tr>)}</tbody></table></div>}
+      {visible.length > 0 && <div className="table-wrap smp-list-scroll"><table className="smp-plugins smp-table"><thead><tr><th>{zh ? '状态' : 'Status'}</th><th>{zh ? '项目' : 'Project'}</th><th>Job</th><th>{zh ? '分支 / Tag' : 'Ref'}</th><th>Commit</th><th>{zh ? '触发' : 'Trigger'}</th><th>{zh ? '时间' : 'Started'}</th><th>{zh ? '耗时' : 'Duration'}</th></tr></thead><tbody>{visible.map(row => <tr key={row.id} className="smp-plugin-row smp-pipeline-row" role="button" tabIndex={0} onClick={() => open(row.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(row.id) } }}><td><span className={`pill ${PILL_TONE[statusOf(row.status, zh).tone] ?? 'offline'}`}>{statusOf(row.status, zh).text}</span></td><td>{row.projectName}</td><td><code>{row.jobName}</code></td><td><code>{refLabel(row.refName) || '—'}</code></td><td><code>{shortSha(row.commitHash)}</code></td><td>{row.submitReason ?? '—'}</td><td>{dateTime(row.runningDate ?? row.submitDate, zh)}</td><td>{duration(row.runningDuration)}</td></tr>)}</tbody></table></div>}
       {visible.length > 0 && <div className="smp-list-pager"><span className="muted">{zh ? `共 ${rows.length} 项` : `${rows.length} items`}</span><div className="row"><button type="button" className="secondary" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - 50))}>{zh ? '上一页' : 'Previous'}</button><span>{zh ? `第 ${page} 页` : `Page ${page}`}</span><button type="button" className="secondary" disabled={nextOffset === null || loading} onClick={() => setOffset(nextOffset ?? offset)}>{zh ? '下一页' : 'Next'}</button></div></div>}
     </Panel>
   )

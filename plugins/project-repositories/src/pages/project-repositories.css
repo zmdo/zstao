@@ -172,3 +172,30 @@
 .smp-pipeline-logs pre { max-height: 420px; overflow: auto; margin: 10px 0 0; padding: 12px; border: 1px solid var(--repo-line); border-radius: 5px; background: var(--repo-code-bg); color: var(--repo-text); font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 760px) { .smp-pipeline-header { flex-direction: column; } .smp-pipeline-meta { grid-template-columns: 70px minmax(0, 1fr); } }
 .smp-list-panel { --repo-text: var(--dsw-alias-label-primary); --repo-line: var(--dsw-alias-border-l2); --repo-muted: var(--dsw-alias-label-secondary); --repo-hover: var(--dsw-alias-interactive-bg-hover); --repo-input: var(--dsw-alias-bg-layer-2); --repo-code-bg: var(--dsw-alias-bg-layer-2); --repo-success: var(--dsw-alias-state-success-primary); --repo-danger: var(--dsw-alias-state-error-primary); --repo-warn: var(--dsw-alias-state-warn-label); --repo-accent: var(--dsw-alias-state-business-primary); }
+
+.smp-console table.smp-plugins tbody tr.smp-pipeline-row:hover td { background: #f7f9fc; }
+body[data-ds-dark-theme] .smp-console table.smp-plugins tbody tr.smp-pipeline-row:hover td { background: var(--repo-hover); }
+.smp-pipeline-titlebar { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.smp-pipeline-titlebar .smp-pipeline-back { border: 1px solid var(--repo-line); border-radius: 4px; background: var(--repo-input); color: var(--repo-text); padding: 4px 9px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.smp-pipeline-titlebar .smp-pipeline-back:hover { background: var(--repo-hover); }
+.smp-pipeline-info-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; padding: 16px 0; border-bottom: 1px solid var(--repo-line); }
+.smp-pipeline-summary { display: flex; align-items: center; gap: 10px; min-width: 220px; }
+.smp-pipeline-summary strong { font-size: 15px; font-weight: 500; }
+.smp-pipeline-summary strong span { color: var(--repo-muted); font-weight: 400; }
+.smp-pipeline-facts { display: flex; flex: 1 1 600px; flex-wrap: wrap; gap: 12px 24px; }
+.smp-pipeline-fact { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.smp-pipeline-fact span { color: var(--repo-muted); font-size: 11px; }
+.smp-pipeline-fact strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.smp-pipeline-body { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 360px; }
+.smp-pipeline-steps { border-top: 0; border-right: 1px solid var(--repo-line); padding: 16px 16px 0 0; }
+.smp-pipeline-steps h3 { margin: 0 0 12px; font-size: 13px; font-weight: 500; }
+.smp-pipeline-steps ol { gap: 10px; }
+.smp-pipeline-steps li { align-items: flex-start; }
+.smp-pipeline-steps li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.smp-pipeline-steps li strong { font-weight: 500; }
+.smp-pipeline-steps li .muted { font-size: 11px; }
+.smp-pipeline-logs { border-top: 0; padding: 16px 0 0 16px; min-width: 0; }
+.smp-pipeline-logs-head { margin-bottom: 10px; }
+.smp-pipeline-logs-head h3 { margin: 0; }
+.smp-pipeline-logs pre { max-height: 520px; margin: 0; }
+@media (max-width: 760px) { .smp-pipeline-body { grid-template-columns: minmax(0, 1fr); } .smp-pipeline-steps { border-right: 0; border-bottom: 1px solid var(--repo-line); padding: 12px 0; } .smp-pipeline-logs { padding: 12px 0 0; } }

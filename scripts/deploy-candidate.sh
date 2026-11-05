@@ -11,6 +11,7 @@ docker network inspect "$network" >/dev/null 2>&1 || {
   exit 1
 }
 
+docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image"
 docker rm -f candidate-ces >/dev/null 2>&1 || true
 docker rm -f ces-candidate-ces >/dev/null 2>&1 || true
 docker run -d --name candidate-ces --network "$network" --restart unless-stopped \

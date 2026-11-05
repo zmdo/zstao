@@ -77,12 +77,8 @@ export function PipelinesPage(props: PageProps): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
-  const [project, setProject] = useState('')
-  const [job, setJob] = useState('')
   const [status, setStatus] = useState('')
-  const [branch, setBranch] = useState('')
   const [query, setQuery] = useState('')
-  const [refresh, setRefresh] = useState(0)
 
   useEffect(() => {
     let stopped = false
@@ -93,7 +89,7 @@ export function PipelinesPage(props: PageProps): JSX.Element {
       .catch(cause => { if (!stopped) setError(errorText(cause, zh)) })
       .finally(() => { if (!stopped) setLoading(false) })
     return () => { stopped = true }
-  }, [offset, pageSize, zh, refresh])
+  }, [offset, pageSize, zh])
 
   useEffect(() => {
     const onHash = () => setSelected(hashBuild())
@@ -130,19 +126,14 @@ export function PipelinesPage(props: PageProps): JSX.Element {
     return () => window.clearInterval(timer)
   }, [build])
 
-  const projects = useMemo(() => [...new Set(rows.map(row => row.projectName))].sort(), [rows])
-  const jobs = useMemo(() => [...new Set(rows.map(row => row.jobName))].sort(), [rows])
   const visible = useMemo(() => rows.filter(row => {
-    if (project !== '' && row.projectName !== project) return false
-    if (job !== '' && row.jobName !== job) return false
     if (status !== '' && row.status !== status) return false
-    if (branch !== '' && !row.refName.toLowerCase().includes(branch.toLowerCase())) return false
     if (query !== '') {
       const haystack = `${row.projectName} ${row.jobName} ${row.refName} ${row.commitHash} ${row.submitReason ?? ''}`.toLowerCase()
       if (!haystack.includes(query.toLowerCase())) return false
     }
     return true
-  }), [rows, project, job, status, branch, query])
+  }), [rows, status, query])
 
   const open = (id: number): void => { setSelected(id); setHashBuild(id) }
   const back = (): void => { setSelected(null); setHashBuild(null) }
@@ -195,12 +186,6 @@ export function PipelinesPage(props: PageProps): JSX.Element {
         <input className="search" type="search" aria-label={zh ? '搜索流水线' : 'Search pipelines'} value={query} onChange={event => setQuery(event.target.value)} placeholder={zh ? '搜索项目、Job、Commit' : 'Search project, job, commit'} />
       </div>
     }>
-      <div className="smp-pipeline-filters">
-        <select value={project} onChange={event => setProject(event.target.value)}><option value="">{zh ? '全部项目' : 'All projects'}</option>{projects.map(value => <option key={value}>{value}</option>)}</select>
-        <select value={job} onChange={event => setJob(event.target.value)}><option value="">{zh ? '全部 Job' : 'All jobs'}</option>{jobs.map(value => <option key={value}>{value}</option>)}</select>
-        <input value={branch} onChange={event => setBranch(event.target.value)} placeholder={zh ? '分支 / Tag' : 'Branch / tag'} />
-        <button type="button" className="secondary" onClick={() => setRefresh(value => value + 1)}>{zh ? '刷新' : 'Refresh'}</button>
-      </div>
       {loading && <p className="muted">{zh ? '正在读取…' : 'Loading…'}</p>}
       {error !== '' && <p className="banner error">{error}</p>}
       {!loading && error === '' && visible.length === 0 && <p className="empty">{rows.length === 0 ? (zh ? '还没有流水线运行。' : 'No pipeline runs yet.') : (zh ? '没有匹配的流水线。' : 'No matching pipelines.')}</p>}

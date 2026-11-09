@@ -15,6 +15,12 @@ export async function json<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 const errors: Record<string, [string, string]> = {
+  pull_credential_changed: ['配置已被更新，请重新读取后再保存。', 'Settings changed. Reload before saving.'],
+  pull_credential_incomplete: ['请填写拉取账号、密码和允许的仓库范围。', 'Enter a pull username, password and repository scopes.'],
+  invalid_pull_credential: ['拉取凭据格式不正确，请检查输入。', 'Check the pull credential fields.'],
+  invalid_repository_scope: ['仓库范围格式不正确，请使用 namespace/repository 或 namespace/*。', 'Use namespace/repository or namespace/*.'],
+  image_scope_denied: ['仓库不在拉取凭据允许的范围内。', 'The repository is outside the allowed credential scope.'],
+  application_server_required: ['请选择应用服务器。', 'Select an application server.'],
   auth_required: ['登录已失效，请重新登录。', 'Please sign in again.'],
   not_configured: ['请先到项目管理配置 OneDev。', 'Configure OneDev in Project management first.'],
   credentials_unavailable: ['无法读取凭据，请重新保存 OneDev 密码。', 'Save the OneDev password again.'],

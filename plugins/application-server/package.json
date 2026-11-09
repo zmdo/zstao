@@ -11,15 +11,30 @@
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
-  "files": ["lib/index.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
-  "engines": { "dsh": "0.2.1-rc.5" },
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "files": [
+    "lib/index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "scripts/registry.py"
+  ],
+  "engines": {
+    "dsh": "0.2.1-rc.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "scripts": {
     "build": "node ../../scripts/build-plugin.mjs",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "~4.0.5",
-    "@smp/console-server-management": "file:../server-management"
+    "@smp/console-server-management": "file:../server-management",
+    "@smp/console-project-repositories": "file:../project-repositories",
+    "@smp/console-container-runtime": "file:../container-runtime"
   }
 }

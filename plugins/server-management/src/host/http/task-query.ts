@@ -3,6 +3,7 @@ import { type TaskQuery } from '../tasks/query.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ACTIONS = [
+  'configure',
   'inspect',
   'inspection_report',
   'test_connection',

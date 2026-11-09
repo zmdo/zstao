@@ -315,6 +315,7 @@
     "unknown": "未知"
   },
   "actions": {
+    "configure": "受管配置",
     "test_connection": "连接测试",
     "install_components": "安装组件",
     "inspect": "巡检",

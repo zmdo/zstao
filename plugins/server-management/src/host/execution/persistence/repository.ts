@@ -58,11 +58,11 @@ export function insertInspection(
   )
 }
 
-export function nextCandidate(db: Db) {
+export function nextCandidate(db: Db, operations: string[] = []) {
   return db.query<JobRecord>(`select j.* from server_jobs j
-      where (j.state in ('claimed','running','recovering') and j.lease_expires_at<now())
+      where (j.purpose<>'configure' or j.request_snapshot->>'operation'=any($1::text[])) and ((j.state in ('claimed','running','recovering') and j.lease_expires_at<now())
         or (j.state='queued' and not exists(select 1 from server_key_rotations r where r.server_id=j.server_id and r.state in ('prepared','deployed','switched','unknown')) and (j.purpose<>'apply_plan' or exists(select 1 from server_change_targets t join server_change_plans p on p.id=t.plan_id where t.id=j.target_id and p.state in ('scheduled','running') and p.window_start<=now() and p.window_end>now())) and not exists(select 1 from server_jobs active where active.server_id=j.server_id and active.state in ('claimed','running','recovering')))
-      order by case when j.state='queued' then 1 else 0 end,j.created_at,j.id for update of j skip locked limit 1`)
+       ) order by case when j.state='queued' then 1 else 0 end,j.created_at,j.id for update of j skip locked limit 1`, [operations])
 }
 
 export async function tryLockServer(db: Db, id: string) {

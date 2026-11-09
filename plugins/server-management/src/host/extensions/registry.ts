@@ -80,6 +80,7 @@ export class ServerExtensionRegistry {
       .filter((entry) => {
         if (typeKey !== undefined && entry.appliesTo.types !== undefined && !entry.appliesTo.types.includes(typeKey))
           return false
+        if (typeKey !== undefined && entry.appliesTo.software !== undefined && !this.definitions.typeRequiresSoftware(typeKey, entry.appliesTo.software)) return false
         if (os !== undefined && entry.appliesTo.os !== undefined && !supportsOs(entry.appliesTo.os, os))
           return false
         return true
@@ -155,6 +156,7 @@ export class ServerExtensionRegistry {
 
   private applies(entry: ExtensionCatalogEntry, server: Pick<ServerDto, 'type_key' | 'declared_os'>): boolean {
     if (entry.appliesTo.types !== undefined && !entry.appliesTo.types.includes(server.type_key)) return false
+    if (entry.appliesTo.software !== undefined && !this.definitions.typeRequiresSoftware(server.type_key, entry.appliesTo.software)) return false
     if (entry.appliesTo.os !== undefined && !supportsOs(entry.appliesTo.os, server.declared_os)) return false
     return true
   }
@@ -198,6 +200,8 @@ export class ServerExtensionRegistry {
         for (const type of appliesTo.types ?? []) {
           if (!this.definitions.hasType(type)) throw new ServerError('definition_reference', { detail: type })
         }
+        if (appliesTo.software !== undefined && !appliesTo.software.length) throw new ServerError('definition_reference')
+        for (const software of appliesTo.software ?? []) if (!this.definitions.hasSoftware(software)) throw new ServerError('definition_reference', { detail: software })
         if (appliesTo.os !== undefined) validateOsSupport(appliesTo.os, false)
         keys.add(key)
         if (kind === 'inspection') {

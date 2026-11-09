@@ -1,3 +1,5 @@
+import { ConfigurationRegistry } from '../configurations/registry.ts'
+import type { ConfigurationOperation, ConfigurationHostContract } from '../configurations/contracts.ts'
 import { Service, type Context } from '@deepseek-ai/cordis'
 import type { DefinitionBundle, Registration } from '../../shared/contracts/definitions.ts'
 import type { ServerExtensionBundle } from '../../shared/contracts/extensions.ts'
@@ -8,14 +10,34 @@ import { type DefinitionRegistry } from './registry.ts'
 
 export class ServerManagement {
   protected readonly ctx: Context
+  private readonly configurations?: ConfigurationRegistry
   private readonly definitions: DefinitionRegistry
   private readonly extensions: ServerExtensionRegistry
-  constructor(ctx: Context, definitions: DefinitionRegistry, extensions?: ServerExtensionRegistry) {
+  constructor(ctx: Context, definitions: DefinitionRegistry, extensions?: ServerExtensionRegistry, configurations?: ConfigurationRegistry) {
     this.ctx = ctx
+    this.configurations = configurations
     this.definitions = definitions
     this.extensions = extensions ?? new ServerExtensionRegistry(definitions)
     Object.defineProperty(this, Service.tracker, { value: { property: 'ctx' } })
   }
+  registerConfigurationOperation(operation: ConfigurationOperation): Registration {
+    const fiber = this.ctx.fiber
+    const entry = (fiber as typeof fiber & { entry?: { options: { name?: string } } }).entry
+    if ((entry?.options.name ?? fiber.runtime?.name) !== operation.owner) throw new ServerError('definition_owner')
+    if (!this.configurations) throw new Error('configuration_unavailable')
+    const registration = this.configurations.register(operation)
+    const dispose = this.ctx.effect(() => () => registration.dispose(), 'serverManagement.registerConfigurationOperation()')
+    return { ready: registration.ready, dispose: async () => { await dispose() } }
+  }
+  enqueueConfiguration(input: Parameters<ConfigurationHostContract['enqueueConfiguration']>[0]) {
+    if (!this.configurations) throw new Error('configuration_unavailable')
+    return this.configurations.enqueue(input)
+  }
+  configurationTask(id: string) {
+    if (!this.configurations) throw new Error('configuration_unavailable')
+    return this.configurations.task(id)
+  }
+
   registerServerExtensions(extensions: ServerExtensionBundle, runtime?: ServerExtensionRuntime): Registration {
     const fiber = this.ctx.fiber
     const entry = (fiber as typeof fiber & { entry?: { options: { name?: string } } }).entry

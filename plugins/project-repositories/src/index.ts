@@ -1,3 +1,4 @@
+import { PullCredentials } from './pull-credentials.ts'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -10,6 +11,7 @@ import type { Secrets } from './onedev.ts'
 import { API, DOWNLOAD_BYTES } from './shared.ts'
 
 interface HostCtx {
+  provide(name: string, service: unknown): () => void | Promise<void>
   consoleSession: { read(cookieHeader: string): Promise<unknown> }
   secrets: Secrets
   webServer: { register(route: { kind: 'prefix'; path: string; handler(request: IncomingMessage, response: ServerResponse): Promise<void> }): () => void }
@@ -22,6 +24,11 @@ export const inject = ['consoleSession', 'secrets', 'webServer', 'tools', 'syste
 
 export function apply(ctx: HostCtx): void {
   const file = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'project-management.json')
+  const credentials = new PullCredentials(join(dirname(file), 'registry-pull-credentials.json'), ctx.secrets)
+  ctx.effect(() => {
+    const remove = ctx.provide('registryCredentials', credentials)
+    return async () => { await remove(); await credentials.close() }
+  })
   ctx.effect(() => ctx.systemPrompt.section({
     name: 'smp-project-repositories:git',
     order: 2500,
@@ -233,7 +240,7 @@ export function apply(ctx: HostCtx): void {
       const close = () => disconnected.abort()
       response.on('close', close)
       const signal = AbortSignal.any([shutdown.signal, disconnected.signal])
-      const task = handle(ctx, file, request, response, signal, () => {
+      const task = handle(ctx, credentials, file, request, response, signal, () => {
         const now = Date.now()
         reveals = reveals.filter(at => now - at < 60_000)
         if (reveals.length >= 10) throw new ApiError(429, 'rate_limited')
@@ -348,13 +355,19 @@ function sameOriginJson(request: IncomingMessage): void {
     if (!['http:', 'https:'].includes(parsed.protocol) || parsed.host !== request.headers.host) throw new ApiError(403, 'origin_rejected')
   }
 }
-async function handle(ctx: HostCtx, file: string, request: IncomingMessage, response: ServerResponse, signal: AbortSignal, reveal: () => void): Promise<void> {
+async function handle(ctx: HostCtx, credentials: PullCredentials, file: string, request: IncomingMessage, response: ServerResponse, signal: AbortSignal, reveal: () => void): Promise<void> {
   try {
     const cookie = request.headers.cookie
     if (await ctx.consoleSession.read(Array.isArray(cookie) ? cookie.join('; ') : cookie ?? '') === undefined) throw new ApiError(401, 'auth_required')
     const url = new URL(request.url ?? '/', 'http://localhost')
     if (!url.pathname.startsWith(`${API}/`)) throw new ApiError(404, 'not_found')
     const path = url.pathname.slice(API.length)
+    if (path === '/image-registry/pull-credentials') {
+      if (request.method === 'GET') { send(response, 200, await credentials.read()); return }
+      if (request.method !== 'POST') throw new ApiError(405, 'method_not_allowed')
+      sameOriginJson(request)
+      send(response, 200, await credentials.save(await readJson(request))); return
+    }
     if (path === '/settings/ai-identity') {
       if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed')
       let publicKey = ''

@@ -1,3 +1,4 @@
+import type { ConfigurationRegistry } from '../configurations/registry.ts'
 import { type ChangeRequest } from '../../shared/changes.ts'
 import { typeSupportsOs } from '../../shared/definitions.ts'
 import { ServerError } from '../../shared/errors.ts'
@@ -41,6 +42,7 @@ export async function executeJob(
   connect: typeof connectSsh = connectSsh,
   updateCheckIntervalSeconds = 3600,
   extensions?: ServerExtensionRegistry,
+  configurations?: ConfigurationRegistry,
 ): Promise<void> {
   let session: SshSession | undefined,
     lease: TypeLease | undefined,
@@ -82,7 +84,7 @@ export async function executeJob(
     })
     connected = true
     await owned(db, job, (client) => markConnected(client, server!.id, session!.fingerprint))
-    if (job.purpose === 'test_connection' || server.internal_host === null) {
+    if (job.request_snapshot.action === 'test_connection' || server.internal_host === null) {
       try {
         const internalHost = await probeInternalHost(session)
         if (internalHost !== null) {
@@ -92,6 +94,24 @@ export async function executeJob(
       } catch {
         // Internal address is advisory; a failed probe must not fail the connection.
       }
+    }
+    if (job.purpose === 'configure') {
+      if (!configurations || !job.request_snapshot.operation || !job.request_snapshot.sequence) throw new Error('configuration_unavailable')
+      await phase(db, job, 'preflight')
+      const result = await configurations.execute(job.request_snapshot.operation, {
+        server: { id: server.id, typeKey: server.type_key, configRevision: String(server.config_revision) },
+        recovering: job.state === 'recovering', operationId: job.operation_id, sequence: job.request_snapshot.sequence, fence: String(job.fence),
+        input: job.request_snapshot.input ?? null, guard,
+        commit: run => owned(db, job, run),
+        exec: (command, timeout, options) => session!.exec(command, timeout, options),
+      })
+      await guard()
+      if (result && typeof result === 'object' && !Array.isArray(result) && result.pending === true) {
+        await recovering(db, job, 'configuration_reconciling')
+        return
+      }
+      await finishJob(db, job, result && typeof result === 'object' && !Array.isArray(result) && result.error ? 'failed' : 'succeeded', '', result)
+      return
     }
     // Recovery must remain possible when a provider has unloaded. The remote journal contains the accepted scripts and result.
     if (job.purpose === 'apply_plan' && job.state === 'recovering' && state.mutation) {
@@ -181,7 +201,11 @@ export async function executeJob(
     }
   } catch (cause) {
     if (cause instanceof ServerError && cause.code === 'job_lease_lost') return
-    const message = scrub(errorDetail(cause, '任务失败。'), secret)
+    if (job.purpose === 'configure' && job.state === 'recovering') {
+      await recovering(db, job, 'configuration_reconciling')
+      return
+    }
+    const message = job.purpose === 'configure' ? 'configuration_failed' : scrub(errorDetail(cause, '任务失败。'), secret)
     if (state.mutation) {
       const recoverable =
         cause instanceof ServerError &&
@@ -213,7 +237,7 @@ export async function executeJob(
       job,
       'failed',
       message,
-      cause instanceof ServerError ? { error: scrubValue(errorPayload(cause), secret) } : null,
+      job.purpose === 'configure' ? { error: cause instanceof ServerError && cause.code === 'job_configuration_changed' ? 'configuration_changed' : 'configuration_failed' } : cause instanceof ServerError ? { error: scrubValue(errorPayload(cause), secret) } : null,
     )
   } finally {
     clearInterval(timer)

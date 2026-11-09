@@ -4,6 +4,8 @@ import type { OsSupport } from '../operating-system-types.ts'
 
 /** Declarative applicability. Omitted types mean every server; omitted OS means every system. */
 export interface ExtensionScope {
+  /** All software requirements must be declared by the server type. */
+  readonly software?: readonly DefinitionKey[]
   readonly types?: readonly DefinitionKey[]
   readonly os?: OsSupport
 }

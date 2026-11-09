@@ -7,3 +7,5 @@ export type * from './shared/contracts/recipes.ts'
 export type * from './shared/operating-system-types.ts'
 export type * from './shared/dto/servers.ts'
 export type { VersionAdapter, VersionRule } from './shared/versions.ts'
+
+export type * from './host/configurations/contracts.ts'

@@ -1,3 +1,4 @@
+import type { ConfigurationRegistry } from '../configurations/registry.ts'
 import { randomUUID } from 'node:crypto'
 import { type Db } from '../database/connection.ts'
 import { DefinitionRegistry } from '../definitions/registry.ts'
@@ -17,6 +18,7 @@ export function startJobs(
   definitions: DefinitionRegistry,
   connect: typeof connectSsh,
   extensions?: ServerExtensionRegistry,
+  configurations?: ConfigurationRegistry,
 ): () => Promise<void> {
   const workerId = randomUUID()
   let stopped = false
@@ -56,10 +58,10 @@ export function startJobs(
     pumping = true
     try {
       while (!stopped && active < WORKERS) {
-        const job = await claimNext(db, workerId)
+        const job = await claimNext(db, workerId, configurations?.keys())
         if (job === undefined) return
         active += 1
-        const task = executeJob(db, ctx.secrets, definitions, job, connect, config.updateCheckIntervalSeconds, extensions)
+        const task = executeJob(db, ctx.secrets, definitions, job, connect, config.updateCheckIntervalSeconds, extensions, configurations)
           .catch((cause: unknown) => {
             ctx.logger.error(cause)
           })

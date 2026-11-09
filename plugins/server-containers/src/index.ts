@@ -42,28 +42,28 @@ export const containerExtensions: ServerExtensionBundle = {
     {
       key: 'containers',
       name: { zh: '容器', en: 'Containers' },
-      appliesTo: { types: [type] },
+      appliesTo: { software: [docker] },
     },
   ],
   queries: [
     {
       key: 'container-list',
       name: { zh: '容器清单', en: 'Container list' },
-      appliesTo: { types: [type] },
+      appliesTo: { software: [docker] },
     },
   ],
   settings: [
     {
       key: 'container-settings', revision: '1',
       name: { zh: '容器设置', en: 'Container settings' },
-      appliesTo: { types: [type] },
+      appliesTo: { software: [docker] },
     },
   ],
   inspections: [
     {
       key: 'container-check',
       name: { zh: '容器检查', en: 'Container check' },
-      appliesTo: { types: [type] },
+      appliesTo: { software: [docker] },
       settingsKey: `${owner}/container-settings`,
       script: inspectScript,
     },

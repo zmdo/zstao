@@ -1,3 +1,4 @@
+import { PullCredentialSettings } from './pull-credential-settings.tsx'
 import { useEffect, useState } from 'react'
 import { Panel } from '@smp/console-kit'
 import { errorText, json, useLanguage } from './client-api.ts'
@@ -48,8 +49,8 @@ export function ImageRegistrySettings(props: Props): JSX.Element {
   }
 
   return (
-    <Panel className="smp-project-panel smp-image-settings-panel" title={zh ? '项目镜像仓库' : 'Project image registry'}>
-      <p className="smp-project-muted">{zh ? '用于项目镜像仓库页面。SecretId/SecretKey 调用 TCR API，用户名/密码用于 Docker pull/push。' : 'Used by the project image registry page. SecretId/SecretKey call the TCR API; username/password are for Docker pull/push.'}</p>
+    <><Panel className="smp-project-panel smp-image-settings-panel" title={zh ? '项目镜像仓库' : 'Project image registry'}>
+      <p className="smp-project-muted">{zh ? '用于项目镜像仓库页面。SecretId/SecretKey 调用 TCR API，已有用户名/密码保留为构建侧凭据，不自动分发到服务器。' : 'Used by the project image registry page. SecretId/SecretKey call the TCR API; legacy username/password remain build credentials and are not distributed.'}</p>
       {loading && <p className="muted">{zh ? '正在读取…' : 'Loading…'}</p>}
       {!loading && <div className="smp-project-form">
         <label><span>Registry</span><input value={registry} disabled={saving} onChange={event => setRegistry(event.target.value)} placeholder="ccr.ccs.tencentyun.com" /></label>
@@ -61,11 +62,11 @@ export function ImageRegistrySettings(props: Props): JSX.Element {
       </div>}
       <div className="smp-project-actions">
         <button type="button" className="primary" disabled={loading || saving} onClick={() => { void save() }}>{zh ? '保存镜像仓库' : 'Save registry'}</button>
-        <button type="button" className="secondary" disabled={loading || testing} onClick={() => { void test() }}>{zh ? '测试连接' : 'Test connection'}</button>
+        <button type="button" className="secondary" disabled={loading || testing} onClick={() => { void test() }}>{zh ? '测试 TCR API' : 'Test TCR API'}</button>
       </div>
-      <p className={configured ? 'smp-project-status ok' : 'smp-project-status'}>{configured ? (zh ? '已配置' : 'Configured') : (zh ? '未配置' : 'Not configured')}</p>
+      <p className={configured ? 'smp-project-status ok' : 'smp-project-status'}>{configured ? (zh ? 'TCR API 已配置' : 'TCR API configured') : (zh ? 'TCR API 未配置' : 'TCR API not configured')}</p>
       {notice !== '' && <p className="smp-project-notice ok">{notice}</p>}
       {error !== '' && <p className="smp-project-notice error">{error}</p>}
-    </Panel>
+    </Panel><PullCredentialSettings zh={zh} /></>
   )
 }

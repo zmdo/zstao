@@ -315,6 +315,7 @@
     "unknown": "Unknown"
   },
   "actions": {
+    "configure": "Managed configuration",
     "test_connection": "Connection test",
     "install_components": "Install components",
     "inspect": "Inspection",

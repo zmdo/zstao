@@ -1,4 +1,9 @@
 import { Service, type Context } from '@deepseek-ai/cordis'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { RegistryCredentials } from '@smp/console-project-repositories/contracts'
+import { RegistryManager } from './registry.ts'
+import { API, registryHandler } from './http.ts'
+import type { ConfigurationHostContract, Db } from '@smp/console-server-management/contracts'
 import type { DefinitionBundle, Registration } from '@smp/console-server-management/contracts'
 
 const owner = '@smp/console-application-server'
@@ -49,13 +54,45 @@ declare module '@deepseek-ai/cordis' {
 }
 
 interface Ctx extends Context {
-  serverManagement: { registerDefinitions(definition: DefinitionBundle): Registration }
+  serverManagement: { registerDefinitions(definition: DefinitionBundle): Registration } & ConfigurationHostContract
+  containerRuntime: { ready: Promise<void> }
+  registryCredentials: RegistryCredentials
+  database: { pool: Db }
+  consoleSession: { read(cookie: string): Promise<unknown> }
+  webServer: { register(route: { kind: 'prefix'; path: string; handler(request: IncomingMessage, response: ServerResponse): Promise<void> }): () => void }
 }
 
-export const inject = ['serverManagement']
+export const inject = ['serverManagement', 'containerRuntime', 'registryCredentials', 'database', 'webServer', 'consoleSession']
 
 export async function apply(ctx: Ctx): Promise<void> {
+  await ctx.containerRuntime.ready
   const registration = ctx.serverManagement.registerDefinitions(applicationServerDefinitions)
-  new ApplicationServer(ctx, registration.ready)
   await registration.ready
+  const manager = new RegistryManager(ctx.database.pool, ctx.registryCredentials, ctx.serverManagement)
+  const operation = ctx.serverManagement.registerConfigurationOperation({
+    owner, key: 'registry-credentials', validate: input => manager.validate(input), execute: context => manager.execute(context),
+  })
+  await operation.ready
+  ctx.effect(() => {
+    let closed = false
+    let reconciling: Promise<void> | undefined
+    const pending = new Set<Promise<void>>()
+    const reconcile = () => {
+      if (closed || reconciling) return
+      reconciling = manager.reconcile().catch(() => { ctx.logger.warn('Registry credential reconciliation failed; it will retry.') }).finally(() => { reconciling = undefined })
+    }
+    const timer = setInterval(reconcile, 30_000)
+    reconcile()
+    const handler = registryHandler(ctx, ctx.database.pool, manager)
+    const stop = ctx.webServer.register({ kind: 'prefix', path: API, handler(request, response) {
+      const task = handler(request, response).finally(() => pending.delete(task))
+      pending.add(task)
+      return task
+    } })
+    return async () => {
+      closed = true; clearInterval(timer); stop()
+      await Promise.allSettled([...pending, ...(reconciling ? [reconciling] : [])])
+    }
+  })
+  new ApplicationServer(ctx, Promise.resolve())
 }

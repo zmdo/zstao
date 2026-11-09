@@ -42,6 +42,17 @@ export class DefinitionRegistry {
       if (this.resolver.isAvailable(owner) && owner.types.has(key)) return true
     return false
   }
+  hasSoftware(key: string): boolean {
+    return [...this.owners.values()].some(owner => this.resolver.isAvailable(owner) && owner.software.has(key))
+  }
+  typeRequiresSoftware(typeKey: string, software: readonly string[]): boolean {
+    for (const owner of this.owners.values()) {
+      if (!this.resolver.isAvailable(owner)) continue
+      const type = owner.types.get(typeKey)
+      if (type) return software.every(key => type.requirements.some(requirement => requirement.software === key))
+    }
+    return false
+  }
   /** Built-in types first, then active public contributions ordered by order and stable key. */
   publicCatalog(owners = this.owners): readonly ServerTypeView[] {
     const types = [...builtinTypes(this.base)]

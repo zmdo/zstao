@@ -1,3 +1,4 @@
+import { ConfigurationRegistry } from './host/configurations/registry.ts'
 import { AdminRuntime } from './host/admin/runtime.ts'
 import { localePreference, type LocaleSettingsReader } from './host/admin/download-copy.ts'
 import { registerWorkspaceAdminTools } from './host/admin/workspace-tools.ts'
@@ -118,6 +119,7 @@ export async function* apply(ctx: HostCtx, config: Config): AsyncGenerator<() =>
   })
   const definitions = new DefinitionRegistry(db, catalog)
   const extensions = new ServerExtensionRegistry(definitions)
+  const configurations = new ConfigurationRegistry(db)
   const connect: typeof connectSsh = (input) =>
     connectSsh({ ...input, readyTimeoutMs: config.sshReadyTimeoutSeconds * 1000 })
   const enrollment = new Enrollment({ db, secrets: ctx.secrets, definitions }, connect)
@@ -156,7 +158,8 @@ export async function* apply(ctx: HostCtx, config: Config): AsyncGenerator<() =>
   yield ctx.effect(function* () {
     yield () => definitions.close()
     yield () => extensions.close()
-    yield startJobs(ctx, db, config, definitions, connect, extensions)
+    yield () => configurations.close()
+    yield startJobs(ctx, db, config, definitions, connect, extensions, configurations)
     yield startMetrics(
       db,
       ctx.secrets,
@@ -174,6 +177,6 @@ export async function* apply(ctx: HostCtx, config: Config): AsyncGenerator<() =>
     const terminal = terminalRoute(db, ctx.secrets, ctx.consoleSession, connect)
     yield ctx.webServer.registerUpgrade({ path: '/console-api/servers/terminal', handler: terminal.handler })
     yield () => terminal.close()
-    yield ctx.provide('serverManagement', new ServerManagement(ctx, definitions, extensions))
+    yield ctx.provide('serverManagement', new ServerManagement(ctx, definitions, extensions, configurations))
   })
 }

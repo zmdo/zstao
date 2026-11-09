@@ -86,10 +86,16 @@ jobs:
       shell: bash
       commands: |
         set -euo pipefail
-        ssh -i /srv/ces-infra/agent/secrets/deploy-key \
-          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-          -l cesdeploy 43.153.204.197 \
-          "sudo -n /usr/local/sbin/ces-runtime install --digest '@param:digest@'"
+        node scripts/deploy-managed-image.mjs
+    envVars:
+    - name: CES_DEPLOY_IMAGE
+      value: '@param:digest@'
+    - name: CES_URL
+      value: '@property:ces-url@'
+    - name: CES_SERVER_ID
+      value: '@property:ces-server-id@'
+    - name: CES_REGISTRY_TOKEN
+      value: '@secret:ces-registry-prepare@'
     condition: SUCCESSFUL
   retryCondition: never
   maxAttempts: 1

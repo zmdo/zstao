@@ -54,9 +54,9 @@ export async function enqueueOn(
   ).rows[0]!
 }
 
-export async function claimNext(db: Db, workerId: string): Promise<JobRecord | undefined> {
+export async function claimNext(db: Db, workerId: string, operations: string[] = []): Promise<JobRecord | undefined> {
   return transaction(db, async (client) => {
-    const found = (await repository.nextCandidate(client)).rows[0]
+    const found = (await repository.nextCandidate(client, operations)).rows[0]
     if (!found) {
       return
     }

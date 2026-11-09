@@ -43,10 +43,16 @@ record_release() {
 
 start_image() {
   image=$1
-  docker pull "$image" >/dev/null
+  if [ "$image" = "${CES_PREPARED_IMAGE:-}" ]; then
+    # ces-registry already pulled this digest while holding the shared server lock.
+    docker image inspect "$image" >/dev/null 2>&1 || return 1
+  else
+    # This function is called in an if condition: set -e alone does not stop it.
+    docker pull "$image" >/dev/null || return 1
+  fi
   docker rm -f prod-ces >/dev/null 2>&1 || true
   docker run -d --name prod-ces --network "$NETWORK" --restart unless-stopped \
-    --env-file "$ENV_FILE" "$image" >/dev/null
+    --env-file "$ENV_FILE" "$image" >/dev/null || return 1
   wait_ready
 }
 

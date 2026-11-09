@@ -1,3 +1,4 @@
+import { applicationServerDefinitions, applicationServerType } from '../../application-server/src/index.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Db } from '../src/host/database/connection.ts'
@@ -18,6 +19,8 @@ test('the container plugin registers its public type, software and extension met
   await runtimeRegistration.ready
   const definitionsRegistration = definitions.registerDefinitions(containerDefinitions)
   await definitionsRegistration.ready
+  const application = definitions.registerDefinitions(applicationServerDefinitions)
+  await application.ready
   const type = definitions.defaultOptions().types.find((item) => item.key === '@smp/console-server-containers/container')
   assert.ok(type)
   assert.deepEqual(type.software.map((item) => item.software_key).sort(), [
@@ -36,6 +39,10 @@ test('the container plugin registers its public type, software and extension met
       'panel:@smp/console-server-containers/containers',
     ],
   )
+  assert.equal(extensions.list(applicationServerType).length, 4)
+  assert.equal(extensions.list('builtin/vacant').length, 0)
+  await application.dispose()
+  assert.equal(extensions.list(applicationServerType).length, 0)
   await registration.dispose()
   await definitionsRegistration.dispose()
   await runtimeRegistration.dispose()

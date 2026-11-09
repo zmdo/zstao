@@ -3,7 +3,7 @@ import type { DbClient } from '../../database/transaction.ts'
 export function cancelActive(db: DbClient, id: string) {
   return db.query<{ id: string; purpose: string; target_id: string | null }>(
     `update server_jobs set state='cancelled',finished_at=now(),output_excerpt='任务已取消。'
-     where id=$1 and state in ('queued','claimed','running','recovering')
+     where id=$1 and state in ('queued','claimed','running','recovering') and (purpose<>'configure' or state='queued')
      returning id,purpose,target_id`,
     [id],
   )

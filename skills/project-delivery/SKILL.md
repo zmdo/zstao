@@ -14,6 +14,8 @@ description: 在 CES Harness 会话中将项目代码提交到 OneDev，构建�
 3. 用本目录 `templates/` 适配项目已有 Dockerfile、`.onedev-buildspec.yml`、Compose 和 `deploy/` 文件。示例 Node 服务仅用于验证，真实项目保留其技术栈和测试。明确镜像仓库、执行器、端口、环境文件和健康地址。构建脚本与交付配置的镜像仓库须一致；示例占位值不能直接运行。
 4. 模板使用 `CES_IMAGE` 固定目标 digest，`APP_ENV_FILE` 指向已有环境文件。环境文件内容经现有配置机制在服务器准备，不能放进 Git、工具参数、日志或构建产物。运行时所需 Python 文件与 shell 入口一并传输。首次发布前运行项目自己的测试。
 
+CES 默认提供 Node、Git、OpenSSH 与 rsync，不保证提供 Python 或 curl。Python 部署脚本在目标服务器执行；可在传输后用该服务器的 Python 检查语法。本机 HTTP 检查可使用带超时的 Node `fetch`。
+
 ## 代码到镜像
 
 1. 检查修改范围，使用平台既有 Git 身份提交并推送。保存完整 commit SHA 和完整 ref（如 `refs/heads/main`）。
@@ -24,7 +26,7 @@ description: 在 CES Harness 会话中将项目代码提交到 OneDev，构建�
 
 ## 发布与验收
 
-1. 从目标 commit 导出独立 Git 快照，包括 Compose、`deploy/project.json` 和 `deploy/runtime.sh/runtime.py`，不要传输工作区后来新增的修改。使用 `platform_server_rsync` 传到该应用独立的暂存目录，目标路径须允许平台 SSH 用户写入。
+1. 从目标 commit 导出独立 Git 快照，包括 Compose、`deploy/project.json` 和 `deploy/runtime.sh/runtime.py`，不要传输工作区后来新增的修改。使用 `platform_server_rsync` 传到该应用独立的暂存目录，目标路径须允许平台 SSH 用户写入。每次服务器执行或传输调用都显式传入 `server`；新快照目录使用 `rsync -az <本地快照>/ <用户>@<服务器地址>:<远端快照>/`，无需 `--delete`，也不修改平台的禁用参数策略。
 2. 准备非敏感 `request.json`：`{"commit":"<40位SHA>","buildId":123,"serverId":"<服务器ID>","image":"<仓库>@sha256:<digest>"}`。仓库必须与项目配置一致。发布 ID 用唯一的小写字母、数字、下划线或连字符。
 3. 使用 `platform_server_exec` 调用 `sudo -n sh <快照>/deploy/runtime.sh start --root <应用目录> --release <发布ID> --request <request.json> --snapshot <快照目录>`。命令返回表示后台任务已接收，不表示发布成功。脚本通过 `/var/lib/ces/application-server/docker` 拉取镜像，部署时不重新注入凭据。
 4. 用 `status --root <应用目录> --release <发布ID>` 跟踪；用 `logs` 的 `--offset` 读取有限日志及 `nextOffset`。每次 SSH 调用保持短时，后台任务不依赖会话连接。持续观察到 succeeded/failed；超过等待预算只报告仍在运行及恢复 ID。

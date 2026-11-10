@@ -1,5 +1,6 @@
 # Harness 项目交付线上核验记录
 
+- 本文件为实施前的只读快照；后续变更与验证见[实施记录](IMPLEMENTATION.md)。
 - 核验日期：2026-11-10（Asia/Shanghai）。
 - 范围：CES、主 OneDev、B-163-98 和 test-72-83 两台已登记应用服务器。
 - 方法：SSH 只读命令、已登录的 CES 查询接口、OneDev REST 查询接口，并与本地源码对照。

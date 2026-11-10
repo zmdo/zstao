@@ -1,9 +1,9 @@
 # Harness 项目构建与部署全流程方案
 
-- 状态：已根据线上核验修订，待实现；P0 环境准备尚未完成。
+- 状态：P0–P3 已实现、上线并完成实际 Harness 会话交付、幂等与中断恢复验收；P4 保留为后续可选工作。
 - 日期：2026-11-10。
 - 范围：Harness 工具、OneDev 构建、TCR 镜像产物、应用服务器部署及交付 Skill。
-- 当前基础：用户已确认应用服务器 TCR 自动注入版本发布并测试成功。2026-11-10 已只读连接 CES、主 OneDev 和两台已登记的应用服务器，并查询线上接口；确认现有模块可用，但正式镜像构建与完整交付链路尚未接通。详见[线上核验记录](ONLINE_VERIFICATION.md)。
+- 当前基础：保留已发布的应用服务器 TCR 自动注入流程。已在现有主 OneDev 主机上线构建 Agent、配置执行器，并发布包含交付工具与 Git/SSH/rsync 的 CES 镜像。初始缺口见[只读核验快照](ONLINE_VERIFICATION.md)，实施变更与实际验收见[实施记录](IMPLEMENTATION.md)。
 
 ## 1. 目标与首版范围
 
@@ -29,9 +29,9 @@
 | TCR | 保存镜像，提供 digest 对应的镜像读取 | 现有镜像仓库 |
 | 应用服务器 | 拉取确定版本的镜像、运行 Compose、执行健康检查、保存发布结果 | 已登记且准备完成的应用服务器 |
 
-构建由 OneDev 调度，具体构建命令由执行器运行。线上目前只有匹配 demo 的服务端 Shell 执行器，不能直接沿用它完成正式镜像构建。P0 优先在现有主 OneDev 宿主机部署构建 Agent 并配置匹配项目 Job 的执行器，不要求新购或增加一台独立服务器。先核对该主机的资源余量，初始构建并发设为 1；如资源不足，再调整到其他合适的现有主机。Agent 是执行构建的进程，不代表新增一台机器。
+构建由 OneDev 调度，具体构建命令由执行器运行。初始线上只有匹配 demo 的服务端 Shell 执行器。实施后，在现有主 OneDev 宿主机部署了 `ces-build-agent`，并配置 `ces-build-test` Remote Shell Executor，并发为 1，仅匹配 `ces-platform`、`harness-delivery-test` 的 `build` Job；已有 `ces-demo` 保留。没有新增服务器。新项目首次接入时需要扩展执行器的项目匹配范围。Agent 是执行构建的进程。
 
-构建 Agent 的具体部署方式和执行器类型在实施时按已部署 OneDev 16.9.7 核验，必须从实际 Job 运行环境验证 Docker daemon、构建依赖、仓库访问和 TCR 推送权限。主机上有 Docker，或者容器里有 Docker 命令，都不能替代这项验证。
+构建环境按 OneDev 16.9.7 实测配置。Agent 使用固定镜像 digest，通过宿主机 Docker socket 构建；真实 Job 已完成测试应用与 CES 镜像的构建、推送和 `image.json` 产物发布。可复用配置见 [Agent 部署说明](../../../deploy/onedev-build-agent/README.md)。
 
 Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://docs.onedev.io/administration-guide/agent-management)和[构建 Agent 配置](https://docs.onedev.io/tutorials/cicd/agent-farm)。具体安装指令以线上实例生成的内容为准，不直接套用文档示例的构建规范版本。
 
@@ -39,7 +39,7 @@ Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://doc
 
 ## 3. 现有能力与缺口
 
-### 3.1 线上核验结论
+### 3.1 实施前的线上核验结论
 
 | 检查项 | 2026-11-10 实测结果 | 对方案的影响 |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://doc
 | 仓库与构建记录 | 主分支已有 `build/candidate/release/rollback`；引用的 `ces-build-test`、`ces-production-deploy` 未配置；查询到的成功构建仅为历史 demo | 流水线文件存在和 demo 成功均不代表正式构建可用 |
 | 镜像与工具 | TCR 仓库、标签和 digest 查询成功；线上 OneDev 工具缺少三个拟新增动作；技能目录只有演示 Skill | 保留查询能力，补齐工具和交付 Skill |
 
-本次核验没有触发构建、推送、拉取或部署。凭据文件存在和旧容器正常运行不能证明当前凭据仍可拉取；TCR 管理 API 查询成功也不能证明构建账号具有推送权限。
+本表保留实施前的只读快照。实施后的构建、推送、拉取与部署结果单独记入[实施记录](IMPLEMENTATION.md)，避免将历史检查和本次发布混为一谈。
 
 ### 3.2 能力复用与改动
 
@@ -75,9 +75,9 @@ Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://doc
 - [现有构建流水线](../../../.onedev-buildspec.yml)、[镜像构建脚本](../../../scripts/build-image.sh)、[CES 发布脚本](../../../deploy/ces-runtime.sh)。
 - [CES 运行镜像](../../../docker/Dockerfile)、[rsync 工具实现](../../../plugins/server-management/src/host/harness/rsync.ts)。
 
-当前 `.onedev-buildspec.yml` 已有 `main` 分支更新触发构建，但匹配的执行器尚未配置。执行环境完成验收后，Harness 应优先查找本次提交已经触发的任务，避免再次提交相同构建。
+当前 `.onedev-buildspec.yml` 保留 `build` 及其 `main` 分支触发器，执行器已配置。Harness 优先查找本次提交已触发的任务；`run_job` 还会复用相同提交、Job、ref 和参数的已有构建，避免重复提交。
 
-普通项目默认使用 OneDev 构建，再通过平台 SSH 工具部署。CES 旧 `candidate/release/rollback` 依赖既有固定目录、专用配置和旧部署目标；主 OneDev 主机上也未找到旧发布任务引用的部署密钥。这些任务不作为已可用能力，也不是本次首个闭环的前置条件。首版执行器只匹配约定的项目及构建 Job，不因沿用 `ces-build-test` 名称而一并开放 `candidate`。后续接入 CES 自身交付时，先明确采用并验证哪条发布路径，禁止同时触发两套发布流程。
+普通项目使用 OneDev 构建，再通过平台 SSH 工具部署。实测发现 OneDev 提交 `build` 也会验证整个 buildspec；旧 `candidate/release/rollback` 引用缺失的 `ces-production-deploy`，导致构建被拒绝。原始定义已归档到 [legacy buildspec](../../../deploy/legacy/ces-onedev-buildspec.yml)，活动规范只保留 `build`。本次 CES 自身更新使用既有 `/opt/ces/docker-compose.yml` 按构建 digest 替换镜像，仅重建 CES 服务，并保存原配置和镜像；没有启用旧发布任务。
 
 ### 3.3 P0 环境准备
 
@@ -87,13 +87,13 @@ Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://doc
 
 **OneDev 构建环境。** 优先在现有主 OneDev 宿主机配置构建 Agent 和执行器，名称与接入项目的 `jobExecutor` 一致；适配现有 CES `build` 时使用 `ces-build-test`。限定项目与 Job，初始只承接构建，不自动运行旧候选部署或生产发布任务。在实际 Job 中验证 Git、Shell、Docker daemon，以及 Dockerfile 所需基础镜像访问；语言工具链可以由项目 Dockerfile 提供。执行器可操作 Docker 的权限只授予受控构建环境，匹配范围不开放给未经信任的项目。
 
-**推送与拉取权限。** 构建端配置目标仓库的推送凭据，并使构建脚本使用的 Docker 配置目录对实际执行账户可用。现有脚本默认 `DOCKER_CONFIG=/srv/ces-test/docker-config`，不能假定新 Agent 已有该路径；部署时明确配置它，或调整脚本默认值。应用服务器继续使用专用拉取配置目录，两端权限分别验收。密码更新沿用现有“保存拉取设置 → 对应用服务器执行安装组件重新注入”的流程，不新增部署时凭据同步。
+**推送与拉取权限。** 构建端配置目标仓库的推送凭据，并使构建脚本使用的 Docker 配置目录对实际执行账户可用。脚本默认 `DOCKER_CONFIG=/srv/ces-build/docker-config`，Agent 将该凭据目录只读挂载。Buildx 的可写状态放在独立临时目录，避免修改凭据配置或因只读挂载构建失败。应用服务器继续使用专用拉取配置目录，两端权限分别验收。密码更新沿用现有“保存拉取设置 → 对应用服务器执行安装组件重新注入”的流程，不新增部署时凭据同步。
 
 **引导与验收。** P0 可以先通过 OneDev 管理界面配置执行器和运行测试构建，不依赖尚未开发的 `run_job`。构建环境就绪后，用它构建包含上述命令依赖的 CES 镜像，沿已有经过验证的人工发布流程更新 CES，再验证实际会话能力。这样不会形成“先有新工具才能构建新工具”的依赖循环。P0 完成需有一次真实镜像构建和推送、一次目标服务器按 digest 拉取，以及会话 Git/文件传输的验证记录；完整自动交付留到 P3 验收。
 
 ## 4. OneDev 工具增补
 
-以下为拟新增的工具动作与契约，不代表当前已实现。具体 OneDev API、参数格式和权限以部署版本验证结果为准；实现前核验实际接口，不根据工具名称猜测上游端点。
+以下动作已在现有项目仓库插件中实现，并按线上 OneDev 16.9.7 的 REST 接口验证。实现见 [delivery.ts](../../../plugins/project-repositories/src/delivery.ts)。
 
 ### 4.1 `list_jobs`
 
@@ -105,7 +105,7 @@ Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://doc
 | `ref` | 分支或标签；工具返回其解析出的 commit SHA |
 | `commit` | 可选的预期 commit，用于检查分支是否已经变化 |
 
-返回指定代码版本可运行的 Job 名称、参数名称、类型、必填项和默认值，供 Harness 选择构建任务。优先使用 OneDev 对该版本解析后的任务信息；若接口能力不足，应明确返回限制，不把不完整的本地 YAML 解析结果宣称为可执行任务清单。
+线上版本没有返回解析后 Job 清单的 REST 接口，因此工具读取固定提交的 `.onedev-buildspec.yml`，返回 Job 名称、执行器及参数信息，并标记 `source=repository-buildspec`。这不代表 OneDev 已验证任务可执行。首版只支持 `type:` 形式的 YAML；自定义旧标签拒绝解析，存在 imports 时返回 `complete=false` 并禁用自动触发；SecretParam 和需要隐式动态求值的参数不自动提交。
 
 ### 4.2 `run_job`
 
@@ -154,7 +154,7 @@ Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://doc
 工作区提交 SHA → OneDev 构建 ID → 镜像仓库地址与 digest → 服务器发布 ID
 ```
 
-现有构建脚本已定义 `image.json` 的生成逻辑，尚未通过本次线上正式构建验证；首版保留其主要字段。以下为兼容现有字段的示例，域名、提交和 digest 都是示意值：
+构建脚本的 `image.json` 已通过线上真实构建与部署验证；首版保留其主要字段。以下为兼容现有字段的示例，域名、提交和 digest 都是示意值：
 
 ```json
 {
@@ -189,12 +189,13 @@ Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://doc
 ├── compose.yml
 └── deploy/
     ├── project.json
-    └── runtime.sh
+    ├── runtime.sh
+    └── runtime.py
 ```
 
 模板内容应覆盖：项目测试命令、构建上下文、构建 Job、镜像仓库、产物发布、应用服务名和健康检查。模板提供默认约定，Harness 根据项目技术栈调整，不强制所有项目使用相同安装或构建命令。
 
-拟采用的 `deploy/project.json` 最小结构如下，所有占位值需要在首次交付前确定：
+`deploy/project.json` 最小结构如下，所有占位值需要在首次交付前确定：
 
 ```json
 {
@@ -223,7 +224,7 @@ Agent 安装与执行器匹配参考 OneDev 官方的 [Agent 管理](https://doc
 
 ## 7. 部署脚本契约
 
-普通项目通过现有 `platform_server_rsync` 传输该次发布快照，通过 `platform_server_exec` 调用项目部署脚本。脚本接口拟统一为：
+普通项目通过现有 `platform_server_rsync` 传输该次发布快照，通过 `platform_server_exec` 调用项目部署脚本。脚本接口为：
 
 | 操作 | 作用 |
 | --- | --- |
@@ -245,7 +246,7 @@ Compose 更新可能产生短暂中断，首版不承诺零停机。HTTP 可访�
 
 ### 7.2 长任务与重复调用
 
-当前远端命令默认最长执行 120 秒。因此 `start` 必须把工作交给独立于本次 SSH 连接的后台执行过程，并返回发布 ID；具体托管方式在目标服务器上验证后确定。不能仅返回“命令已启动”就宣称部署成功。
+当前远端命令默认最长执行 120 秒。因此 `start` 必须把工作交给独立于本次 SSH 连接的后台执行过程，并返回发布 ID；实现使用独立进程会话、关闭标准输入、日志文件重定向，并向后台进程传递文件锁；目标服务器需要 Linux 与 Python 3.9+。不能仅返回“命令已启动”就宣称部署成功。
 
 发布 ID 在发起前生成并保存。重复提交相同 ID 和相同内容时返回已有状态，不启动第二次部署；相同 ID 对应不同镜像或配置时拒绝。应用发布锁覆盖真正的后台执行过程，不能在 SSH 启动命令返回后提前释放。
 
@@ -259,12 +260,15 @@ Compose 更新可能产生短暂中断，首版不承诺零停机。HTTP 可访�
 /srv/apps/demo/
 ├── shared/app.env
 ├── current.json
+├── active.json
 ├── deploy.lock
 └── releases/<release-id>/
     ├── request.json
     ├── status.json
-    ├── compose.yml
-    ├── runtime.sh
+    ├── previous.json
+    ├── snapshot/
+    │   ├── compose.yml
+    │   └── deploy/{project.json,runtime.sh,runtime.py}
     └── deploy.log
 ```
 
@@ -328,11 +332,11 @@ Skill 必须遵守以下执行约定：
 
 | 阶段 | 工作 | 完成标准 |
 | --- | --- | --- |
-| P0：环境准备 | 配置正式构建执行器及推送权限；重建 CES 镜像补齐命令依赖；验证实际会话、SSH 和文件传输 | 实际 Job 构建并推送测试镜像，目标服务器按 digest 拉取；会话能编辑、检出、提交推送并传输文件 |
-| P1：构建工具 | 核验部署版本 OneDev API；新增 `list_jobs`、`run_job`、`get_build_artifact`；增强 `list_builds`；修正 `get_tag` | Harness 能定位或启动指定提交的构建，读取与提交一致的镜像产物 |
-| P2：交付模板 | 整理 Dockerfile、测试/构建流水线、Compose、项目配置与部署脚本；实现发布锁、状态和回滚 | 单个示例项目可以按 digest 部署并查询到真实结果 |
-| P3：Skill 串联 | 编写并通过现有目录安装 `project-delivery`，覆盖失败与恢复分支 | 在 Harness 会话中从修改代码走到部署验收，能恢复一次中断的交付 |
-| P4：使用体验 | 应用服务器容器面板兼容、构建取消/重跑、工具目录分类 | 在已有能力上完善操作体验，不作为首个闭环的前置条件 |
+| P0：环境准备（已完成） | 配置正式构建执行器及推送权限；重建 CES 镜像补齐命令依赖；验证实际会话、SSH 和文件传输 | 实际 Job 构建并推送测试镜像，目标服务器按 digest 拉取；会话能编辑、检出、提交推送并传输文件 |
+| P1：构建工具（已完成） | 核验部署版本 OneDev API；新增 `list_jobs`、`run_job`、`get_build_artifact`；增强 `list_builds`；修正 `get_tag` | Harness 能定位或启动指定提交的构建，读取与提交一致的镜像产物 |
+| P2：交付模板（已完成） | 整理 Dockerfile、测试/构建流水线、Compose、项目配置与部署脚本；实现发布锁、状态和回滚 | 单个示例项目可以按 digest 部署并查询到真实结果 |
+| P3：Skill 串联（已完成） | 编写并通过现有目录安装 `project-delivery`，覆盖失败与恢复分支 | 在 Harness 会话中从修改代码走到部署验收，能恢复一次中断的交付 |
+| P4：使用体验（后续可选） | 应用服务器容器面板兼容、构建取消/重跑、工具目录分类 | 在已有能力上完善操作体验，不作为首个闭环的前置条件 |
 
 第一轮选用一个无复杂数据迁移的示例项目，在已登记的应用服务器上使用独立应用目录和未占用端口验证，保持已有服务运行。P0 先打通真实构建、推送与拉取，P1–P3 再完成会话自动交付及恢复测试。上线范围包括 CES 运行镜像、构建环境配置、工具、Skill 和模板；不因安装方案而自动发布所有已有项目，也不执行旧 `release/rollback`。
 
@@ -367,9 +371,11 @@ Skill 必须遵守以下执行约定：
 13. 部署脚本只操作指定应用，其他应用容器与持久化数据不被误删。
 14. 用户最终得到准确的访问入口与可追溯的版本信息。
 
-以上为待实现功能的验收要求，不代表已经执行过本方案的端到端测试。2026-11-10 只读核验已完成，P0 及后续实施验收尚未执行；当前已发布的 TCR 注入测试结果不能替代构建、发布与会话恢复测试。
+以上为验收要求；实际已执行的线上步骤、自动测试覆盖和未覆盖边界见[实施记录](IMPLEMENTATION.md)。本地故障测试与线上实测分别列出，不以模拟结果代替真实发布验证。
 
 ## 12. 关联设计
+
+- [实施与验收记录](IMPLEMENTATION.md)：部署版本、构建和发布标识、实际工具调用结果及保留边界。
 
 - [2026-11-10 线上核验记录](ONLINE_VERIFICATION.md)：本次方案修订的实测依据与验证边界。
 - [应用服务器自动注入 TCR 凭据（简化版）](../application-server-tcr-simple/README.md)：沿用当前凭据分发方式。

@@ -13,7 +13,8 @@ trap 'rm -rf "$BUILDX_CONFIG"' EXIT HUP INT TERM
 image="ces-candidate:build-$build"
 registry="${CCR_REGISTRY:-ccr.ccs.tencentyun.com/zstao/ces-platform}:build-$build"
 
-docker build --network=host --build-arg "NODE_IMAGE=${CES_NODE_IMAGE:-node:24-bookworm-slim}" -t "$image" -f docker/Dockerfile .
+docker build --network=host --build-arg "NODE_IMAGE=${CES_NODE_IMAGE:-node:24-bookworm-slim}" \
+  --build-arg "DEBIAN_MIRROR=${CES_DEBIAN_MIRROR:-deb.debian.org}" -t "$image" -f docker/Dockerfile .
 docker tag "$image" "$registry"
 docker push "$registry"
 

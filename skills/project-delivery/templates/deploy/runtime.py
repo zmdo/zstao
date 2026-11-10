@@ -121,6 +121,9 @@ def start(root, release, request, source):
         if folder.exists():
             require((folder / 'request.json').exists() and read(folder / 'request.json') == identity, 'release_id_conflict')
             return status(root, release)
+        if (root / 'active.json').exists():
+            active = read(root / 'active.json')
+            require(status(root, active['releaseId'])['state'] in ('succeeded', 'failed'), 'previous_deployment_needs_verification')
         folder.mkdir(mode=0o700)
         for name in files:
             destination = folder / 'snapshot' / name
@@ -132,6 +135,7 @@ def start(root, release, request, source):
         write(folder / 'previous.json', previous)
         initial = {**identity, 'state': 'starting', 'phase': 'queued', 'startedAt': now(), 'bootId': boot_id()}
         write(folder / 'status.json', initial)
+        write(root / 'active.json', {'releaseId': release})
         with (folder / 'deploy.log').open('ab') as log:
             os.chmod(folder / 'deploy.log', 0o600)
             worker = subprocess.Popen([sys.executable, str(folder / 'snapshot/deploy/runtime.py'), '_worker',

@@ -19,6 +19,6 @@
 
 OneDev 16.9.7 会校验整个构建规范，即使只运行 `build`，不存在的旧发布执行器也会阻止提交。活动 `.onedev-buildspec.yml` 因此只保留构建；旧任务保存在 `deploy/legacy/ces-onedev-buildspec.yml` 供迁移参考，不是可直接执行的部署配置。
 
-CES 构建脚本支持环境变量 `DOCKER_CONFIG`、`CCR_REGISTRY` 和 `CES_NODE_IMAGE`。默认凭据目录为 `/srv/ces-build/docker-config`；`CES_NODE_IMAGE` 可指定当前构建网络能访问的 Node 24 镜像。普通项目使用 Skill 中的构建模板，显式配置 `IMAGE_REPOSITORY`。
+CES 构建脚本支持环境变量 `DOCKER_CONFIG`、`CCR_REGISTRY`、`CES_NODE_IMAGE` 和 `CES_DEBIAN_MIRROR`。默认凭据目录为 `/srv/ces-build/docker-config`；`CES_NODE_IMAGE` 可指定当前构建网络能访问的 Node 24 镜像。`CES_DEBIAN_MIRROR` 是 Debian 镜像站主机名，CES 的 OneDev Job 默认使用已在当前主机验证的腾讯云镜像站；本地 Docker 构建仍默认官方源。普通项目使用 Skill 中的构建模板，显式配置 `IMAGE_REPOSITORY`。
 
 验收须在实际 Job 中完成 Git 检出、`docker info`、镜像构建、推送和 `image.json` 发布。Agent 在线或镜像命令存在不能替代实际构建。

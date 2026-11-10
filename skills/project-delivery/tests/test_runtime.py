@@ -139,6 +139,9 @@ class RuntimeTests(unittest.TestCase):
         folder.mkdir(parents=True)
         (folder / 'status.json').write_text(json.dumps({'state': 'running', 'pid': 99999999, 'bootId': 'old'}))
         self.assertEqual(runtime.status(self.root, 'stale')['state'], 'needs_verification')
+        (self.root / 'active.json').write_text(json.dumps({'releaseId': 'stale'}))
+        self.assertEqual(self.start('new')[1]['error'], 'previous_deployment_needs_verification')
+        self.assertFalse((self.root / 'releases/new').exists())
 
 
 if __name__ == '__main__':

@@ -18,6 +18,7 @@ jobs:
       shell: bash
       commands: |
         set -euo pipefail
+        export CES_DEBIAN_MIRROR=${CES_DEBIAN_MIRROR:-mirrors.cloud.tencent.com}
         bash scripts/build-image.sh @build_number@
     condition: SUCCESSFUL
   - type: PublishArtifactStep

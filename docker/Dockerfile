@@ -10,8 +10,11 @@ RUN npm run build
 
 FROM ${NODE_IMAGE}
 WORKDIR /app
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends git openssh-client rsync ca-certificates \
+ARG DEBIAN_MIRROR=deb.debian.org
+RUN case "$DEBIAN_MIRROR" in ''|*[!a-zA-Z0-9.-]*) exit 2;; esac \
+    && sed -i "s|http://deb.debian.org|http://$DEBIAN_MIRROR|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update \
+    && apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 install -y --no-install-recommends git openssh-client rsync ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app /app
 RUN npm install -g @deepseek-ai/dsh@0.2.1-rc.5 --registry=https://registry.npmmirror.com

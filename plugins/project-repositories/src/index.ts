@@ -5,9 +5,10 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { defineTool, type ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { deliveryAction, type DeliveryArgs } from './delivery.ts'
-import { authorizeBuild } from './delivery-authorization.ts'
+import { authorizeBuild, authorizeProjectOperation } from './delivery-authorization.ts'
 import { ApiError, OneDev, commitSha, decryptPassword, imageType, preview, projectId, repositoryPath } from './onedev.ts'
-import { tcrDeleteTag, tcrRepositories, tcrTags, tcrTag, type TcrSettings } from './tcr.ts'
+import { tcrDeleteTag, tcrRepositories, tcrTags, tcrTag, ensurePrivateRepository, type TcrSettings } from './tcr.ts'
+import { BOOTSTRAP_DEFAULTS, bootstrapSettings, projectPath, resolveProject, createManagedProject, projectContext, buildEnvironment, managedProject, type BootstrapSettings } from './bootstrap.ts'
 import type { Secrets } from './onedev.ts'
 import { API, DOWNLOAD_BYTES } from './shared.ts'
 
@@ -21,7 +22,7 @@ interface HostCtx {
   systemPrompt: { section(section: { name: string; order: number; text: string }): () => void }
   effect(run: () => (() => void | Promise<void>)): void
 }
-interface Settings { internalBaseUrl: string; externalBaseUrl: string; username: string; passwordCiphertext: string; updatedAt: string | null }
+interface Settings extends BootstrapSettings { internalBaseUrl: string; externalBaseUrl: string; username: string; passwordCiphertext: string; updatedAt: string | null }
 export const inject = ['consoleSession', 'secrets', 'webServer', 'tools', 'systemPrompt']
 
 export function apply(ctx: HostCtx): void {
@@ -39,27 +40,27 @@ export function apply(ctx: HostCtx): void {
     name: 'smp-project-repositories:git',
     order: 2500,
     text:
-      'CES has a configured OneDev Git service for new projects. When the user asks to create or write a new project, first call platform_onedev with action=create_project and a lowercase project slug and a short description; do not create only local files for a new project. ' +
-      'An existing project is returned by platform_onedev. After creation, use normal git commands with the CES AI identity: username cesai, email cesai@dianzinao.cn. ' +
-      'The SSH key is at /dsh-home/keys/cesai and the OneDev SSH remote is ssh://git@10.2.8.9:2222/<project>.git. ' +
-      'For delivery, use list_jobs and run_job with an explicit commit SHA, then get_build_artifact for image.json after success. If submission is uncertain, query list_builds before retrying. For pipeline status, use platform_onedev action=list_builds or get_build. For TCR image repositories, use platform_image_registry actions list_repositories, list_tags or get_tag. Never delete a OneDev project or change the OneDev login key.',
+      'For a new software project, call platform_onedev action=create_project with a lowercase project slug and description. It creates a repository in the configured managed project space, or reuses the existing project. Use the full project.path returned by tools for later calls. ' +
+      'Use the returned git connection, SSH command, identity and readiness fields; never invent a repository address or derive SSH settings from a web URL. If access is incomplete, retry create_project for the same project to finish it. Do not read private keys or registry credentials. ' +
+      'When asked to create an application and deploy it, load the project-delivery skill and call prepare_delivery for the new project to obtain the build executor, base image and private image repository. Use existing project configuration when continuing an existing app. ' +
+      'Implement the requested application and tests, commit and push with normal Git commands. Use list_jobs/run_job with explicit ref and commit, then get_build_artifact after success. Check list_builds before retrying uncertain submissions. Deploy only to the user-selected managed server through platform_server tools. Never delete projects or replace the AI login key.',
   }))
 
   ctx.effect(() => {
     const stop = ctx.tools.register(defineTool({
       name: 'platform_onedev',
       description:
-        'OneDev actions: list_projects, get_project, list_branches, list_tags, list_commits, get_tree, get_file, list_builds, get_build, get_build_logs, list_jobs, run_job, get_build_artifact, create_project. ' +
-        'Use list_builds/get_build/get_build_logs to inspect pipeline runs and logs. Use action=create_project to create a new project and grant the CES AI account cesai Code Writer; existing projects are returned without changing access. ' +
+        'OneDev actions: list_projects, get_project, list_branches, list_tags, list_commits, get_tree, get_file, list_builds, get_build, get_build_logs, list_jobs, run_job, get_build_artifact, create_project, prepare_delivery. ' +
+        'Use create_project for a new project: it creates in the managed space, returns Git connection info and repairs incomplete AI access there. Existing unmanaged projects are returned without changing access. Use prepare_delivery before the first build/deployment of a managed project; it checks the build environment and ensures a private TCR repository, returning executor, image and template defaults. ' +
         'Use list_jobs before run_job; run_job requires an explicit ref and commit SHA, reuses existing matching builds, and never automatically retries an uncertain submission. Read image.json with get_build_artifact after success. Imported build specs are not supported for submission. ' +
         'Use the other actions to discover and inspect projects. This tool never deletes projects or changes the AI login key.',
       parameters: {
         action: {
           type: 'string', required: true,
-          enum: ['list_projects', 'get_project', 'list_branches', 'list_tags', 'list_commits', 'get_tree', 'get_file', 'list_builds', 'get_build', 'get_build_logs', 'list_jobs', 'run_job', 'get_build_artifact', 'create_project'],
+          enum: ['list_projects', 'get_project', 'list_branches', 'list_tags', 'list_commits', 'get_tree', 'get_file', 'list_builds', 'get_build', 'get_build_logs', 'list_jobs', 'run_job', 'get_build_artifact', 'create_project', 'prepare_delivery'],
           description: 'Operation to perform.',
         },
-        project: { type: 'string', description: 'OneDev project name. Required for repository actions; optional for list_builds.' },
+        project: { type: 'string', description: 'OneDev full project path (for example apps/todo). create_project also accepts a new lowercase slug. Use returned project.path for subsequent actions.' },
         ref: { type: 'string', description: 'Branch or tag name. Defaults to the default branch for code reads.' },
         path: { type: 'string', description: 'Repository path or JSON artifact path; get_build_artifact defaults to image.json.' },
         commit: { type: 'string', description: 'Full 40-character commit SHA. Required for run_job; optional expected head for list_jobs or filter for list_builds.' },
@@ -91,6 +92,11 @@ export function apply(ctx: HostCtx): void {
           })
         }
         if (['list_builds', 'list_jobs', 'run_job', 'get_build_artifact'].includes(action)) {
+          if (args.project) {
+            const selected = await resolveProject(one, args.project, settings)
+            if (!selected) throw new ApiError(404, 'project_not_found')
+            args = { ...args, project: selected.path }
+          }
           return JSON.stringify(await deliveryAction(one, args, () => authorizeBuild(ctx, exec, name, args.job ?? '', args.commit ?? '')))
         }
         if (action === 'get_build' || action === 'get_build_logs') {
@@ -100,35 +106,33 @@ export function apply(ctx: HostCtx): void {
           const [build, projectNames] = await Promise.all([one.build(id), one.projectNames()])
           return JSON.stringify({ ...build, projectName: projectNames.get(build.projectId) ?? `#${build.projectId}` })
         }
-        if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)) throw new ApiError(400, 'invalid_project_name')
+        projectPath(name)
         if (action === 'create_project') {
-          const description = (args.description ?? '').trim().slice(0, 500)
-          const result = await one.createProject(name, description)
-          let granted = false
-          if (result.created) {
-            const userId = await one.findUser('cesai')
-            if (userId === null) throw new ApiError(502, 'ai_user_missing')
-            await one.grantCodeWriter(result.project.id, userId)
-            granted = true
-          }
-          return JSON.stringify({
-            created: result.created, granted,
-            project: {
-              id: result.project.id, name: result.project.name, path: result.project.path,
-              description: result.project.description, webUrl: result.project.webUrl,
-              cloneUrl: `${result.project.webUrl}.git`,
-              sshCloneUrl: `ssh://git@${new URL(result.project.webUrl).hostname}:2222/${result.project.path}.git`,
-            },
-            ai: { username: 'cesai', email: 'cesai@dianzinao.cn' },
-          })
+          const result = await createManagedProject(one, name, (args.description ?? '').trim().slice(0, 500), settings,
+            () => authorizeProjectOperation(ctx, exec, `Create or finish managed project ${name}`, `创建或补齐项目 ${name}？`))
+          const context = await projectContext(one, result.project, settings, dirname(file), await readImageSettings(join(dirname(file), 'image-registry.json')))
+          return JSON.stringify({ ...result, ...context, ready: result.repositoryReady && result.access.ready === true && context.git.configured })
         }
-        const project = await one.projectByName(name)
+        const project = await resolveProject(one, name, settings)
         if (project === null) throw new ApiError(404, 'project_not_found')
+        if (action === 'prepare_delivery') {
+          if (!managedProject(project.path, settings)) throw new ApiError(409, 'use_existing_project_delivery_configuration')
+          const context = await projectContext(one, project, settings, dirname(file), await readImageSettings(join(dirname(file), 'image-registry.json')))
+          if (!context.git.configured) return JSON.stringify({ project: project.path, prepared: false, ...context })
+          const environment = await buildEnvironment(one, settings)
+          await authorizeProjectOperation(ctx, exec, `Prepare private image repository for ${project.path}`, `准备项目 ${project.path} 的私有镜像仓库？`)
+          const images = tcrSettings(await readImageSettings(join(dirname(file), 'image-registry.json')), ctx.secrets)
+          const repository = await ensurePrivateRepository(images, project.id, exec.signal)
+          return JSON.stringify({ project: project.path, projectId: project.id, prepared: true, ...context, buildEnvironment: environment,
+            image: { ...repository, address: `${images.registry}/${repository.repository}`, private: true, pushVerified: false },
+            next: 'Use the project-delivery skill templates, adapt to the application, test and push a commit. Actual build/push/pull validate the credentials.' })
+        }
         const repo = await one.repository(project.id)
         if (action === 'get_project') {
           return JSON.stringify({
             project: { id: project.id, name: project.name, path: project.path, description: project.description, webUrl: project.webUrl, lastUpdated: project.lastUpdated },
             defaultBranch: repo.defaultBranch, branches: repo.branches, tags: repo.tags, cloneUrl: repo.cloneUrl, cloneUrls: repo.cloneUrls,
+            ...await projectContext(one, project, settings, dirname(file), await readImageSettings(join(dirname(file), 'image-registry.json'))),
           })
         }
         if (action === 'list_branches') return JSON.stringify({ project: project.name, branches: repo.branches })
@@ -320,7 +324,7 @@ async function writeImageSettings(file: string, settings: ImageRegistrySettings)
 async function readSettings(file: string): Promise<Settings> {
   let content: string
   try { content = await readFile(file, 'utf8') } catch (cause) {
-    if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return { internalBaseUrl: 'http://10.2.8.9', externalBaseUrl: 'http://10.2.8.9', username: 'admin', passwordCiphertext: '', updatedAt: null }
+    if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return { ...BOOTSTRAP_DEFAULTS, internalBaseUrl: '', externalBaseUrl: '', username: 'admin', passwordCiphertext: '', updatedAt: null }
     throw new ApiError(500, 'settings_unavailable', { cause })
   }
   let value: unknown
@@ -329,11 +333,11 @@ async function readSettings(file: string): Promise<Settings> {
   const row = value as Record<string, unknown>
   const internal = typeof row.internalBaseUrl === 'string' ? row.internalBaseUrl : typeof row.baseUrl === 'string' ? row.baseUrl : ''
   if (!internal || typeof row.username !== 'string' || typeof row.passwordCiphertext !== 'string') throw new ApiError(500, 'settings_unavailable')
-  return { internalBaseUrl: normalizeBaseUrl(internal), externalBaseUrl: normalizeBaseUrl(typeof row.externalBaseUrl === 'string' && row.externalBaseUrl ? row.externalBaseUrl : internal), username: row.username,
+  return { ...bootstrapSettings(row), internalBaseUrl: normalizeBaseUrl(internal), externalBaseUrl: normalizeBaseUrl(typeof row.externalBaseUrl === 'string' && row.externalBaseUrl ? row.externalBaseUrl : internal), username: row.username,
     passwordCiphertext: row.passwordCiphertext, updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : null }
 }
 function publicSettings(settings: Settings) {
-  return { internalBaseUrl: settings.internalBaseUrl, externalBaseUrl: settings.externalBaseUrl, username: settings.username, configured: settings.passwordCiphertext !== '', updatedAt: settings.updatedAt }
+  return { ...bootstrapSettings({ ...settings }), internalBaseUrl: settings.internalBaseUrl, externalBaseUrl: settings.externalBaseUrl, username: settings.username, configured: settings.passwordCiphertext !== '', updatedAt: settings.updatedAt }
 }
 function sameOriginJson(request: IncomingMessage): void {
   if (!/^application\/json(?:;|$)/i.test(request.headers['content-type'] ?? '')) throw new ApiError(415, 'json_required')
@@ -357,7 +361,7 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
       if (request.method !== 'GET') throw new ApiError(405, 'method_not_allowed')
       let publicKey = ''
       try { publicKey = (await readFile(join(dirname(file), 'keys', 'cesai.pub'), 'utf8')).trim() } catch (cause) { void cause }
-      send(response, 200, { username: 'cesai', email: 'cesai@dianzinao.cn', publicKey, privateKeyPath: '/dsh-home/keys/cesai' })
+      send(response, 200, { username: 'cesai', email: 'cesai@dianzinao.cn', publicKey, privateKeyPath: join(dirname(file), 'keys', 'cesai') })
       return
     }
     if (path === '/settings') {
@@ -373,7 +377,7 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
       const password = typeof body.password === 'string' ? body.password : ''
       const passwordCiphertext = password === '' ? previous.passwordCiphertext : ctx.secrets.encrypt(password)
       if (!passwordCiphertext) throw new ApiError(400, 'password_required')
-      const next = { internalBaseUrl, externalBaseUrl, username, passwordCiphertext, updatedAt: new Date().toISOString() }
+      const next = { ...bootstrapSettings({ ...previous, ...body }), internalBaseUrl, externalBaseUrl, username, passwordCiphertext, updatedAt: new Date().toISOString() }
       await mkdir(dirname(file), { recursive: true })
       const temporary = join(dirname(file), `.project-management-${randomUUID()}.json`)
       await writeFile(temporary, `${JSON.stringify(next, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })

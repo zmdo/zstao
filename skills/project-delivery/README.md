@@ -2,6 +2,8 @@
 
 `SKILL.md` 是会话执行说明，`templates/` 是首次接入项目时的参考文件。将整个 `project-delivery` 目录打包后，通过 CES 的 Harness 技能目录导入并启用。
 
+新项目由 `create_project` 创建到平台配置的 OneDev 项目空间；Git 地址与身份以工具返回的 `git` 为准。首次构建部署调用 `prepare_delivery`，使用返回的执行器、镜像仓库与基础镜像适配模板。平台设置与验收要求见 [新项目接入方案](../../docs/design/harness-new-project-bootstrap/README.md)。
+
 部署脚本需要目标 Linux 服务器具备 Python 3.9+、Docker/Compose 和专用 TCR 拉取配置。以可读取配置并运行 Docker 的账户执行，通常通过平台 SSH 工具调用 `sudo -n sh deploy/runtime.sh`。
 
 ```sh

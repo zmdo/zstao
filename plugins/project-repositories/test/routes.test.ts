@@ -82,7 +82,7 @@ test('projects page beyond 100, nullable default branch and public clone URL', a
   assert.equal(repo.defaultBranch, null)
   assert.equal(repo.cloneUrl, 'https://public.example/group/p1.git')
   assert.equal(repo.cloneUrls.http, 'https://public.example/group/p1.git')
-  assert.equal(repo.cloneUrls.ssh, 'ssh://public.example/group/p1.git')
+  assert.equal(repo.cloneUrls.ssh, 'ssh://10.0.0.1/group/p1.git')
   assert.equal(repo.project.webUrl, 'https://public.example/group/p1')
 })
 test('same-name branch and tag are resolved through separate endpoints', async () => {
@@ -141,6 +141,21 @@ test('application pull opt-in is explicit, encrypted and independent of API keys
   assert.equal((await imageRegistry.pullLogin()).password, 'rotated-secret')
   assert.equal((await save({ ...input, password: '', applicationServerPull: false })).status, 200)
   await assert.rejects(imageRegistry.pullLogin(), { code: 'application_pull_not_configured' })
+})
+
+test('delivery settings survive older saves and one SSH source is shared by repository reads', async () => {
+  const save = (body: unknown) => request('/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const base = { internalBaseUrl: upstreamOrigin, externalBaseUrl: 'https://public.example', username: 'admin', password: '' }
+  const configured = await save({ ...base, gitSshBaseUrl: 'ssh://git@private.example:2222', projectSpace: 'apps', buildExecutor: 'managed-build', nodeImage: 'mirror.example/node:24-alpine' })
+  assert.equal(configured.status, 200)
+  const olderSave = await save(base)
+  const values = await olderSave.json()
+  assert.equal(values.gitSshBaseUrl, 'ssh://git@private.example:2222')
+  assert.equal(values.buildExecutor, 'managed-build')
+  assert.equal(JSON.stringify(values).includes('one-secret'), false)
+  const repo = await (await request('/repos/1')).json()
+  assert.equal(repo.cloneUrls.ssh, 'ssh://git@private.example:2222/group/p1.git')
+  assert.equal((await save({ ...base, gitSshBaseUrl: 'ssh://git:password@host' })).status, 400)
 })
 
 test('unloading aborts and drains pending upstream work', async () => {

@@ -33,6 +33,10 @@ interface PageProps {
 interface AiIdentity { username: string; email: string; publicKey: string; privateKeyPath: string }
 
 interface Settings {
+  gitSshBaseUrl: string
+  projectSpace: string
+  buildExecutor: string
+  nodeImage: string
   internalBaseUrl: string
   externalBaseUrl: string
   username: string
@@ -66,6 +70,13 @@ function copyOf(active: string) {
     internalUrl: zh ? '内部访问地址' : 'Internal URL',
     externalUrl: zh ? '外部访问地址' : 'External URL',
     externalHint: zh ? '留空时与内部访问地址相同。打开 OneDev 会优先使用外部地址。' : 'Defaults to the internal URL. Open OneDev uses this URL when set.',
+    gitSshUrl: zh ? 'Harness Git SSH 地址' : 'Harness Git SSH URL',
+    gitSshHint: zh ? '例如 ssh://git@host:2222；留空使用 OneDev 返回的 SSH 地址。' : 'For example ssh://git@host:2222; leave blank to use OneDev clone URLs.',
+    deliveryDefaults: zh ? '新项目交付默认值' : 'New project delivery defaults',
+    projectSpace: zh ? 'OneDev 项目空间' : 'OneDev project space',
+    projectSpaceHint: zh ? '新项目创建在此父项目下；构建执行器需匹配该空间的 build 任务。' : 'New projects are created under this parent; the executor must match its build jobs.',
+    buildExecutor: zh ? '构建执行器' : 'Build executor',
+    nodeImage: zh ? 'Node 基础镜像' : 'Node base image',
     username: zh ? '用户名' : 'Username',
     password: zh ? '密码' : 'Password',
     passwordHint: zh ? '留空表示沿用已保存的密码。' : 'Leave blank to keep the saved password.',
@@ -117,7 +128,7 @@ export function installStyle(): () => void {
 function ProjectSettingsPage(props: PageProps) {
   const zh = useLanguage(props.locale)
   const copy = copyOf(zh ? 'zh' : 'en')
-  const [settings, setSettings] = useState<Settings>({ internalBaseUrl: 'http://10.2.8.9', externalBaseUrl: 'http://10.2.8.9', username: 'admin', configured: false, updatedAt: null })
+  const [settings, setSettings] = useState<Settings>({ internalBaseUrl: '', externalBaseUrl: '', gitSshBaseUrl: '', projectSpace: 'apps', buildExecutor: 'ces-build-test', nodeImage: 'node:24-alpine', username: 'admin', configured: false, updatedAt: null })
   const [ai, setAi] = useState<AiIdentity>()
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(true)
@@ -146,7 +157,7 @@ function ProjectSettingsPage(props: PageProps) {
       const next = await json<Settings>('/settings', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ internalBaseUrl: settings.internalBaseUrl, externalBaseUrl: settings.externalBaseUrl, username: settings.username, password }),
+        body: JSON.stringify({ internalBaseUrl: settings.internalBaseUrl, externalBaseUrl: settings.externalBaseUrl, username: settings.username, password, gitSshBaseUrl: settings.gitSshBaseUrl, projectSpace: settings.projectSpace, buildExecutor: settings.buildExecutor, nodeImage: settings.nodeImage }),
       })
       setSettings(next)
       setPassword('')
@@ -171,8 +182,15 @@ function ProjectSettingsPage(props: PageProps) {
       <div className="smp-project-form">
         <label><span>{copy.internalUrl}</span><input value={settings.internalBaseUrl} disabled={loading || saving} onChange={event => setSettings({ ...settings, internalBaseUrl: event.target.value })} /></label>
         <label><span>{copy.externalUrl}</span><input value={settings.externalBaseUrl} disabled={loading || saving} onChange={event => setSettings({ ...settings, externalBaseUrl: event.target.value })} /><small>{copy.externalHint}</small></label>
+        <label><span>{copy.gitSshUrl}</span><input value={settings.gitSshBaseUrl} disabled={loading || saving} onChange={event => setSettings({ ...settings, gitSshBaseUrl: event.target.value })} /><small>{copy.gitSshHint}</small></label>
         <label><span>{copy.username}</span><input value={settings.username} disabled={loading || saving} onChange={event => setSettings({ ...settings, username: event.target.value })} /></label>
         <label><span>{settings.configured ? (zh ? '新密码' : 'New password') : copy.password}</span><input type="password" autoComplete="new-password" value={password} disabled={loading || saving} onChange={event => setPassword(event.target.value)} /><small>{copy.passwordHint}</small></label>
+      </div>
+      <h3>{copy.deliveryDefaults}</h3>
+      <div className="smp-project-form">
+        <label><span>{copy.projectSpace}</span><input value={settings.projectSpace} disabled={loading || saving} onChange={event => setSettings({ ...settings, projectSpace: event.target.value })} /><small>{copy.projectSpaceHint}</small></label>
+        <label><span>{copy.buildExecutor}</span><input value={settings.buildExecutor} disabled={loading || saving} onChange={event => setSettings({ ...settings, buildExecutor: event.target.value })} /></label>
+        <label><span>{copy.nodeImage}</span><input value={settings.nodeImage} disabled={loading || saving} onChange={event => setSettings({ ...settings, nodeImage: event.target.value })} /></label>
       </div>
       {settings.configured && !saving && <SavedPassword key={settings.updatedAt} zh={zh} />}
       <p className={settings.configured ? 'smp-project-status ok' : 'smp-project-status'}>{settings.configured ? `${copy.configured} · ${settings.username}` : copy.notConfigured}</p>

@@ -13,6 +13,7 @@ export class ApiError extends Error {
 export interface ConnectionSettings {
   internalBaseUrl: string
   externalBaseUrl: string
+  gitSshBaseUrl?: string
   username: string
   passwordCiphertext: string
 }
@@ -185,15 +186,26 @@ export class OneDev {
       throw cause
     }
   }
-  async createProject(name: string, description: string): Promise<{ project: Project; created: boolean }> {
-    const existing = await this.projectByName(name)
+  async createProject(path: string, description: string): Promise<{ project: Project; created: boolean }> {
+    const existing = await this.projectByName(path)
     if (existing !== null) return { project: existing, created: false }
-    const id = await this.post('projects', {
+    const parts = path.split('/')
+    const name = parts.pop()!
+    const parent = parts.length ? await this.projectByName(parts.join('/')) : null
+    if (parts.length && !parent) throw new ApiError(409, 'project_space_missing')
+    let id: unknown
+    try { id = await this.post('projects', {
+      ...(parent ? { parentId: parent.id } : {}),
       name, key: '', description, codeManagement: true, wikiManagement: false, packManagement: false,
       issueManagement: false, timeTracking: false,
       gitPackConfig: { windowMemory: '', packSizeLimit: '', threads: '', window: '' },
       codeIndexingSetting: { analysisFiles: '', requireLoginForAutoIndexing: false },
-    })
+    }) } catch (cause) {
+      // A concurrent request or a lost response may have created the same project.
+      const recovered = await this.projectByName(path)
+      if (recovered) return { project: recovered, created: false }
+      throw cause
+    }
     if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) throw new ApiError(502, 'invalid_upstream')
     return { project: this.project(await this.request(`projects/${id}`)), created: true }
   }
@@ -219,6 +231,19 @@ export class OneDev {
     const roleId = await this.findRole('Code Writer')
     if (roleId === null) throw new ApiError(502, 'upstream_role_missing')
     await this.post('user-authorizations', { projectId, userId, roleId })
+  }
+
+  async ensureCodeWriter(projectId: number, userId: number): Promise<boolean> {
+    const roleId = await this.findRole('Code Writer')
+    if (roleId === null) throw new ApiError(502, 'upstream_role_missing')
+    const values = await this.request(`projects/${projectId}/user-authorizations`)
+    if (!Array.isArray(values)) throw new ApiError(502, 'invalid_upstream')
+    const current = values.map(object).find(row => row.userId === userId)
+    if (current?.roleId === roleId) return false
+    // Do not silently downgrade a pre-existing role on a managed project.
+    if (current) throw new ApiError(409, 'ai_project_role_requires_review')
+    await this.post('user-authorizations', { projectId, userId, roleId })
+    return true
   }
 
   project(value: unknown): Project {
@@ -254,10 +279,14 @@ export class OneDev {
   async repository(id: number): Promise<Repository> {
     const project = this.project(await this.request(`projects/${id}`))
     if (!project.codeManagement) throw new ApiError(409, 'code_disabled')
-    const [branches, tags, defaultBranch, clone] = await Promise.all([
+    const [branches, tags, defaultBranch, cloneUrls] = await Promise.all([
       this.request(`repositories/${id}/branches`), this.request(`repositories/${id}/tags`),
-      this.request(`repositories/${id}/default-branch`, undefined, 'text'), this.request(`projects/${id}/clone-url`),
+      this.request(`repositories/${id}/default-branch`, undefined, 'text'), this.cloneUrls(id, project.path),
     ])
+    return { project, branches: strings(branches), tags: strings(tags), defaultBranch: defaultBranch === null ? null : string(defaultBranch), cloneUrl: cloneUrls.http, cloneUrls }
+  }
+  async cloneUrls(id: number, path: string): Promise<{ http: string; ssh: string }> {
+    const clone = await this.request(`projects/${id}/clone-url`)
     const cloneData = object(clone)
     const rawHttp = string(cloneData.http)
     const rawSsh = typeof cloneData.ssh === 'string' ? cloneData.ssh : ''
@@ -273,9 +302,17 @@ export class OneDev {
       return new URL(`${protocol}//${host}${external.pathname.replace(/\/$/, '')}${suffix}`).href
     }
     const http = publicClone(rawHttp)
-    const ssh = publicClone(rawSsh)
+    let ssh = ''
+    if (this.settings.gitSshBaseUrl) {
+      ssh = `${this.settings.gitSshBaseUrl.replace(/\/$/, '')}/${path.split('/').map(encodeURIComponent).join('/')}.git`
+    } else if (rawSsh) {
+      let parsed: URL
+      try { parsed = new URL(rawSsh) } catch (cause) { throw new ApiError(502, 'invalid_upstream_clone_url', { cause }) }
+      if (parsed.protocol !== 'ssh:' || parsed.password || parsed.search || parsed.hash || !parsed.hostname) throw new ApiError(502, 'invalid_upstream_clone_url')
+      ssh = parsed.href
+    }
     if (http === '') throw new ApiError(502, 'invalid_upstream')
-    return { project, branches: strings(branches), tags: strings(tags), defaultBranch: defaultBranch === null ? null : string(defaultBranch), cloneUrl: http, cloneUrls: { http, ssh } }
+    return { http, ssh }
   }
   async resolve(id: number, type: RefType, name: string): Promise<string> {
     if (!name || name.length > 1024 || /[\x00-\x1f\x7f]/.test(name)) throw new ApiError(400, 'invalid_revision')

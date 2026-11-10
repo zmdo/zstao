@@ -127,6 +127,36 @@ export async function tcrDeleteTag(settings: TcrSettings, repository: string, ta
   await request(settings, 'DeleteImagePersonal', { RepoName: repository, Tag: tag }, signal)
 }
 
+async function privateRepository(settings: TcrSettings, repository: string, signal: AbortSignal): Promise<boolean> {
+  let result: Record<string, unknown>
+  try { result = await request(settings, 'DescribeRepositoryPersonal', { RepoName: repository }, signal) }
+  catch (cause) {
+    if (cause instanceof ApiError && cause.code === 'tcr_ResourceNotFound.ErrNoRepo') return false
+    throw cause
+  }
+  const data = result.Data
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new ApiError(502, 'tcr_invalid_response')
+  const row = data as Record<string, unknown>
+  if (row.RepoName !== repository) throw new ApiError(502, 'tcr_repository_mismatch')
+  if (row.Public !== 0) throw new ApiError(409, 'delivery_repository_must_be_private')
+  return true
+}
+
+export async function ensurePrivateRepository(settings: TcrSettings, projectId: number, signal: AbortSignal) {
+  if (!Number.isSafeInteger(projectId) || projectId < 1 || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(settings.namespace)) throw new ApiError(400, 'invalid_delivery_repository')
+  const repository = `${settings.namespace}/ces-project-${projectId}`
+  if (await privateRepository(settings, repository, signal)) return { repository, created: false }
+  let recovered = false
+  try { await request(settings, 'CreateRepositoryPersonal', { RepoName: repository, Public: 0, Description: `CES OneDev project ${projectId}` }, signal) }
+  catch (cause) {
+    // Reconcile lost responses and concurrent creation without submitting twice.
+    if (!await privateRepository(settings, repository, signal)) throw cause
+    recovered = true
+  }
+  if (!await privateRepository(settings, repository, signal)) throw new ApiError(502, 'repository_creation_unconfirmed_retry_prepare_delivery')
+  return { repository, created: !recovered }
+}
+
 export async function tcrTags(settings: TcrSettings, repository: string, offset: number, limit: number, signal: AbortSignal): Promise<{ tags: TcrTag[]; total: number }> {
   const result = await request(settings, 'DescribeImagePersonal', { RepoName: repository, Offset: offset, Limit: limit }, signal)
   const data = result.Data

@@ -1,11 +1,20 @@
 ---
 name: project-delivery
-description: 在 CES Harness 会话中将项目代码提交到 OneDev，构建并推送 TCR 镜像，再部署到已登记的应用服务器；支持状态查询、会话恢复和显式回滚。
+description: 从自然需求创建完整项目并部署：自动建立 OneDev 仓库、发现 Git 与构建配置、开发测试、构建推送 TCR 镜像、部署到应用服务器；也支持已有项目更新、恢复和回滚。
 ---
 
 # 项目构建与部署
 
-在用户要求构建、部署、查看本次交付状态或回滚项目时使用。本 Skill 通过现有 OneDev、镜像与服务器工具执行，不保存凭据，也不安装新的服务器类型。
+在用户要求创建应用并发布、构建部署、查看交付状态或回滚项目时使用。本 Skill 通过现有 OneDev、镜像与服务器工具执行。用户无需提供仓库地址、工具名称或构建命令；从平台工具取得这些信息。
+
+## 从零创建完整项目
+
+1. 根据业务需求确定项目短名称，调用 `platform_onedev` 的 `create_project`（`project`、`description`）。保存返回的完整 `project.path`，后续工具都用该路径。若已有工作区/仓库先核对，避免重复创建。创建后授权未就绪时对同一路径重试补齐，不换名字重建。
+2. 使用返回的 `git.sshCloneUrl`、`git.sshCommand` 和 Git 身份。每次运行网络 Git 命令均设置 `GIT_SSH_COMMAND`；在新仓库配置 `user.name/user.email/core.sshCommand` 可供后续回合复用。密钥与主机密钥文件由平台提供，不能输出内容、忽略主机密钥校验或根据网页地址猜 SSH 端口。`git.configured=false` 时报告缺失项。
+3. 若要求构建部署，调用 `prepare_delivery`，取得 `delivery.executor`、`delivery.dockerConfig`、`delivery.nodeImage`、`delivery.imageRepository`、应用名称和目录建议。它会准备托管项目的私有镜像仓库；实际构建验证推送权限。用户没有指定技术栈时可选环境已支持的 Node，Dockerfile 的基础镜像使用返回的 nodeImage。
+4. 开发用户要求的完整应用：包含实际页面、后端、必要的数据存储、错误处理、测试和 README。不能用模板的固定 JSON 响应替代业务功能。需要持久化时使用 Compose 命名卷或应用目录下的持久化目录，确认容器用户可写；部署快照只保存 Compose、项目配置和运行时，不把应用代码当作宿主机绑定挂载，应用代码应打进镜像。
+5. 通过 `platform_server_list/get` 找到用户指定服务器，调用 `platform_server_exec` 检查现有端口、目录、Docker/Compose、Python 与 sudo。自行选择空闲端口和独立 Compose 项目。准备所需应用目录及环境文件；没有业务密钥需求时可创建空环境文件。不要读取平台 Docker 认证内容。缺少用户业务密钥时明确缺项。
+6. 依据下面的构建部署步骤接入模板，首次提交须包含实际应用、自动测试、Dockerfile、buildspec、Compose 和 deploy 配置/脚本。Node 项目可在构建 Dockerfile 中运行测试；本地可用工具也执行必要检查。初始化默认分支为 main。准备工作完成后连续执行到构建、部署和功能验收，不停在仅创建仓库或给出命令。
 
 ## 首次接入
 
@@ -30,7 +39,7 @@ CES 默认提供 Node、Git、OpenSSH 与 rsync，不保证提供 Python 或 cur
 2. 准备非敏感 `request.json`：`{"commit":"<40位SHA>","buildId":123,"serverId":"<服务器ID>","image":"<仓库>@sha256:<digest>"}`。仓库必须与项目配置一致。发布 ID 用唯一的小写字母、数字、下划线或连字符。
 3. 使用 `platform_server_exec` 调用 `sudo -n sh <快照>/deploy/runtime.sh start --root <应用目录> --release <发布ID> --request <request.json> --snapshot <快照目录>`。命令返回表示后台任务已接收，不表示发布成功。脚本通过 `/var/lib/ces/application-server/docker` 拉取镜像，部署时不重新注入凭据。
 4. 用 `status --root <应用目录> --release <发布ID>` 跟踪；用 `logs` 的 `--offset` 读取有限日志及 `nextOffset`。每次 SSH 调用保持短时，后台任务不依赖会话连接。持续观察到 succeeded/failed；超过等待预算只报告仍在运行及恢复 ID。
-5. succeeded 要求拉取 digest 对应镜像、目标容器镜像和运行状态正确、容器健康检查（若有）正常且配置的 HTTP 健康地址返回 200。再通过平台工具确认实际入口。公网访问地址与服务器内部健康地址分别报告。
+5. succeeded 要求拉取 digest 对应镜像、目标容器镜像和运行状态正确、容器健康检查（若有）正常且配置的 HTTP 健康地址返回 200。随后验证实际业务功能：页面可加载、API 可执行、数据持久化正常。用唯一测试数据验证后清理该测试数据；不要清空其他数据。公网访问地址与服务器内部健康地址分别报告，公网不可达时不能宣称外部可用，也不擅自改动其他服务或网络策略。
 
 ## 失败、恢复与回滚
 

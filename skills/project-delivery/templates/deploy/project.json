@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "application": "demo",
+  "project": "demo",
+  "buildJob": "build",
+  "imageRepository": "registry.example.com/team/demo",
+  "composeFile": "compose.yml",
+  "service": "web",
+  "target": {
+    "environment": "test",
+    "serverId": "REPLACE_WITH_PLATFORM_SERVER_ID",
+    "directory": "/srv/apps/demo",
+    "envFile": "/srv/apps/demo/shared/app.env",
+    "healthUrl": "http://127.0.0.1:18082/health"
+  }
+}

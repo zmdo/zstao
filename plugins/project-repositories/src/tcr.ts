@@ -148,3 +148,15 @@ export async function tcrTags(settings: TcrSettings, repository: string, offset:
   })
   return { tags, total: typeof row.TagCount === 'number' ? row.TagCount : tags.length }
 }
+
+export async function tcrTag(settings: TcrSettings, repository: string, name: string, signal: AbortSignal): Promise<TcrTag> {
+  for (let offset = 0; offset < 10_000; offset += 100) {
+    signal.throwIfAborted()
+    const result = await tcrTags(settings, repository, offset, 100, signal)
+    const tag = result.tags.find(tag => tag.name === name)
+    if (tag) return tag
+    if (offset + result.tags.length >= result.total) throw new ApiError(404, 'tag_not_found')
+    if (result.tags.length === 0) throw new ApiError(502, 'tag_lookup_incomplete')
+  }
+  throw new ApiError(422, 'tag_lookup_incomplete')
+}

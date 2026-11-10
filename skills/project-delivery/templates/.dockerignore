@@ -1,0 +1,5 @@
+.git
+.ces
+node_modules
+image.json
+*.env

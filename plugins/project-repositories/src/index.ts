@@ -3,13 +3,16 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, type ToolRunContext } from '@deepseek-ai/dsh-tools'
+import { deliveryAction, type DeliveryArgs } from './delivery.ts'
+import { authorizeBuild } from './delivery-authorization.ts'
 import { ApiError, OneDev, commitSha, decryptPassword, imageType, preview, projectId, repositoryPath } from './onedev.ts'
-import { tcrDeleteTag, tcrRepositories, tcrTags, type TcrSettings } from './tcr.ts'
+import { tcrDeleteTag, tcrRepositories, tcrTags, tcrTag, type TcrSettings } from './tcr.ts'
 import type { Secrets } from './onedev.ts'
 import { API, DOWNLOAD_BYTES } from './shared.ts'
 
 interface HostCtx {
+  get?(name: string): unknown
   provide(name: string, service: unknown): () => void | Promise<void>
   consoleSession: { read(cookieHeader: string): Promise<unknown> }
   secrets: Secrets
@@ -39,35 +42,39 @@ export function apply(ctx: HostCtx): void {
       'CES has a configured OneDev Git service for new projects. When the user asks to create or write a new project, first call platform_onedev with action=create_project and a lowercase project slug and a short description; do not create only local files for a new project. ' +
       'An existing project is returned by platform_onedev. After creation, use normal git commands with the CES AI identity: username cesai, email cesai@dianzinao.cn. ' +
       'The SSH key is at /dsh-home/keys/cesai and the OneDev SSH remote is ssh://git@10.2.8.9:2222/<project>.git. ' +
-      'For pipeline status, use platform_onedev action=list_builds or get_build. For TCR image repositories, use platform_image_registry actions list_repositories, list_tags or get_tag. Never delete a OneDev project or change the OneDev login key.',
+      'For delivery, use list_jobs and run_job with an explicit commit SHA, then get_build_artifact for image.json after success. If submission is uncertain, query list_builds before retrying. For pipeline status, use platform_onedev action=list_builds or get_build. For TCR image repositories, use platform_image_registry actions list_repositories, list_tags or get_tag. Never delete a OneDev project or change the OneDev login key.',
   }))
 
   ctx.effect(() => {
     const stop = ctx.tools.register(defineTool({
       name: 'platform_onedev',
       description:
-        'OneDev actions: list_projects, get_project, list_branches, list_tags, list_commits, get_tree, get_file, list_builds, get_build, get_build_logs, create_project. ' +
+        'OneDev actions: list_projects, get_project, list_branches, list_tags, list_commits, get_tree, get_file, list_builds, get_build, get_build_logs, list_jobs, run_job, get_build_artifact, create_project. ' +
         'Use list_builds/get_build/get_build_logs to inspect pipeline runs and logs. Use action=create_project to create a new project and grant the CES AI account cesai Code Writer; existing projects are returned without changing access. ' +
+        'Use list_jobs before run_job; run_job requires an explicit ref and commit SHA, reuses existing matching builds, and never automatically retries an uncertain submission. Read image.json with get_build_artifact after success. Imported build specs are not supported for submission. ' +
         'Use the other actions to discover and inspect projects. This tool never deletes projects or changes the AI login key.',
       parameters: {
         action: {
           type: 'string', required: true,
-          enum: ['list_projects', 'get_project', 'list_branches', 'list_tags', 'list_commits', 'get_tree', 'get_file', 'list_builds', 'get_build', 'get_build_logs', 'create_project'],
+          enum: ['list_projects', 'get_project', 'list_branches', 'list_tags', 'list_commits', 'get_tree', 'get_file', 'list_builds', 'get_build', 'get_build_logs', 'list_jobs', 'run_job', 'get_build_artifact', 'create_project'],
           description: 'Operation to perform.',
         },
         project: { type: 'string', description: 'OneDev project name. Required for repository actions; optional for list_builds.' },
         ref: { type: 'string', description: 'Branch or tag name. Defaults to the default branch for code reads.' },
-        path: { type: 'string', description: 'Repository path for get_tree or get_file.' },
+        path: { type: 'string', description: 'Repository path or JSON artifact path; get_build_artifact defaults to image.json.' },
+        commit: { type: 'string', description: 'Full 40-character commit SHA. Required for run_job; optional expected head for list_jobs or filter for list_builds.' },
+        offset: { type: 'integer', description: 'Build pagination offset, defaults to 0. Follow nextOffset until null.' },
+        params: { type: 'object', additionalProperties: true, description: 'Job parameters as a map of names to arrays of strings. Never pass plaintext secrets.' },
         query: { type: 'string', description: 'Optional case-insensitive project search for list_projects.' },
         description: { type: 'string', description: 'Project description for create_project.' },
-        buildId: { type: 'integer', description: 'OneDev build id for get_build or get_build_logs.' },
+        buildId: { type: 'integer', description: 'OneDev build id for get_build, get_build_logs or get_build_artifact.' },
         status: { type: 'string', enum: ['WAITING', 'PENDING', 'RUNNING', 'FAILED', 'CANCELLED', 'TIMED_OUT', 'SUCCESSFUL'], description: 'Optional build status filter for list_builds.' },
-        job: { type: 'string', description: 'Optional job name filter for list_builds.' },
+        job: { type: 'string', description: 'Job name for run_job or optional filter for list_builds.' },
         count: { type: 'integer', description: 'Maximum builds to return for list_builds, 1-100. Defaults to 20.' },
       },
       output: { schema: { type: 'string' as const }, render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }] },
       timeoutMs: 60_000,
-      async execute(args: { action: string; project?: string; ref?: string; path?: string; query?: string; description?: string; buildId?: number; status?: string; job?: string; count?: number }, exec: { signal: AbortSignal }) {
+      async execute(args: DeliveryArgs & { query?: string; description?: string }, exec: ToolRunContext) {
         const action = args.action
         const name = (args.project ?? '').trim()
         const settings = await readSettings(file)
@@ -83,29 +90,8 @@ export function apply(ctx: HostCtx): void {
             })),
           })
         }
-        if (action === 'list_builds') {
-          const projectNames = await one.projectNames()
-          let projectId: number | null = null
-          if (name !== '') {
-            const found = [...projectNames.entries()].find(([, projectName]) => projectName === name)
-            if (found === undefined) throw new ApiError(404, 'project_not_found')
-            projectId = found[0]
-          }
-          const count = Math.min(100, Math.max(1, args.count ?? 20))
-          const builds = await one.builds(0, 100)
-          const filtered = builds.filter(build =>
-            (projectId === null || build.projectId === projectId) &&
-            (args.status === undefined || args.status === '' || build.status === args.status) &&
-            (args.job === undefined || args.job === '' || build.jobName === args.job),
-          ).slice(0, count)
-          return JSON.stringify({
-            builds: filtered.map(build => ({
-              id: build.id, number: build.number, projectName: projectNames.get(build.projectId) ?? `#${build.projectId}`,
-              jobName: build.jobName, refName: build.refName, commitHash: build.commitHash, status: build.status,
-              submitReason: build.submitReason, submitDate: build.submitDate, finishDate: build.finishDate,
-              durationMs: build.runningDuration, steps: build.steps,
-            })),
-          })
+        if (['list_builds', 'list_jobs', 'run_job', 'get_build_artifact'].includes(action)) {
+          return JSON.stringify(await deliveryAction(one, args, () => authorizeBuild(ctx, exec, name, args.job ?? '', args.commit ?? '')))
         }
         if (action === 'get_build' || action === 'get_build_logs') {
           const id = args.buildId
@@ -220,9 +206,7 @@ export function apply(ctx: HostCtx): void {
       if (args.action === 'get_tag') {
         const tagName = (args.tag ?? '').trim()
         if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tagName)) throw new ApiError(400, 'invalid_tag')
-        const result = await tcrTags(settings, repository, 0, 100, exec.signal)
-        const tag = result.tags.find(value => value.name === tagName)
-        if (tag === undefined) throw new ApiError(404, 'tag_not_found')
+        const tag = await tcrTag(settings, repository, tagName, exec.signal)
         return JSON.stringify({
           registry: settings.registry, repository, tag: tag.name, digest: tag.digest, size: tag.size,
           os: tag.os, architecture: tag.architecture, pushed: tag.pushed,

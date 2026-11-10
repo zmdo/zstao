@@ -1,0 +1,34 @@
+version: 54
+jobs:
+- name: build
+  jobExecutor: ces-build-test
+  steps:
+  - type: CheckoutStep
+    name: checkout
+    cloneCredential:
+      type: DefaultCredential
+    withLfs: false
+    withSubmodules: false
+    condition: SUCCESSFUL
+  - type: CommandStep
+    name: build and push
+    runInContainer: false
+    interpreter:
+      type: PosixInterpreter
+      shell: bash
+      commands: |
+        set -euo pipefail
+        export DOCKER_CONFIG=/srv/ces-build/docker-config
+        export IMAGE_REPOSITORY=registry.example.com/team/demo
+        sh deploy/build.sh @build_number@
+    condition: SUCCESSFUL
+  - type: PublishArtifactStep
+    name: image manifest
+    artifacts: image.json
+    condition: SUCCESSFUL
+  retryCondition: never
+  maxAttempts: 1
+  retryDelay: 60
+  includeUpstreamWhenRebuild: false
+  includeDownstreamWhenRebuild: false
+  timeout: 1800

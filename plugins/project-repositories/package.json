@@ -43,10 +43,11 @@
   },
   "dependencies": {
     "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.5",
     "@smp/console-kit": "file:../../packages/console-kit",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "@deepseek-ai/dsh-tools": "0.2.1-rc.5"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-rc.5",

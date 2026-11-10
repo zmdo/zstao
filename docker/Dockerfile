@@ -1,4 +1,5 @@
-FROM node:24-bookworm-slim AS builder
+ARG NODE_IMAGE=node:24-bookworm-slim
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY plugins ./plugins
@@ -7,8 +8,11 @@ COPY scripts ./scripts
 RUN npm ci --ignore-scripts
 RUN npm run build
 
-FROM node:24-bookworm-slim
+FROM ${NODE_IMAGE}
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git openssh-client rsync ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app /app
 RUN npm install -g @deepseek-ai/dsh@0.2.1-rc.5 --registry=https://registry.npmmirror.com
 # The loader does not pick the NAPI prebuild from the optional package; expose it

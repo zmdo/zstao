@@ -329,8 +329,8 @@ export class OneDev {
     }
     return names
   }
-  async builds(offset: number, count: number): Promise<Build[]> {
-    const data = await this.request('builds', new URLSearchParams({ offset: String(offset), count: String(count) }))
+  async builds(offset: number, count: number, query = ''): Promise<Build[]> {
+    const data = await this.request('builds', new URLSearchParams({ offset: String(offset), count: String(count), query }))
     if (!Array.isArray(data)) throw new ApiError(502, 'invalid_upstream')
     return data.map(value => this.buildFrom(value))
   }
@@ -366,7 +366,13 @@ export class OneDev {
   async buildLogs(id: number): Promise<string> {
     return parseBuildLog(await this.requestBytes(`streaming/build-logs/${id}`, 2 * 1024 * 1024))
   }
-  private async requestBytes(path: string, maxBytes: number): Promise<Buffer> {
+  async artifact(id: number, path: string): Promise<unknown> {
+    const safePath = repositoryPath(path, false)
+    const bytes = await this.requestBytes(`artifacts/${id}/contents/${safePath.split('/').map(encodeURIComponent).join('/')}`, 1024 * 1024, true)
+    try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) }
+    catch (cause) { throw new ApiError(422, 'invalid_json_artifact', { cause }) }
+  }
+  private async requestBytes(path: string, maxBytes: number, strict = false): Promise<Buffer> {
     const signal = AbortSignal.any([this.signal, AbortSignal.timeout(15_000)])
     let response: Response
     try {
@@ -377,15 +383,25 @@ export class OneDev {
     if (reader === undefined) return Buffer.alloc(0)
     const chunks: Uint8Array[] = []
     let total = 0
-    while (true) {
-      const next = await reader.read()
-      if (next.done) break
-      if (next.value !== undefined) {
-        total += next.value.byteLength
-        if (total > maxBytes) { await reader.cancel(); break }
-        chunks.push(next.value)
+    try {
+      while (true) {
+        const next = await reader.read()
+        if (next.done) break
+        if (next.value !== undefined) {
+          total += next.value.byteLength
+          if (total > maxBytes) {
+            await reader.cancel()
+            if (strict) throw new ApiError(413, 'artifact_too_large')
+            break
+          }
+          chunks.push(next.value)
+        }
       }
-    }
+    } catch (cause) {
+      // Live build logs keep the stream open until the job finishes. Return the
+      // collected snapshot on our read deadline, but preserve caller cancellation.
+      if (strict || !signal.aborted || this.signal.aborted) throw cause
+    } finally { reader.releaseLock() }
     return Buffer.concat(chunks.map(chunk => Buffer.from(chunk)))
   }
 

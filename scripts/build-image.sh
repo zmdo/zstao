@@ -5,12 +5,15 @@
 set -eu
 
 build=${1:?build number is required}
-export DOCKER_CONFIG=${DOCKER_CONFIG:-/srv/ces-test/docker-config}
+export DOCKER_CONFIG=${DOCKER_CONFIG:-/srv/ces-build/docker-config}
+BUILDX_CONFIG=$(mktemp -d)
+export BUILDX_CONFIG
+trap 'rm -rf "$BUILDX_CONFIG"' EXIT HUP INT TERM
 
 image="ces-candidate:build-$build"
 registry="${CCR_REGISTRY:-ccr.ccs.tencentyun.com/zstao/ces-platform}:build-$build"
 
-docker build --network=host -t "$image" -f docker/Dockerfile .
+docker build --network=host --build-arg "NODE_IMAGE=${CES_NODE_IMAGE:-node:24-bookworm-slim}" -t "$image" -f docker/Dockerfile .
 docker tag "$image" "$registry"
 docker push "$registry"
 

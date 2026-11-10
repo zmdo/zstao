@@ -1,0 +1,8 @@
+services:
+  web:
+    image: ${CES_IMAGE:?CES_IMAGE is supplied by the deployment runtime}
+    restart: unless-stopped
+    ports:
+      - "18082:8080"
+    env_file:
+      - ${APP_ENV_FILE:-/srv/apps/demo/shared/app.env}

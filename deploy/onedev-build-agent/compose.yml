@@ -1,0 +1,13 @@
+services:
+  agent:
+    image: ${ONEDEV_AGENT_IMAGE:-1dev/agent}
+    hostname: ces-build-agent
+    restart: unless-stopped
+    env_file:
+      - /srv/ces-build/agent.env
+    environment:
+      DOCKER_CONFIG: /srv/ces-build/docker-config
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /srv/ces-build/work:/agent/work
+      - /srv/ces-build/docker-config:/srv/ces-build/docker-config:ro

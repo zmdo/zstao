@@ -153,6 +153,7 @@ export class DefinitionResolver {
       type: {
         key,
         name_i18n: type.name,
+        ...(type.requiresSetup ? { requiresSetup: true } : {}),
         supportedOs: type.supportedOs,
         software: components.map(softwareView),
       },

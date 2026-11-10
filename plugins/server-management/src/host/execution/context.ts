@@ -1,3 +1,4 @@
+import type { DefinitionRegistry } from '../definitions/registry.ts'
 import type { ChangeRequest } from '../../shared/changes.ts'
 import type { Db } from '../database/connection.ts'
 import type { TypeLease } from '../definitions/model.ts'
@@ -21,5 +22,6 @@ export interface WorkerContext {
   guard(): Promise<void>
   state: { mutation: boolean }
   updateCheckIntervalSeconds: number
+  definitions?: DefinitionRegistry
   extensions?: ServerExtensionRegistry
 }

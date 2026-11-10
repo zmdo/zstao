@@ -64,6 +64,7 @@ export function adapterOf(software: SoftwareDefinition): VersionAdapter {
 export function definitionSignature(type: ServerTypeView, components: readonly Component[]): string {
   return digest({
     key: type.key,
+    ...(type.requiresSetup ? { requiresSetup: true } : {}),
     supportedOs: type.supportedOs,
     software: components.map((c) => ({ software: c.software_key, revision: c.revision })),
   })

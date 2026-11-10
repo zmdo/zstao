@@ -1,4 +1,6 @@
 export const ERROR_CODES = [
+  'type_setup_failed',
+  'type_setup_unavailable',
   'request_failed',
   'unauthorized',
   'invalid_request',

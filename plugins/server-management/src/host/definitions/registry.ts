@@ -15,6 +15,7 @@ import { type Component } from './catalog.ts'
 import type { Owner, TypeLease } from './model.ts'
 import * as repository from './persistence/repository.ts'
 import { DefinitionResolver } from './resolver.ts'
+import type { DefinitionRuntime, TypeSetupContext } from './runtime.ts'
 import { prepareOwner, snapshotBundle } from './validation.ts'
 import { builtinTypes, definitionSignature } from './views.ts'
 
@@ -61,7 +62,7 @@ export class DefinitionRegistry {
     return types
   }
 
-  registerDefinitions(input: DefinitionBundle, identity: object = input): RegistrationHandle {
+  registerDefinitions(input: DefinitionBundle, identity: object = input, runtime?: DefinitionRuntime): RegistrationHandle {
     if (this.closed) throw new ServerError('definitions_unavailable')
     // Snapshot metadata now; adapter functions are captured separately and included in the semantic digest.
     const bundle = snapshotBundle(input)
@@ -69,7 +70,7 @@ export class DefinitionRegistry {
       cancelled = false
     const ready = this.tail.then(async () => {
       if (cancelled) return
-      record = await this.activate(bundle, identity)
+      record = await this.activate(bundle, identity, runtime)
       if (cancelled || this.closed) await this.unregister(record)
     })
     this.tail = ready.then(
@@ -88,9 +89,17 @@ export class DefinitionRegistry {
     }
   }
 
-  private async activate(input: DefinitionBundle, identity: object): Promise<Owner> {
+  private async activate(input: DefinitionBundle, identity: object, runtime?: DefinitionRuntime): Promise<Owner> {
     if (this.closed) throw new ServerError('definitions_unavailable')
     const owner = await prepareOwner(input, identity, this.owners.has(input.owner))
+    owner.runtime = runtime && { types: { ...runtime.types } }
+    for (const type of owner.types.values()) {
+      const handler = owner.runtime?.types?.[type.key.slice(owner.owner.length + 1)]
+      if (type.requiresSetup && typeof handler !== 'function')
+        throw new ServerError('type_setup_unavailable')
+    }
+    for (const key of Object.keys(runtime?.types ?? {}))
+      if (!owner.types.has(`${owner.owner}/${key}`)) throw new ServerError('definition_reference')
     const available = new Map(this.owners)
     available.set(owner.owner, owner)
     for (const recipe of owner.recipes.values()) {
@@ -199,6 +208,8 @@ export class DefinitionRegistry {
       for (const dep of item.dependencies) collect(dep)
     }
     if (owner) collect(owner)
+    const typeOwner = [...this.owners.values()].find((item) => item.types.has(key))
+    if (typeOwner) collect(typeOwner)
     if ([...providers].some((item) => !this.resolver.isAvailable(item))) return
     const token = Symbol()
     for (const item of providers) item.leases.add(token)
@@ -215,6 +226,30 @@ export class DefinitionRegistry {
           if (!item.leases.size) for (const resolve of item.drained) resolve()
         }
       },
+    }
+  }
+  async setupType(type: ServerTypeView, context: TypeSetupContext): Promise<void> {
+    const owner = [...this.owners.values()].find((item) => item.types.has(type.key))
+    // Existing server snapshots can predate this capability. Prefer live metadata
+    // when available, while a saved requirement still fails closed after unload.
+    if (!type.requiresSetup && !owner?.types.get(type.key)?.requiresSetup) return
+    const handler = owner?.runtime?.types?.[type.key.slice(owner.owner.length + 1)]
+    if (!owner || !this.resolver.isAvailable(owner) || !handler || this.closed)
+      throw new ServerError('type_setup_unavailable')
+    const token = Symbol()
+    owner.leases.add(token)
+    try {
+      await context.guard()
+      // Provider errors may include secret-bearing subprocess input. Persist only a stable code.
+      try {
+        await handler(context)
+      } catch {
+        throw new ServerError('type_setup_failed')
+      }
+      await context.guard()
+    } finally {
+      owner.leases.delete(token)
+      if (!owner.leases.size) for (const resolve of owner.drained) resolve()
     }
   }
   async close(): Promise<void> {

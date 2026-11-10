@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true,
+    "outDir": "lib/types",
+    "rootDir": "src",
+    "skipLibCheck": true
+  },
+  "files": [
+    "src/contracts.ts"
+  ]
+}

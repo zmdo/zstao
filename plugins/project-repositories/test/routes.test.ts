@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { once } from 'node:events'
 import { apply } from '../src/index.ts'
+import type { ImageRegistryService } from '../src/contracts.ts'
 const sha = 'a'.repeat(40)
 const tagSha = 'b'.repeat(40)
 let root = ''
@@ -15,6 +16,7 @@ let upstreamOrigin = ''
 let previousHome: string | undefined
 let cleanup: () => void | Promise<void>
 let handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>
+let imageRegistry: ImageRegistryService
 const calls: URL[] = []
 let slowStarted: (() => void) | undefined
 const upstream = createServer((req, res) => {
@@ -50,7 +52,7 @@ before(async () => {
   const address = upstream.address(); assert(address && typeof address !== 'string')
   upstreamOrigin = `http://127.0.0.1:${address.port}`
   await writeFile(join(root, 'project-management.json'), JSON.stringify({ internalBaseUrl: upstreamOrigin, externalBaseUrl: 'https://public.example', username: 'admin', passwordCiphertext: 'encrypted', updatedAt: '2026-11-04' }))
-  apply({ consoleSession: { read: async cookie => cookie === 'session=yes' ? 'admin' : undefined }, secrets: { encrypt: v => `enc:${v}`, decrypt: () => 'one-secret' },
+  apply({ provide: (name, service) => { if (name === 'imageRegistry') imageRegistry = service as ImageRegistryService; return () => {} }, consoleSession: { read: async cookie => cookie === 'session=yes' ? 'admin' : undefined }, secrets: { encrypt: v => `enc:${v}`, decrypt: value => value.startsWith('enc:') ? value.slice(4) : 'one-secret' },
     webServer: { register: route => { handler = route.handler; return () => {} } }, tools: { register: () => () => {} }, systemPrompt: { section: () => () => {} }, effect: run => { cleanup = run() } })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const local = server.address(); assert(local && typeof local !== 'string'); origin = `http://127.0.0.1:${local.port}`
@@ -118,6 +120,29 @@ test('password reveal requires same-origin JSON POST and limits requests', async
   }
   assert.equal((await request('/settings/reveal-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 429)
 })
+test('application pull opt-in is explicit, encrypted and independent of API keys', async () => {
+  const settings = '/image-registry/settings'
+  const save = (body: unknown) => request(settings, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const input = { registry: 'registry.invalid', namespace: 'test', username: 'puller', password: 'pull-only-secret' }
+  assert.equal((await (await request(settings)).json()).applicationServerPull, false)
+  assert.equal((await save(input)).status, 200)
+  await assert.rejects(imageRegistry.pullLogin(), { code: 'application_pull_not_configured' })
+  assert.equal((await save({ ...input, applicationServerPull: true, username: '' })).status, 400)
+  const enabled = await save({ ...input, applicationServerPull: true })
+  assert.equal(enabled.status, 200)
+  const result = await enabled.json()
+  assert.equal(result.pullConfigured, true)
+  assert.equal(result.configured, false)
+  assert.equal(JSON.stringify(result).includes(input.password), false)
+  assert.deepEqual(await imageRegistry.pullLogin(), { registry: input.registry, username: input.username, password: input.password })
+  assert.equal((await save({ ...input, password: 'rotated-secret' })).status, 200)
+  assert.equal((await imageRegistry.pullLogin()).password, 'rotated-secret')
+  assert.equal((await save({ ...input, password: '' })).status, 200)
+  assert.equal((await imageRegistry.pullLogin()).password, 'rotated-secret')
+  assert.equal((await save({ ...input, password: '', applicationServerPull: false })).status, 200)
+  await assert.rejects(imageRegistry.pullLogin(), { code: 'application_pull_not_configured' })
+})
+
 test('unloading aborts and drains pending upstream work', async () => {
   const started = new Promise<void>(resolve => { slowStarted = resolve })
   const controller = new AbortController()

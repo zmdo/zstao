@@ -10,6 +10,7 @@ import type { Secrets } from './onedev.ts'
 import { API, DOWNLOAD_BYTES } from './shared.ts'
 
 interface HostCtx {
+  provide(name: string, service: unknown): () => void | Promise<void>
   consoleSession: { read(cookieHeader: string): Promise<unknown> }
   secrets: Secrets
   webServer: { register(route: { kind: 'prefix'; path: string; handler(request: IncomingMessage, response: ServerResponse): Promise<void> }): () => void }
@@ -22,6 +23,15 @@ export const inject = ['consoleSession', 'secrets', 'webServer', 'tools', 'syste
 
 export function apply(ctx: HostCtx): void {
   const file = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'project-management.json')
+  ctx.effect(() => ctx.provide('imageRegistry', {
+    async pullLogin() {
+      const settings = await readImageSettings(join(dirname(file), 'image-registry.json'))
+      if (!settings.applicationServerPull || !settings.username || !settings.passwordCiphertext) throw new ApiError(409, 'application_pull_not_configured')
+      if (!/^[a-z0-9][a-z0-9.-]*(?::\d+)?$/i.test(settings.registry) || /[\r\n\0:]/.test(settings.username)) throw new ApiError(409, 'application_pull_not_configured')
+      return { registry: settings.registry, username: settings.username, password: ctx.secrets.decrypt(settings.passwordCiphertext) }
+    },
+  }))
+
   ctx.effect(() => ctx.systemPrompt.section({
     name: 'smp-project-repositories:git',
     order: 2500,
@@ -251,6 +261,7 @@ export function apply(ctx: HostCtx): void {
 }
 
 interface ImageRegistrySettings {
+  applicationServerPull: boolean
   registry: string
   namespace: string
   region: string
@@ -270,6 +281,7 @@ async function readImageSettings(file: string): Promise<ImageRegistrySettings> {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('invalid')
     const row = value as Record<string, unknown>
     return {
+      applicationServerPull: row.applicationServerPull === true,
       registry: typeof row.registry === 'string' ? row.registry : IMAGE_REGISTRY_DEFAULT,
       namespace: typeof row.namespace === 'string' ? row.namespace : '',
       region: typeof row.region === 'string' ? row.region : TCR_REGION,
@@ -281,7 +293,7 @@ async function readImageSettings(file: string): Promise<ImageRegistrySettings> {
     }
   } catch (cause) {
     if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') {
-      return { registry: IMAGE_REGISTRY_DEFAULT, namespace: '', region: TCR_REGION, secretIdCiphertext: '', secretKeyCiphertext: '', username: '', passwordCiphertext: '', updatedAt: null }
+      return { applicationServerPull: false, registry: IMAGE_REGISTRY_DEFAULT, namespace: '', region: TCR_REGION, secretIdCiphertext: '', secretKeyCiphertext: '', username: '', passwordCiphertext: '', updatedAt: null }
     }
     throw new ApiError(500, 'image_registry_settings_unavailable', { cause })
   }
@@ -289,6 +301,8 @@ async function readImageSettings(file: string): Promise<ImageRegistrySettings> {
 
 function imageRegistryPublic(settings: ImageRegistrySettings): Record<string, unknown> {
   return {
+    applicationServerPull: settings.applicationServerPull,
+    pullConfigured: settings.applicationServerPull && !!settings.username && !!settings.passwordCiphertext,
     registry: settings.registry,
     namespace: settings.namespace,
     region: settings.region,
@@ -399,23 +413,26 @@ async function handle(ctx: HostCtx, file: string, request: IncomingMessage, resp
       const body = await readJson(request)
       const registry = typeof body.registry === 'string' ? body.registry.trim().replace(/^https?:\/\//, '') : ''
       const namespace = typeof body.namespace === 'string' ? body.namespace.trim() : ''
-      if (!/^[a-z0-9.-]+(?::\d+)?$/i.test(registry)) throw new ApiError(400, 'invalid_registry')
+      if (!/^[a-z0-9][a-z0-9.-]*(?::\d+)?$/i.test(registry)) throw new ApiError(400, 'invalid_registry')
       if (!/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(namespace)) throw new ApiError(400, 'invalid_namespace')
       const secretId = typeof body.secretId === 'string' ? body.secretId.trim() : ''
       const secretKey = typeof body.secretKey === 'string' ? body.secretKey : ''
       const secretIdCiphertext = secretId === '' ? settings.secretIdCiphertext : ctx.secrets.encrypt(secretId)
       const secretKeyCiphertext = secretKey === '' ? settings.secretKeyCiphertext : ctx.secrets.encrypt(secretKey)
-      if (secretIdCiphertext === '' || secretKeyCiphertext === '') throw new ApiError(400, 'image_registry_credentials_required')
+      if ((secretIdCiphertext === '') !== (secretKeyCiphertext === '')) throw new ApiError(400, 'image_registry_credentials_required')
       const username = typeof body.username === 'string' ? body.username.trim() : ''
       const password = typeof body.password === 'string' ? body.password : ''
+      if (body.applicationServerPull !== undefined && typeof body.applicationServerPull !== 'boolean') throw new ApiError(400, 'invalid_request')
+      const applicationServerPull = body.applicationServerPull === undefined ? settings.applicationServerPull : body.applicationServerPull === true
+      if (applicationServerPull && (!username || /[\r\n\0:]/.test(username) || (!password && !settings.passwordCiphertext))) throw new ApiError(400, 'application_pull_not_configured')
       const next: ImageRegistrySettings = {
-        registry, namespace, region: TCR_REGION,
+        applicationServerPull, registry, namespace, region: TCR_REGION,
         secretIdCiphertext, secretKeyCiphertext, username,
         passwordCiphertext: password === '' ? settings.passwordCiphertext : ctx.secrets.encrypt(password),
         updatedAt: new Date().toISOString(),
       }
-      const probe = tcrSettings(next, ctx.secrets)
-      await tcrRepositories(probe, 0, 1, signal)
+      // Docker credentials can be configured independently of the TCR management API.
+      // Connectivity is checked by the Test API action or the target's docker login.
       await writeImageSettings(join(dirname(file), 'image-registry.json'), next)
       send(response, 200, imageRegistryPublic(next))
       return

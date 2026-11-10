@@ -315,6 +315,7 @@
     "unknown": "Unknown"
   },
   "actions": {
+    "prepare_type": "Prepare server type",
     "test_connection": "Connection test",
     "install_components": "Install components",
     "inspect": "Inspection",
@@ -341,6 +342,8 @@
     "cancelled": "Cancelled"
   },
   "errors": {
+    "type_setup_failed": "Server type setup failed. Check credentials, Docker and server permissions.",
+    "type_setup_unavailable": "The server type setup provider is unavailable. Enable it and retry.",
     "request_failed": "The request could not be completed.",
     "unauthorized": "Please sign in.",
     "invalid_request": "The request could not be read.",

@@ -26,6 +26,7 @@ export interface SoftwareView {
 }
 
 export interface ServerTypeView {
+  requiresSetup?: boolean
   key: string
   name_i18n: LocalizedText
   software: readonly SoftwareView[]

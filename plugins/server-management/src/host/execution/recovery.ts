@@ -20,6 +20,7 @@ export async function reconcile(
   result: RemoteResult,
   secret: string,
   plan: PreparedPlan,
+  beforeSuccess?: () => Promise<void>,
 ): Promise<void> {
   if (result.state === 'not-started') {
     await finishJob(db, job, 'failed', '远端安装未启动；可重新检查并准备新计划。', {
@@ -114,6 +115,7 @@ export async function reconcile(
         phase: job.mutation_phase ?? 'installing',
       })
   })
+  if (result.state === 'completed') await beforeSuccess?.()
   await finishJob(
     db,
     job,
@@ -130,6 +132,7 @@ export async function recoverMutation(
   job: JobRecord,
   session: SshSession,
   secret: string,
+  beforeSuccess?: (plan: PreparedPlan) => Promise<void>,
 ): Promise<void> {
   const saved = await loadPlan(db, job)
   if (!saved) {
@@ -137,5 +140,5 @@ export async function recoverMutation(
     return
   }
   const result = await remoteOperation(session, 'recover', job.operation_id, saved.digest)
-  await reconcile(db, job, result, secret, saved.plan)
+  await reconcile(db, job, result, secret, saved.plan, () => beforeSuccess?.(saved.plan) ?? Promise.resolve())
 }

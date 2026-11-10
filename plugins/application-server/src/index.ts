@@ -1,5 +1,7 @@
+import { setupApplicationServer } from './setup.ts'
+import type { ImageRegistryService } from '@smp/console-project-repositories/contracts'
 import { Service, type Context } from '@deepseek-ai/cordis'
-import type { DefinitionBundle, Registration } from '@smp/console-server-management/contracts'
+import type { DefinitionBundle, DefinitionRuntime, Registration } from '@smp/console-server-management/contracts'
 
 const owner = '@smp/console-application-server'
 export const applicationServerType = `${owner}/application-server`
@@ -24,6 +26,7 @@ export const applicationServerDefinitions: DefinitionBundle = {
   owner,
   types: [{
     key: 'application-server',
+    requiresSetup: true,
     name: { zh: '应用服务器', en: 'Application server' },
     supportedOs: { kind: 'explicit', selectors: [...ubuntu, ...debian] },
     requirements: [
@@ -49,13 +52,18 @@ declare module '@deepseek-ai/cordis' {
 }
 
 interface Ctx extends Context {
-  serverManagement: { registerDefinitions(definition: DefinitionBundle): Registration }
+  containerRuntime: { ready: Promise<void> }
+  imageRegistry: ImageRegistryService
+  serverManagement: { registerDefinitions(definition: DefinitionBundle, runtime?: DefinitionRuntime): Registration }
 }
 
-export const inject = ['serverManagement']
+export const inject = ['serverManagement', 'containerRuntime', 'imageRegistry']
 
 export async function apply(ctx: Ctx): Promise<void> {
-  const registration = ctx.serverManagement.registerDefinitions(applicationServerDefinitions)
+  await ctx.containerRuntime.ready
+  const registration = ctx.serverManagement.registerDefinitions(applicationServerDefinitions, {
+    types: { 'application-server': context => setupApplicationServer(context, ctx.imageRegistry) },
+  })
   new ApplicationServer(ctx, registration.ready)
   await registration.ready
 }

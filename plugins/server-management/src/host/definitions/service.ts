@@ -1,3 +1,4 @@
+import type { DefinitionRuntime } from './runtime.ts'
 import { Service, type Context } from '@deepseek-ai/cordis'
 import type { DefinitionBundle, Registration } from '../../shared/contracts/definitions.ts'
 import type { ServerExtensionBundle } from '../../shared/contracts/extensions.ts'
@@ -36,14 +37,14 @@ export class ServerManagement {
     }
   }
 
-  registerDefinitions(definition: DefinitionBundle): Registration {
+  registerDefinitions(definition: DefinitionBundle, runtime?: DefinitionRuntime): Registration {
     const fiber = this.ctx.fiber
     const entry = (fiber as typeof fiber & { entry?: { options: { name?: string } } }).entry
     const owner = entry?.options.name ?? fiber.runtime?.name
     if (owner !== definition.owner) throw new ServerError('definition_owner')
     let registration: Registration
     const dispose = this.ctx.effect(() => {
-      registration = this.definitions.registerDefinitions(definition, fiber)
+      registration = this.definitions.registerDefinitions(definition, fiber, runtime)
       return async () => {
         await registration.dispose()
       }

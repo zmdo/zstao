@@ -1,3 +1,4 @@
+import type { DefinitionRuntime } from './runtime.ts'
 import type {
   ServerTypeDefinition,
   SoftwareDefinition,
@@ -7,6 +8,7 @@ import { type ServerTypeView } from '../../shared/definitions.ts'
 import { type Component, type LoadedRecipe } from './catalog.ts'
 
 export interface Owner {
+  runtime?: DefinitionRuntime
   identity: object
   owner: string
   active: boolean

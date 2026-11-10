@@ -1,3 +1,4 @@
+import { setupType } from '../type-setup.ts'
 import { ServerError } from '../../../shared/errors.ts'
 import { canonical } from '../../recipes/canonical.ts'
 import { checkPlan } from '../../recipes/planning.ts'
@@ -52,5 +53,7 @@ export async function applyPlanJob(context: WorkerContext): Promise<void> {
   await owned(db, job, (client) =>
     saveComponentStatus(client, server.id, scrubValue(actual, secret), lease.components),
   )
-  await reconcile(db, job, result, secret, saved.plan)
+  await reconcile(db, job, result, secret, saved.plan, async () => {
+    if (context.definitions) await setupType(context.definitions, session, server, lease.type, guard)
+  })
 }

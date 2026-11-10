@@ -128,11 +128,11 @@ export async function createServer(deps: ServerDeps, body: unknown): Promise<unk
             },
         ),
       )
-      if (auto || field(body, 'inspect_after_save') === true)
+      if (auto || lease.type.requiresSetup || field(body, 'inspect_after_save') === true)
         await enqueue(
           client,
           id,
-          'test_connection',
+          lease.type.requiresSetup ? 'prepare_type' : 'test_connection',
           { configRevision: 1, typeSignature: lease.signature },
           auto,
         )

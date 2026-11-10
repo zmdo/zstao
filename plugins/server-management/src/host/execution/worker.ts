@@ -1,3 +1,4 @@
+import { setupType } from './type-setup.ts'
 import { type ChangeRequest } from '../../shared/changes.ts'
 import { typeSupportsOs } from '../../shared/definitions.ts'
 import { ServerError } from '../../shared/errors.ts'
@@ -82,7 +83,7 @@ export async function executeJob(
     })
     connected = true
     await owned(db, job, (client) => markConnected(client, server!.id, session!.fingerprint))
-    if (job.purpose === 'test_connection' || server.internal_host === null) {
+    if (job.request_snapshot.action === 'test_connection' || server.internal_host === null) {
       try {
         const internalHost = await probeInternalHost(session)
         if (internalHost !== null) {
@@ -95,7 +96,9 @@ export async function executeJob(
     }
     // Recovery must remain possible when a provider has unloaded. The remote journal contains the accepted scripts and result.
     if (job.purpose === 'apply_plan' && job.state === 'recovering' && state.mutation) {
-      await recoverMutation(db, job, session, secret)
+      await recoverMutation(db, job, session, secret, async plan => {
+        if (plan.targetType) await setupType(definitions, session!, server!, plan.targetType, guard)
+      })
       return
     }
     let explicit: ChangeRequest | undefined
@@ -124,7 +127,7 @@ export async function executeJob(
         lease,
         explicit?.selection?.binding?.policies ?? (await readPolicies(db, server.id)),
       )
-    if (job.purpose === 'apply_plan' || job.request_snapshot.prepare) {
+    if (job.purpose === 'apply_plan' || job.request_snapshot.prepare || job.request_snapshot.action === 'prepare_type') {
       if (!lease) throw new ServerError('type_unavailable')
       if (job.definition_revision !== lease.signature) throw new ServerError('job_definition_changed')
     }
@@ -164,6 +167,7 @@ export async function executeJob(
       state,
       updateCheckIntervalSeconds,
       extensions,
+      definitions,
     }
     switch (job.purpose) {
       case 'detect_updates':

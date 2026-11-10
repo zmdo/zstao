@@ -34,6 +34,8 @@ export interface SoftwareRequirement {
 }
 
 export interface ServerTypeDefinition {
+  /** Additional host-side preparation after required software is ready. */
+  readonly requiresSetup?: boolean
   readonly key: string
   readonly name: LocalizedText
   readonly supportedOs: OsSupport

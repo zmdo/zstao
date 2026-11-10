@@ -8,7 +8,15 @@ RELEASES=$RUNTIME/releases
 STATE=$RUNTIME/current.json
 ENV_FILE=$ROOT/prod.env
 NETWORK=ces-prod_default
-export DOCKER_CONFIG=${DOCKER_CONFIG:-$ROOT/docker-config}
+# Application-server type preparation owns this config; preserve explicit overrides.
+if [ -z "${DOCKER_CONFIG:-}" ]; then
+  if [ -f /var/lib/ces/application-server/docker/config.json ]; then
+    DOCKER_CONFIG=/var/lib/ces/application-server/docker
+  else
+    DOCKER_CONFIG=$ROOT/docker-config
+  fi
+fi
+export DOCKER_CONFIG
 
 usage() {
   echo "usage: ces-runtime install --digest <ref> | verify | rollback --release <id> | backup | restore --file <path>" >&2
@@ -43,7 +51,7 @@ record_release() {
 
 start_image() {
   image=$1
-  docker pull "$image" >/dev/null
+  docker pull "$image" >/dev/null || return 1
   docker rm -f prod-ces >/dev/null 2>&1 || true
   docker run -d --name prod-ces --network "$NETWORK" --restart unless-stopped \
     --env-file "$ENV_FILE" "$image" >/dev/null

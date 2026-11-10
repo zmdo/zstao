@@ -15,6 +15,7 @@ export async function json<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 const errors: Record<string, [string, string]> = {
+  application_pull_not_configured: ['请填写专用拉取账号和密码，并启用向应用服务器分发。', 'Enter a dedicated pull username and password, and enable distribution to application servers.'],
   auth_required: ['登录已失效，请重新登录。', 'Please sign in again.'],
   not_configured: ['请先到项目管理配置 OneDev。', 'Configure OneDev in Project management first.'],
   credentials_unavailable: ['无法读取凭据，请重新保存 OneDev 密码。', 'Save the OneDev password again.'],

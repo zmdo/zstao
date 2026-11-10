@@ -81,6 +81,7 @@ export interface ActiveOperation {
 }
 
 export interface ServerSecret {
+  type_snapshot?: ServerTypeView
   id: string
   host: string
   ssh_port: number

@@ -315,6 +315,7 @@
     "unknown": "未知"
   },
   "actions": {
+    "prepare_type": "准备服务器类型",
     "test_connection": "连接测试",
     "install_components": "安装组件",
     "inspect": "巡检",
@@ -341,6 +342,8 @@
     "cancelled": "已取消"
   },
   "errors": {
+    "type_setup_failed": "服务器类型配置失败，请检查该类型的凭据配置、Docker 和服务器权限。",
+    "type_setup_unavailable": "服务器类型配置插件不可用，请启用后重试。",
     "request_failed": "请求没有完成",
     "unauthorized": "未登录",
     "invalid_request": "请求无法读取",

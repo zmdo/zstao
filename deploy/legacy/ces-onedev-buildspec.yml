@@ -1,0 +1,133 @@
+# Archived: references old environments and is not an active pipeline.
+version: 54
+jobs:
+- name: build
+  jobExecutor: ces-build-test
+  steps:
+  - type: CheckoutStep
+    name: checkout
+    cloneCredential:
+      type: DefaultCredential
+    withLfs: false
+    withSubmodules: false
+    condition: SUCCESSFUL
+  - type: CommandStep
+    name: image
+    runInContainer: false
+    interpreter:
+      type: PosixInterpreter
+      shell: bash
+      commands: |
+        set -euo pipefail
+        bash scripts/build-image.sh @build_number@
+    condition: SUCCESSFUL
+  - type: PublishArtifactStep
+    name: image info
+    artifacts: image.json
+    condition: SUCCESSFUL
+  triggers:
+  - type: BranchUpdateTrigger
+    branches: main
+    userMatch: anyone
+  retryCondition: never
+  maxAttempts: 1
+  retryDelay: 60
+  includeUpstreamWhenRebuild: false
+  includeDownstreamWhenRebuild: false
+  timeout: 3600
+- name: candidate
+  jobExecutor: ces-build-test
+  paramSpecs:
+  - type: TextParam
+    name: image
+    description: image id or reference produced by the build job
+  steps:
+  - type: CheckoutStep
+    name: checkout
+    cloneCredential:
+      type: DefaultCredential
+    withLfs: false
+    withSubmodules: false
+    condition: SUCCESSFUL
+  - type: CommandStep
+    name: deploy
+    runInContainer: false
+    interpreter:
+      type: PosixInterpreter
+      shell: bash
+      commands: |
+        set -euo pipefail
+        DOCKER_CONFIG=/srv/ces-test/docker-config bash scripts/deploy-candidate.sh "@param:image@" /srv/ces-test/candidate.env
+    condition: SUCCESSFUL
+  retryCondition: never
+  maxAttempts: 1
+  retryDelay: 60
+  includeUpstreamWhenRebuild: false
+  includeDownstreamWhenRebuild: false
+  timeout: 3600
+- name: release
+  jobExecutor: ces-production-deploy
+  paramSpecs:
+  - type: TextParam
+    name: digest
+    description: image reference with digest produced by the build job
+  steps:
+  - type: CheckoutStep
+    name: checkout
+    cloneCredential:
+      type: DefaultCredential
+    withLfs: false
+    withSubmodules: false
+    condition: SUCCESSFUL
+  - type: CommandStep
+    name: deploy
+    runInContainer: false
+    interpreter:
+      type: PosixInterpreter
+      shell: bash
+      commands: |
+        set -euo pipefail
+        ssh -i /srv/ces-infra/agent/secrets/deploy-key \
+          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          -l cesdeploy 43.153.204.197 \
+          "sudo -n /usr/local/sbin/ces-runtime install --digest '@param:digest@'"
+    condition: SUCCESSFUL
+  retryCondition: never
+  maxAttempts: 1
+  retryDelay: 60
+  includeUpstreamWhenRebuild: false
+  includeDownstreamWhenRebuild: false
+  timeout: 3600
+- name: rollback
+  jobExecutor: ces-production-deploy
+  paramSpecs:
+  - type: TextParam
+    name: release
+    description: release id recorded under /srv/ces-prod/runtime/releases
+  steps:
+  - type: CheckoutStep
+    name: checkout
+    cloneCredential:
+      type: DefaultCredential
+    withLfs: false
+    withSubmodules: false
+    condition: SUCCESSFUL
+  - type: CommandStep
+    name: rollback
+    runInContainer: false
+    interpreter:
+      type: PosixInterpreter
+      shell: bash
+      commands: |
+        set -euo pipefail
+        ssh -i /srv/ces-infra/agent/secrets/deploy-key \
+          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          -l cesdeploy 43.153.204.197 \
+          "sudo -n /usr/local/sbin/ces-runtime rollback --release '@param:release@'"
+    condition: SUCCESSFUL
+  retryCondition: never
+  maxAttempts: 1
+  retryDelay: 60
+  includeUpstreamWhenRebuild: false
+  includeDownstreamWhenRebuild: false
+  timeout: 3600

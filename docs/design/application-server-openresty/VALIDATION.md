@@ -1,6 +1,6 @@
 # 验证记录
 
-日期：2026-11-11。验证对象：本分支的应用服务器插件与 `project-delivery` Skill。未发布 CES 线上版本，未修改线上容器或真实 DNS。
+日期：2026-11-11。本页记录应用服务器插件与 `project-delivery` Skill 的本地验证。插件和 Skill 随后已上线，并在两台托管测试服务器及实际 Harness 会话中验证，见 [线上验证记录](ONLINE-VALIDATION.md)。未修改真实 DNS。
 
 ## 自动检查
 
@@ -19,7 +19,7 @@ git diff --check
 
 ## 真实 Docker 检查
 
-环境：本机 Colima Linux Docker daemon，ARM64；使用官方固定 digest 的 OpenResty 镜像。测试运行器提供 Python 和 Docker CLI，挂载本机测试 Docker socket，运行完整 shell JSON 配方。测试副本替换网关容器名、数据目录及两个默认监听端口为随机空闲端口，以隔离本机已有服务；站点和容器在结束后清理。线上将以真实 80/443 验收。
+环境：本机 Colima Linux Docker daemon，ARM64；使用官方固定 digest 的 OpenResty 镜像。测试运行器提供 Python 和 Docker CLI，挂载本机测试 Docker socket，运行完整 shell JSON 配方。测试副本替换网关容器名、数据目录及两个默认监听端口为随机空闲端口，以隔离本机已有服务；站点和容器在结束后清理。线上另以真实 80/443 验收。
 
 可复现命令（需 Linux Docker daemon；会启动临时测试容器并使用随机监听端口）：
 
@@ -42,6 +42,6 @@ sh plugins/application-server/test/docker-smoke.sh
 | 上游不可达 | 实际入口返回 502，恢复旧配置后恢复 200 |
 | 网关容器删除后重建 | 已有配置完整保留，域名入口恢复正常 |
 
-此测试没有创建公网 DNS、签发证书或模拟完整 AI 会话，不能据此声称真实域名/HTTPS 已上线。线上需发布插件、导入更新后的完整 Skill，再为目标服务器补齐必要软件并按实际域名验收。
+本节 Docker 测试没有创建公网 DNS、签发证书或模拟 AI 会话，不能据此声称真实域名/HTTPS 已上线。后续线上测试包含实际 Harness 会话和临时测试 CA，但仍未配置真实用户域名或公认 CA 证书。
 
 一次早期复跑在重建阶段失败，当时断言未保留配方错误码，无法确定原因；补充错误输出后的复跑通过。随后增加精确 digest 缓存复用，去掉已有镜像重建时的外部拉取依赖，并重新验证。该记录不将未定位的早期失败归因于某个已证实原因。

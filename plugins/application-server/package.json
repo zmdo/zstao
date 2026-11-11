@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "应用服务器类型定义：Docker Engine 与 Docker Compose",
+  "description": "应用服务器类型定义：Docker Engine、Docker Compose 与 OpenResty 网站网关",
   "main": "./lib/index.js",
   "exports": {
     ".": "./lib/index.js",
@@ -16,7 +16,8 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "scripts/login.py"
+    "scripts/login.py",
+    "scripts/openresty.sh"
   ],
   "engines": {
     "dsh": "0.2.1-rc.5"

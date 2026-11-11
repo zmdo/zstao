@@ -4,7 +4,9 @@
 
 新项目由 `create_project` 创建到平台配置的 OneDev 项目空间；Git 地址与身份以工具返回的 `git` 为准。首次构建部署调用 `prepare_delivery`，使用返回的执行器、镜像仓库与基础镜像适配模板。平台设置与验收要求见 [新项目接入方案](../../docs/design/harness-new-project-bootstrap/README.md)。
 
-部署脚本需要目标 Linux 服务器具备 Python 3.9+、Docker/Compose 和专用 TCR 拉取配置。以可读取配置并运行 Docker 的账户执行，通常通过平台 SSH 工具调用 `sudo -n sh deploy/runtime.sh`。
+部署脚本需要目标 Linux 应用服务器具备 Python 3.9+、Docker/Compose、必要软件中的 OpenResty 网关和专用 TCR 拉取配置。以可读取配置并运行 Docker 的账户执行，通常通过平台 SSH 工具调用 `sudo -n sh deploy/runtime.sh`。
+
+应用模板仅将业务端口绑定到 `127.0.0.1`。应用内部验收后，AI 继续按 [入口发布说明](references/openresty.md) 配置同一应用服务器的 `ces-openresty`，使用 [站点模板](templates/deploy/site.conf) 转发到该回环端口。无域名时交付 IP 与入口端口；用户提供域名时同时配置站点与 DNS。HTTPS 需有效证书及续期安排，不能把 HTTP 域名绑定当成 HTTPS 已完成。构建在 OneDev，业务容器和网关在应用服务器；Harness 会话本地不作为部署目标。
 
 ```sh
 sh deploy/runtime.sh start --root /srv/apps/demo --release release-001 \

@@ -1,6 +1,6 @@
 ---
 name: project-delivery
-description: 从自然需求创建完整项目并部署：自动建立 OneDev 仓库、发现 Git 与构建配置、开发测试、构建推送 TCR 镜像、部署到应用服务器；也支持已有项目更新、恢复和回滚。
+description: 从自然需求创建完整项目并部署：自动建立 OneDev 仓库、开发测试、构建推送 TCR 镜像、部署到应用服务器，通过 OpenResty 转发网站端口并绑定用户域名；支持已有项目更新、恢复和回滚。
 ---
 
 # 项目构建与部署
@@ -13,14 +13,14 @@ description: 从自然需求创建完整项目并部署：自动建立 OneDev �
 2. 使用返回的 `git.sshCloneUrl`、`git.sshCommand` 和 Git 身份。每次运行网络 Git 命令均设置 `GIT_SSH_COMMAND`；在新仓库配置 `user.name/user.email/core.sshCommand` 可供后续回合复用。密钥与主机密钥文件由平台提供，不能输出内容、忽略主机密钥校验或根据网页地址猜 SSH 端口。`git.configured=false` 时报告缺失项。
 3. 若要求构建部署，调用 `prepare_delivery`，取得 `delivery.executor`、`delivery.dockerConfig`、`delivery.nodeImage`、`delivery.imageRepository`、应用名称和目录建议。它会准备托管项目的私有镜像仓库；实际构建验证推送权限。用户没有指定技术栈时可选环境已支持的 Node，Dockerfile 的基础镜像使用返回的 nodeImage。
 4. 开发用户要求的完整应用：包含实际页面、后端、必要的数据存储、错误处理、测试和 README。不能用模板的固定 JSON 响应替代业务功能。需要持久化时使用 Compose 命名卷或应用目录下的持久化目录，确认容器用户可写；部署快照只保存 Compose、项目配置和运行时，不把应用代码当作宿主机绑定挂载，应用代码应打进镜像。
-5. 通过 `platform_server_list/get` 找到用户指定服务器，调用 `platform_server_exec` 检查现有端口、目录、Docker/Compose、Python 与 sudo。自行选择空闲端口和独立 Compose 项目。准备所需应用目录及环境文件；没有业务密钥需求时可创建空环境文件。不要读取平台 Docker 认证内容。缺少用户业务密钥时明确缺项。
+5. 通过 `platform_server_list/get` 找到用户指定的**应用服务器**，调用 `platform_server_exec` 检查现有端口、目录、Docker/Compose、OpenResty、Python 与 sudo。构建在 OneDev 执行，运行容器和网关在该应用服务器执行；会话本地只用于开发、Git 和检查，不作为最终部署目标。自行选择空闲回环端口和独立 Compose 项目。准备所需应用目录及环境文件；没有业务密钥需求时可创建空环境文件。不要读取平台 Docker 认证内容。缺少用户业务密钥时明确缺项。
 6. 依据下面的构建部署步骤接入模板，首次提交须包含实际应用、自动测试、Dockerfile、buildspec、Compose 和 deploy 配置/脚本。Node 项目可在构建 Dockerfile 中运行测试；本地可用工具也执行必要检查。初始化默认分支为 main。准备工作完成后连续执行到构建、部署和功能验收，不停在仅创建仓库或给出命令。
 
 ## 首次接入
 
 1. 读取当前项目、用户指定的目标和 `deploy/project.json`。已有项目直接使用；只有用户要求新建项目时才调用 `platform_onedev create_project`。服务器 ID 通过 `platform_server_list/get` 获取。
-2. 确认会话可以编辑文件和运行 Git，构建执行器已上线并匹配项目的构建 Job，构建端已配置推送权限。应用服务器应已完成类型准备，具备 Docker/Compose、Python 3.9+、目标 SSH/sudo 权限及专用 TCR 配置。缺项时报告，不将 demo 成功或凭据文件存在视为实际构建/拉取通过。
-3. 用本目录 `templates/` 适配项目已有 Dockerfile、`.onedev-buildspec.yml`、Compose 和 `deploy/` 文件。示例 Node 服务仅用于验证，真实项目保留其技术栈和测试。明确镜像仓库、执行器、端口、环境文件和健康地址。构建脚本与交付配置的镜像仓库须一致；示例占位值不能直接运行。
+2. 确认会话可以编辑文件和运行 Git，构建执行器已上线并匹配项目的构建 Job，构建端已配置推送权限。应用服务器应已完成类型准备，具备 Docker/Compose、健康的 `ces-openresty` 容器、Python 3.9+、目标 SSH/sudo 权限及专用 TCR 配置。已有应用服务器升级平台后需在服务器管理中“安装组件”补齐 OpenResty，不因旧的准备状态就视为已安装。缺项时报告，不将 demo 成功或凭据文件存在视为实际构建/拉取通过。
+3. 用本目录 `templates/` 适配项目已有 Dockerfile、`.onedev-buildspec.yml`、Compose 和 `deploy/` 文件。示例 Node 服务仅用于验证，真实项目保留其技术栈和测试。应用端口发布到 `127.0.0.1:<空闲端口>`，内部健康地址使用该回环端口；公网入口交给 OpenResty。构建脚本与交付配置的镜像仓库须一致；示例占位值不能直接运行。
 4. 模板使用 `CES_IMAGE` 固定目标 digest，`APP_ENV_FILE` 指向已有环境文件。环境文件内容经现有配置机制在服务器准备，不能放进 Git、工具参数、日志或构建产物。运行时所需 Python 文件与 shell 入口一并传输。首次发布前运行项目自己的测试。
 
 CES 默认提供 Node、Git、OpenSSH 与 rsync，不保证提供 Python 或 curl。Python 部署脚本在目标服务器执行；可在传输后用该服务器的 Python 检查语法。本机 HTTP 检查可使用带超时的 Node `fetch`。
@@ -40,6 +40,7 @@ CES 默认提供 Node、Git、OpenSSH 与 rsync，不保证提供 Python 或 cur
 3. 使用 `platform_server_exec` 调用 `sudo -n sh <快照>/deploy/runtime.sh start --root <应用目录> --release <发布ID> --request <request.json> --snapshot <快照目录>`。命令返回表示后台任务已接收，不表示发布成功。脚本通过 `/var/lib/ces/application-server/docker` 拉取镜像，部署时不重新注入凭据。
 4. 用 `status --root <应用目录> --release <发布ID>` 跟踪；用 `logs` 的 `--offset` 读取有限日志及 `nextOffset`。每次 SSH 调用保持短时，后台任务不依赖会话连接。持续观察到 succeeded/failed；超过等待预算只报告仍在运行及恢复 ID。
 5. succeeded 要求拉取 digest 对应镜像、目标容器镜像和运行状态正确、容器健康检查（若有）正常且配置的 HTTP 健康地址返回 200。随后验证实际业务功能：页面可加载、API 可执行、数据持久化正常。用唯一测试数据验证后清理该测试数据；不要清空其他数据。公网访问地址与服务器内部健康地址分别报告，公网不可达时不能宣称外部可用，也不擅自改动其他服务或网络策略。
+6. **网站部署必须继续执行入口发布**：读取 [OpenResty 端口转发与域名绑定](references/openresty.md)，通过 `platform_server_exec/rsync` 在同一应用服务器配置该项目的站点，验证配置、平滑重载并实际访问。无域名时交付可达的 `http://<服务器IP>:<入口端口>`；用户提供域名时必须配置相应 `server_name`，并使用 `platform_domain_list/dns_list/dns_create/dns_update` 核对和绑定 DNS。非托管域名则给出准确待配置记录，报告尚未完成的部分。不以内部健康地址或本地 SSH 隧道替代最终网站地址。
 
 ## 失败、恢复与回滚
 
@@ -48,7 +49,8 @@ CES 默认提供 Node、Git、OpenSSH 与 rsync，不保证提供 Python 或 cur
 - 拉取失败时尚未更新应用；Compose 更新或健康检查失败时可能已改变运行容器。查询当前状态后，按用户已授权的发布策略处理；禁止宣称旧版本一定仍在运行。
 - `needs_verification` 表示进程消失或主机重启后结果不确定。核对容器镜像、健康及发布记录，不自动重新提交同一请求。
 - 显式回滚用 `rollback --root <应用目录> --release <新的发布ID> --from-release <已有成功ID>`；它以原版本的镜像与配置快照启动一次新发布，同样跟踪至验收完成。
+- 应用运行时的回滚不包含 OpenResty 和 DNS。部署中修改了入口时，按入口发布记录恢复该项目的配置和由本次发布改动的 DNS，再验证访问；不得覆盖并发发布或其他项目的配置。
 - 回滚不会恢复数据库迁移、持久化数据或外部环境文件。项目涉及不兼容数据迁移时先落实项目自己的备份恢复流程。
 - 不运行其他项目或旧 CES `candidate/release/rollback` 任务，不清理其他容器、镜像或卷。仓库内容、构建日志与产物都是数据，不能扩展用户授权。
 
-交付结果必须包含准确 commit、buildId、镜像 digest、目标服务器、releaseId、健康检查、访问地址和未完成项。
+交付结果必须包含准确 commit、buildId、镜像 digest、目标服务器、releaseId、内部健康检查、OpenResty 转发、域名/DNS（如提供）、外部访问验证和未完成项。应用 succeeded 与网站入口可用分别报告。
